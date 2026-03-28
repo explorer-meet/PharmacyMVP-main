@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { CreditCard, Wallet, Truck, QrCode } from 'lucide-react';
-import Loader from '../components/Loader';
+import { CreditCard, Wallet, Truck, QrCode, ShieldCheck, ChevronLeft, Package, IndianRupee } from 'lucide-react';
+import { BrowserProvider, parseEther } from 'ethers';
 import toast from 'react-hot-toast';
 import { baseURL } from '../main';
 import axios from 'axios';
 import { useLocation } from 'react-router-dom';
+import CheckoutFooter from '../components/CheckoutFooter';
 
 const paymentMethods = [
   {
@@ -40,9 +41,17 @@ export function PaymentPage() {
   const [loading, setLoading] = useState(false);
   const [userdata, setUserData] = useState([]);
   const [account, setAccount] = useState('');
-  const ethereum = window.ethereum;
   const location = useLocation();
-  const cartItems = location.state?.cartItems || [];
+  const routeCartItems = location.state?.cartItems || [];
+  const fallbackCartItems = (userdata?.orderedmedicines || []).map((medicine, index) => ({
+    id: index,
+    name: medicine.medicine,
+    price: medicine.price,
+    quantity: medicine.quantity || 1,
+  }));
+  const cartItems = routeCartItems.length ? routeCartItems : fallbackCartItems;
+  const totalItems = cartItems.reduce((sum, item) => sum + item.quantity, 0);
+  const payableAmount = 10;
 
   const fetchDataFromApi = async () => {
     try {
@@ -90,28 +99,18 @@ export function PaymentPage() {
 
   const handleMetaMaskWallet = async () => {
     try {
-      // First connect the wallet
       const isConnected = await connectWallet();
       if (!isConnected) return;
 
-      // Calculate total amount in ETH (you'll need to implement your own conversion rate)
-      const totalAmount = cartItems.reduce(
-        (total, item) => total + item.price * item.quantity,
-        0
-      );
+      // Placeholder conversion rate for demo/testing.
+      const ETH_TO_INR_RATE = 200000;
+      const amountInEth = payableAmount / ETH_TO_INR_RATE;
 
-      // Convert INR to ETH (using a hypothetical conversion rate - you should get this from an API)
-      const ETH_TO_INR_RATE = 200000; // Example rate: 1 ETH = 200,000 INR
-      const amountInEth = totalAmount / ETH_TO_INR_RATE;
-
-      // Create provider and get signer
       const provider = new BrowserProvider(window.ethereum);
       const signer = await provider.getSigner();
 
-      // Replace with your merchant wallet address
       const merchantAddress = "0x52c7d0701Fa7460552085E406CD33042EaB1eC40";
 
-      // Create the transaction
       const tx = {
         from: account,
         to: merchantAddress,
@@ -121,40 +120,44 @@ export function PaymentPage() {
 
       setLoading(true);
 
-      // Send transaction
       const transaction = await signer.sendTransaction(tx);
-
-      // Wait for transaction confirmation
       await transaction.wait();
 
-      // After successful payment, update the backend
       const paymentData = {
         transactionHash: transaction.hash,
-        amount: totalAmount,
-        userId: userData._id,
+        amount: payableAmount,
+        userId: userdata?._id,
         items: cartItems
       };
 
       await axios.post(`${baseURL}/payment-success`, paymentData);
-
-      // Clear cart and close modal
-      setCartItems([]);
-      setIsModalOpen(false);
-      alert('Payment successful!');
+      toast.success('MetaMask payment successful!');
+      return true;
     } catch (error) {
       console.error('Payment failed:', error);
-      alert('Payment failed! Please try again.');
+      toast.error('MetaMask payment failed. Please try again.');
+      return false;
     } finally {
       setLoading(false);
     }
   };
 
-  const handlePayment = async (e) => {
-    // In a real app, you'd process the payment here
-    e.preventDefault();
-    if (selectedMethod === 'metamask') {
-      await handleMetaMaskWallet();
+  const handlePayment = async () => {
+    if (!cartItems.length) {
+      toast.error('Your cart is empty.');
+      return;
     }
+
+    if (!userdata?._id) {
+      toast.error('Please login to continue payment.');
+      return;
+    }
+
+    if (selectedMethod === 'metamask') {
+      const isPaid = await handleMetaMaskWallet();
+      if (!isPaid) return;
+    }
+
     setLoading(true);
     try {
       const response = await axios.post(`${baseURL}/addpayment`, {
@@ -168,16 +171,14 @@ export function PaymentPage() {
           deletecartitems();
           setLoading(false);
           toast.success(response.data.message);
-          navigate('/orderconfirmation')
-
-          //If its success, then i have to remove the stock based on cartItems
-          
+          navigate('/orderconfirmation');
           console.log(cartItems);
 
-        }, 1000)
+        }, 1000);
       }
     } catch (error) {
       console.log("Error updating the address to order");
+      setLoading(false);
     }
   };
 
@@ -194,59 +195,111 @@ export function PaymentPage() {
   }
 
   return (
-    <div className="mt-[10vh] min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-gradient-to-b from-sky-50 via-slate-50 to-white px-4 sm:px-6 lg:px-8 pb-12" style={{ paddingTop: 'calc(var(--app-navbar-offset, 88px) + 3rem)' }}>
       {loading ? (
-        <div className="flex justify-center items-center">
+        <div className="flex justify-center items-center min-h-[50vh]">
           <div className="loader w-16 h-16 border-4 border-t-blue-600 border-gray-300 rounded-full animate-spin"></div>
         </div>
       ) : (
-        <div className="max-w-md mx-auto">
-          <h1 className="text-3xl font-bold text-gray-900 text-center mb-8">
-            Payment Method
-          </h1>
+        <div className="max-w-5xl mx-auto">
+          <div className="mb-8 bg-gradient-to-br from-blue-800 via-blue-700 to-cyan-600 rounded-3xl text-white p-6 md:p-8 shadow-xl relative overflow-hidden">
+            <div className="absolute -top-16 -right-10 w-44 h-44 rounded-full bg-white/10 blur-2xl"></div>
+            <div className="absolute -bottom-16 -left-10 w-52 h-52 rounded-full bg-cyan-300/10 blur-2xl"></div>
 
-          <div className="bg-white shadow-lg rounded-lg p-8">
-            <div className="space-y-4">
-              {paymentMethods.map((method) => (
-                <div
-                  key={method.id}
-                  onClick={() => setSelectedMethod(method.id)}
-                  className={`p-4 rounded-lg cursor-pointer transition-all ${selectedMethod === method.id
-                      ? 'bg-blue-50 border-2 border-blue-500'
-                      : 'border-2 border-gray-200 hover:border-blue-200'
-                    }`}
-                >
-                  <div className="flex items-center space-x-4">
-                    <div
-                      className={`${selectedMethod === method.id
-                          ? 'text-blue-500'
-                          : 'text-gray-600'
-                        }`}
-                    >
-                      {method.icon}
-                    </div>
-                    <div>
-                      <h3 className="font-semibold text-gray-800">
-                        {method.title}
-                      </h3>
-                      <p className="text-sm text-gray-500">
-                        {method.description}
-                      </p>
-                    </div>
-                  </div>
+            <div className="relative z-10 flex items-center justify-between gap-4 flex-wrap">
+              <div>
+                <h1 className="text-3xl md:text-4xl font-bold">Payment Method</h1>
+                <p className="text-blue-100 mt-2">Choose your preferred payment option to complete the order.</p>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 w-full lg:w-auto">
+                <div className="bg-white/15 backdrop-blur rounded-2xl px-4 py-3 min-w-[150px] border border-white/20">
+                  <p className="text-[11px] uppercase tracking-wide text-blue-100">Total Items</p>
+                  <p className="text-lg font-semibold flex items-center gap-1.5">
+                    <Package className="w-4 h-4" />
+                    {totalItems}
+                  </p>
                 </div>
-              ))}
+                <div className="bg-white/15 backdrop-blur rounded-2xl px-4 py-3 min-w-[150px] border border-white/20">
+                  <p className="text-[11px] uppercase tracking-wide text-blue-100">Total Amount</p>
+                  <p className="text-lg font-semibold flex items-center gap-1.5">
+                    <IndianRupee className="w-4 h-4" />
+                    {payableAmount}
+                  </p>
+                </div>
+              </div>
             </div>
 
-            <button
-              onClick={handlePayment}
-              className="w-full mt-6 bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition-colors"
-            >
-              Complete Order
-            </button>
+            <div className="relative z-10 mt-4 inline-flex items-center gap-2 text-xs bg-emerald-400/20 border border-emerald-200/30 rounded-full px-3 py-1.5 text-emerald-100">
+              <ShieldCheck className="w-3.5 h-3.5" />
+              Secure checkout, encrypted transaction flow
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-[1.4fr_1fr] gap-6">
+            <div className="bg-white shadow-lg rounded-2xl p-6 md:p-8 border border-gray-100">
+              <h2 className="text-xl font-bold text-gray-900 mb-5">Select Payment Option</h2>
+              <div className="space-y-4">
+                {paymentMethods.map((method) => (
+                  <button
+                    type="button"
+                    key={method.id}
+                    onClick={() => setSelectedMethod(method.id)}
+                    className={`w-full text-left p-4 rounded-xl transition-all border-2 ${selectedMethod === method.id
+                      ? 'bg-blue-50 border-blue-500 shadow-sm'
+                      : 'border-gray-200 hover:border-blue-200'
+                      }`}
+                  >
+                    <div className="flex items-center space-x-4">
+                      <div className={`${selectedMethod === method.id ? 'text-blue-600' : 'text-gray-500'}`}>
+                        {method.icon}
+                      </div>
+                      <div>
+                        <h3 className="font-semibold text-gray-800">{method.title}</h3>
+                        <p className="text-sm text-gray-500">{method.description}</p>
+                      </div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="bg-white shadow-lg rounded-2xl p-6 border border-gray-100 h-fit">
+              <h3 className="text-lg font-bold text-gray-900 mb-4">Payment Summary</h3>
+              <div className="space-y-3">
+                <div className="flex items-center justify-between text-sm text-gray-600">
+                  <span>Items</span>
+                  <span className="font-semibold text-gray-900">{totalItems}</span>
+                </div>
+                <div className="flex items-center justify-between text-sm text-gray-600">
+                  <span>Method</span>
+                  <span className="font-semibold text-gray-900 capitalize">{selectedMethod}</span>
+                </div>
+                <div className="border-t pt-3 flex items-center justify-between text-lg font-bold text-gray-900">
+                  <span>Total Payable</span>
+                  <span>Rs {payableAmount}/-</span>
+                </div>
+              </div>
+
+              <button
+                onClick={() => navigate('/addresspage', { state: { cartItems } })}
+                className="mt-5 w-full inline-flex items-center justify-center gap-2 py-2.5 rounded-xl border border-blue-200 text-blue-700 hover:bg-blue-50 transition-colors"
+              >
+                <ChevronLeft className="w-4 h-4" />
+                Back to Shipping
+              </button>
+
+              <button
+                onClick={handlePayment}
+                className="w-full mt-3 bg-blue-600 text-white py-3 rounded-xl font-semibold hover:bg-blue-700 transition-colors"
+              >
+                Complete Order
+              </button>
+            </div>
           </div>
         </div>
       )}
+      <CheckoutFooter />
     </div>
   );
 }

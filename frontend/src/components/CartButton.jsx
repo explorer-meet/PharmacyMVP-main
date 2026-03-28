@@ -1,20 +1,21 @@
 import React, { useState, useEffect } from 'react';
-import { ShoppingCart, X, Trash, Lock } from 'lucide-react';
+import { ShoppingCart, X, Trash, Lock, Plus, Minus, BadgeIndianRupee } from 'lucide-react';
 import axios from 'axios';
 import { baseURL } from '../main';
 import { useNavigate } from 'react-router-dom';
-import { BrowserProvider, parseEther, formatEther } from 'ethers';
-import { PaymentModal }  from './PaymentModal';
 import toast from 'react-hot-toast';
 
 // const ethereum = window.ethereum;
 
-const CartButton = () => {
+const CartButton = ({ openOnMount = false }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [cartItems, setCartItems] = useState([]);
   const [userData, setUserData] = useState([]);
-  const [paylock, setPayLock] = useState(false);
+  const [hasAutoOpened, setHasAutoOpened] = useState(false);
   const navigate = useNavigate();
+
+  const totalAmount = cartItems.reduce((total, item) => total + item.price * item.quantity, 0);
+  const paylock = cartItems.length > 0;
 
   const viewCartModal = () => { 
     setIsModalOpen(true);
@@ -49,6 +50,13 @@ const CartButton = () => {
   }, []);
 
   useEffect(() => {
+    if (openOnMount && userData?._id && !hasAutoOpened) {
+      setIsModalOpen(true);
+      setHasAutoOpened(true);
+    }
+  }, [openOnMount, userData?._id, hasAutoOpened]);
+
+  useEffect(() => {
     if (userData?.orderedmedicines?.length > 0) {
       const updatedCartItems = userData.orderedmedicines.map((medicine, index) => ({
         id: index,
@@ -57,7 +65,8 @@ const CartButton = () => {
         quantity: medicine.quantity || 1,
       }));
       setCartItems(updatedCartItems);
-      setPayLock(true);
+    } else {
+      setCartItems([]);
     }
   }, [userData?.orderedmedicines?.length]);
   
@@ -111,7 +120,8 @@ const CartButton = () => {
       console.log(response);
 
       if (response.status === 200) {
-        console.log("Medicine Deleted from cart!")
+        setCartItems((prevItems) => prevItems.filter((item) => item.name !== name));
+        console.log("Medicine Deleted from cart!");
       }
     } catch (error) {
       console.error('Error deleting the medicine from cart:', error.message);
@@ -147,126 +157,126 @@ const CartButton = () => {
 
   return (
     <>
-      {/* Cart Button */}
-    {/* Cart Button */}
-<button
-  onClick={userData?._id ? viewCartModal : null}
-  className={`fixed bottom-6 right-6 z-50 
-  w-16 h-16 
-  rounded-full 
-  shadow-lg 
-  flex items-center justify-center 
-  transition-all duration-200
-  ${userData?._id
-    ? 'bg-blue-600 text-white hover:bg-blue-700 hover:scale-110 active:scale-95'
-    : 'bg-gray-400 text-gray-200 cursor-not-allowed'
-  }`}
-  disabled={!userData?._id}
->
-  <ShoppingCart className="w-7 h-7" />
+      <button
+        onClick={userData?._id ? viewCartModal : null}
+        className={`fixed bottom-6 right-6 z-50 w-16 h-16 rounded-2xl shadow-xl border flex items-center justify-center transition-all duration-300 ${
+          userData?._id
+            ? 'bg-gradient-to-br from-blue-600 to-cyan-500 text-white border-blue-400/40 hover:scale-110 hover:shadow-blue-400/40 active:scale-95'
+            : 'bg-gray-300 text-gray-500 border-gray-200 cursor-not-allowed'
+        }`}
+        disabled={!userData?._id}
+        aria-label="Open Cart"
+      >
+        <ShoppingCart className="w-7 h-7" />
 
-  {cartItems.length > 0 && (
-    <div className="absolute -top-2 -right-2 bg-red-500 text-white text-xs font-bold rounded-full w-6 h-6 flex items-center justify-center">
-      {cartItems.length}
-    </div>
-  )}
-</button>
+        {cartItems.length > 0 && (
+          <div className="absolute -top-2 -right-2 bg-rose-500 text-white text-xs font-bold rounded-full min-w-6 h-6 px-1.5 flex items-center justify-center ring-2 ring-white">
+            {cartItems.length}
+          </div>
+        )}
+      </button>
 
 
       {/* Modal */}
       {isModalOpen && (
         <div
-          className="fixed inset-0 z-40 bg-black bg-opacity-50 flex items-center justify-center"
+          className="fixed inset-0 z-40 bg-slate-900/65 backdrop-blur-sm flex items-center justify-center p-4"
           onClick={closeCartModal}
         >
           <div
-            className="bg-white rounded-lg shadow-lg p-6 w-96 max-w-full relative"
+            className="bg-white rounded-2xl shadow-2xl w-full max-w-xl relative overflow-hidden"
             onClick={(e) => e.stopPropagation()}
           >
-            {/* Close Button */}
+            <div className="bg-gradient-to-r from-blue-700 to-cyan-600 px-6 py-4">
+              <h2 className="text-xl font-bold text-white">Your Cart</h2>
+              <p className="text-blue-100 text-sm">Review medicines before checkout</p>
+            </div>
+
             <button
               onClick={closeCartModal}
-              className="absolute top-4 right-4 text-gray-600 hover:text-gray-800 transition-colors"
+              className="absolute top-4 right-4 text-white/80 hover:text-white transition-colors"
               aria-label="Close"
             >
               <X className="w-6 h-6" />
             </button>
 
-            <h2 className="text-xl font-bold mb-4">Your Cart</h2>
-            {cartItems.length > 0 ? (
-              <div>
-                <ul>
+            <div className="px-6 py-5 max-h-[62vh] overflow-y-auto">
+              {cartItems.length > 0 ? (
+                <ul className="space-y-3">
                   {cartItems.map((item) => (
                     <li
                       key={item.id}
-                      className="flex justify-between items-center border-b py-2"
+                      className="bg-slate-50 border border-slate-100 rounded-xl p-3"
                     >
-                      <div>
-                        <h3 className="font-medium">{item.name}</h3>
-                        <p className="text-sm text-gray-500">Rs {item.price}</p>
-                      </div>
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <h3 className="font-semibold text-slate-900">{item.name}</h3>
+                          <p className="text-sm text-slate-500 flex items-center gap-1 mt-0.5">
+                            <BadgeIndianRupee className="w-4 h-4" />
+                            {item.price}
+                          </p>
+                        </div>
                         <button
-                          onClick={() => handleDecreaseQuantity(item.name)}
-                          className="bg-gray-200 px-2 py-1 rounded hover:bg-gray-300"
-                        >
-                          −
-                        </button>
-                        <span className="text-sm font-medium">{item.quantity}</span>
-                        <button
-                          onClick={() => handleIncreaseQuantity(item.name)}
-                          className="bg-gray-200 px-2 py-1 rounded hover:bg-gray-300"
-                        >
-                          +
-                        </button>
-                      </div>
-                      <div className="text-right">
-                        <button
-                          className="text-red-600 hover:text-red-800 transition-colors"
+                          className="text-rose-500 hover:text-rose-700 transition-colors"
                           aria-label="Delete"
                           onClick={() => handleDeleteMedicine(item.name)}
                         >
                           <Trash className="w-5 h-5" />
                         </button>
                       </div>
+
+                      <div className="mt-3 flex items-center justify-between">
+                        <div className="text-sm text-slate-600">
+                          Subtotal: <span className="font-semibold text-slate-900">Rs {item.price * item.quantity}/-</span>
+                        </div>
+                        <div className="flex items-center gap-2 bg-white border border-slate-200 rounded-lg px-2 py-1">
+                        <button
+                          onClick={() => handleDecreaseQuantity(item.name)}
+                            className="p-1.5 rounded-md hover:bg-slate-100 transition-colors"
+                        >
+                            <Minus className="w-4 h-4" />
+                        </button>
+                          <span className="text-sm font-semibold min-w-6 text-center">{item.quantity}</span>
+                        <button
+                          onClick={() => handleIncreaseQuantity(item.name)}
+                            className="p-1.5 rounded-md hover:bg-slate-100 transition-colors"
+                        >
+                            <Plus className="w-4 h-4" />
+                        </button>
+                        </div>
+                      </div>
                     </li>
                   ))}
                 </ul>
-
-                {/* Total Price */}
-                <div className="mt-4 flex justify-between items-center border-t pt-4">
-                  <h3 className="text-lg font-medium">Total</h3>
-                  <p className="text-lg font-medium">
-                    Rs{" "}
-                    {cartItems.reduce(
-                      (total, item) => total + item.price * item.quantity,
-                      0
-                    )}
-                    /-
-                  </p>
+              ) : (
+                <div className="py-10 text-center">
+                  <div className="w-14 h-14 rounded-full bg-slate-100 mx-auto mb-3 flex items-center justify-center">
+                    <ShoppingCart className="w-7 h-7 text-slate-400" />
+                  </div>
+                  <p className="text-slate-700 font-medium">Your cart is empty</p>
+                  <p className="text-sm text-slate-500 mt-1">Add medicines to see them here.</p>
                 </div>
+              )}
+            </div>
+
+            <div className="border-t bg-slate-50 px-6 py-4">
+              <div className="flex justify-between items-center mb-3">
+                <h3 className="text-base font-medium text-slate-700">Total</h3>
+                <p className="text-xl font-bold text-slate-900">Rs {totalAmount}/-</p>
               </div>
-            ) : (
-              <p className="text-gray-500">Your cart is empty.</p>
-            )}
 
               <button
                 onClick={() => handletoAddress()}
-                className={`mt-4 w-full bg-blue-600 text-white py-2 rounded-lg transition-colors flex items-center justify-center gap-1  ${paylock
-              ? 'bg-blue-600 text-white hover:bg-blue-700 hover:scale-105 active:scale-95'
-              : 'bg-gray-400 text-gray-200 cursor-not-allowed'
-            }`}
+                className={`w-full py-2.5 rounded-xl transition-all duration-200 flex items-center justify-center gap-1.5 ${paylock
+                  ? 'bg-blue-600 text-white hover:bg-blue-700 hover:scale-[1.01] active:scale-[0.99]'
+                  : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                }`}
                 disabled={!paylock}
               >
                 Proceed
-                <Lock className='w-4 h-4'/>
+                <Lock className='w-4 h-4' />
               </button>
-
-              {/* <PaymentModal
-                isOpen={isModalOpenPayment}
-                onClose={() => setIsModalOpenPayement(false)}
-              /> */}
-
+            </div>
           </div>
         </div>
       )}

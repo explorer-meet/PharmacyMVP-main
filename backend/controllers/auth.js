@@ -3,11 +3,50 @@ const User = require("../models/user");
 const Doctor = require("../models/doctor");
 const Admin = require("../models/admin")
 const Pharmacy = require("../models/pharmacy");
+const StoreApprovalRequest = require("../models/storeApprovalRequest");
 const jwt = require("jsonwebtoken");
 const bcrypt = require('bcrypt');
 
+const verifyAdminRequest = (req) => {
+    const token = req.header('Authorization')?.split(' ')[1];
+    if (!token) {
+        return { ok: false, status: StatusCodes.UNAUTHORIZED, message: 'Admin token missing' };
+    }
+
+    try {
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        if (decoded.role !== 'admin') {
+            return { ok: false, status: StatusCodes.FORBIDDEN, message: 'Admin access required' };
+        }
+        return { ok: true, decoded };
+    } catch (error) {
+        return { ok: false, status: StatusCodes.UNAUTHORIZED, message: 'Invalid token' };
+    }
+};
+
 const signUp = async (req, res) => {
-    const { regNo, name, email, password, confirmPassword } = req.body;
+    const {
+        regNo,
+        name,
+        email,
+        password,
+        confirmPassword,
+        salutation,
+        firstName,
+        middleName,
+        lastName,
+        countryCode,
+        mobile,
+        address,
+        city,
+        state,
+        pincode,
+        role,
+        storeName,
+        ownerName,
+        licenceNumber,
+        gstNumber,
+    } = req.body;
 
     // Check if required fields are provided
     if (!name || !email || !password) {
@@ -33,6 +72,21 @@ const signUp = async (req, res) => {
             const userData = {
                 name,
                 email,
+                salutation,
+                firstName,
+                middleName,
+                lastName,
+                countryCode,
+                mobile,
+                address,
+                city,
+                state,
+                pincode,
+                role,
+                storeName,
+                ownerName,
+                licenceNumber,
+                gstNumber,
                 hash_password,
             };
 
@@ -71,7 +125,7 @@ const signUp = async (req, res) => {
 
 const signIn = async (req, res) => {
     try {
-        const { isDoctor, email, password } = req.body;
+        const { isDoctor = false, userType = 'patient', email, password } = req.body;
         console.log(req.body);
 
         // Check if email and password are provided
@@ -84,9 +138,9 @@ const signIn = async (req, res) => {
         let user;
         let role;
         // Find the user by email
-        if (isDoctor === false) {
+        if (isDoctor !== true) {
             user = await User.findOne({ email });
-            role = 'User';
+            role = userType === 'store' ? 'Store' : 'User';
         }
         else {
             user = await Doctor.findOne({ email });
@@ -1015,7 +1069,131 @@ const uploadPrescriptionFile = async (req, res) => {
   }
 };
 
+const createStoreApprovalRequest = async (req, res) => {
+    try {
+        const {
+            storeName,
+            ownerName,
+            countryCode,
+            mobile,
+            email,
+            licenceNumber,
+            gstNumber,
+            city,
+            address,
+            state,
+            pincode,
+        } = req.body;
+
+        if (!storeName || !ownerName || !mobile || !email || !licenceNumber || !city || !address || !state || !pincode) {
+            return res.status(StatusCodes.BAD_REQUEST).json({ message: 'Please provide all required store details' });
+        }
+
+        if (!req.file) {
+            return res.status(StatusCodes.BAD_REQUEST).json({ message: 'Store licence document is required' });
+        }
+
+        const existingPending = await StoreApprovalRequest.findOne({
+            $or: [{ email }, { licenceNumber }],
+            status: 'pending',
+        });
+
+        if (existingPending) {
+            return res.status(StatusCodes.BAD_REQUEST).json({
+                message: 'A pending store approval request already exists for this email or licence number',
+            });
+        }
+
+        const requestPayload = {
+            storeName,
+            ownerName,
+            countryCode: countryCode || '+91',
+            mobile,
+            email,
+            licenceNumber,
+            gstNumber: gstNumber || '',
+            city,
+            address,
+            state,
+            pincode,
+            licenceDocument: {
+                fileName: req.file.originalname,
+                filePath: req.file.path,
+                mimeType: req.file.mimetype,
+            },
+        };
+
+        const createdRequest = await StoreApprovalRequest.create(requestPayload);
+
+        return res.status(StatusCodes.CREATED).json({
+            message: 'Store approval request submitted successfully',
+            request: createdRequest,
+        });
+    } catch (error) {
+        console.error('Error creating store approval request:', error);
+        return res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({ message: 'Failed to submit store approval request' });
+    }
+};
+
+const getStoreApprovalRequests = async (req, res) => {
+    const adminAccess = verifyAdminRequest(req);
+    if (!adminAccess.ok) {
+        return res.status(adminAccess.status).json({ message: adminAccess.message });
+    }
+
+    try {
+        const status = req.query.status;
+        const filter = status ? { status } : {};
+
+        const requests = await StoreApprovalRequest.find(filter).sort({ createdAt: -1 });
+
+        return res.status(StatusCodes.OK).json({ success: true, requests });
+    } catch (error) {
+        console.error('Error fetching store approval requests:', error);
+        return res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({ message: 'Failed to fetch store approval requests' });
+    }
+};
+
+const reviewStoreApprovalRequest = async (req, res) => {
+    const adminAccess = verifyAdminRequest(req);
+    if (!adminAccess.ok) {
+        return res.status(adminAccess.status).json({ message: adminAccess.message });
+    }
+
+    try {
+        const { id } = req.params;
+        const { status, reviewNotes = '' } = req.body;
+
+        if (!['approved', 'rejected'].includes(status)) {
+            return res.status(StatusCodes.BAD_REQUEST).json({ message: 'Invalid review status' });
+        }
+
+        const updatedRequest = await StoreApprovalRequest.findByIdAndUpdate(
+            id,
+            {
+                status,
+                reviewNotes,
+                reviewedAt: new Date(),
+            },
+            { new: true },
+        );
+
+        if (!updatedRequest) {
+            return res.status(StatusCodes.NOT_FOUND).json({ message: 'Store approval request not found' });
+        }
+
+        return res.status(StatusCodes.OK).json({
+            success: true,
+            message: `Store request ${status}`,
+            request: updatedRequest,
+        });
+    } catch (error) {
+        console.error('Error reviewing store approval request:', error);
+        return res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({ message: 'Failed to review store approval request' });
+    }
+};
+
 module.exports = {
     signUp, signIn, fetchData, UpdateDoctorProfile, adminsignIn, AdminfetchData, doctorListAssigned, updatedoctorstatus
-    , fetchupdateddoctors, updateavailability, fetchavailableslots, confirmslot, getnames, linkgiven, uploadpres, confirmstatus, UpdatePatientProfile, fetchDoctors, fetchpharmacymedicines, updateorderedmedicines, updatecartquantity, addmedicinetodb, decreaseupdatecartquantity, deletemedicine, finalitems, finaladdress, finalpayment, deletecartItems, doctorchatbotfetchdata, uploadPrescriptionFile
+    , fetchupdateddoctors, updateavailability, fetchavailableslots, confirmslot, getnames, linkgiven, uploadpres, confirmstatus, UpdatePatientProfile, fetchDoctors, fetchpharmacymedicines, updateorderedmedicines, updatecartquantity, addmedicinetodb, decreaseupdatecartquantity, deletemedicine, finalitems, finaladdress, finalpayment, deletecartItems, doctorchatbotfetchdata, uploadPrescriptionFile, createStoreApprovalRequest, getStoreApprovalRequests, reviewStoreApprovalRequest
 };

@@ -3,18 +3,22 @@ import toast from 'react-hot-toast';
 import axios from 'axios';
 import { baseURL } from '../main';
 
-const DoctorProfile = () => {
+const PatientProfile = () => {
     const [status, setStatus] = useState('pending'); // 'approved', 'rejected', or 'pending'
     const [assign, setAssign] = useState(false);
     const [showstatus, setShowStatus] = useState(false);
     const [formData, setFormData] = useState({
-        address: '',
+        salutation: '',
+        firstName: '',
+        middleName: '',
+        lastName: '',
+        countryCode: '+91',
         mobile: '',
-        weight: '',
-        dob: '',
-        height: '',
-        sex: '',
-        bloodgroup: ''
+        email: '',
+        address: '',
+        state: '',
+        pincode: '',
+        sex: ''
     });
 
     const handleChange = (e) => {
@@ -44,7 +48,7 @@ const DoctorProfile = () => {
 
 
     return (
-        <div className="mt-[10vh] min-h-screen bg-gray-100 py-12 px-4 sm:px-6 lg:px-8">
+        <div className="min-h-screen bg-gray-100 px-4 sm:px-6 lg:px-8 pb-12" style={{ paddingTop: 'calc(var(--app-navbar-offset, 88px) + 3rem)' }}>
             <div className="max-w-7xl mx-auto">
                 <h1 className="text-3xl font-extrabold text-gray-900 text-center mb-8">Patient Profile Registration</h1>
                 <div className="bg-white shadow overflow-hidden sm:rounded-lg">
@@ -55,16 +59,105 @@ const DoctorProfile = () => {
                                 <h2 className="text-2xl font-bold text-gray-900">Personal Information</h2>
                                 <form onSubmit={submitHandler} className="space-y-6">
                                     <div>
-                                        <label htmlFor="name" className="block text-sm font-medium text-gray-700">
-                                            Name:
+                                        <label htmlFor="salutation" className="block text-sm font-medium text-gray-700">
+                                            Salutation
+                                        </label>
+                                        <select
+                                            name="salutation"
+                                            id="salutation"
+                                            value={formData.salutation}
+                                            onChange={handleChange}
+                                            className="mt-1 block w-full rounded-md border-gray-300 bg-white py-2 px-3 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm"
+                                        >
+                                            <option value="">Select salutation</option>
+                                            <option value="Mr">Mr</option>
+                                            <option value="Mrs">Mrs</option>
+                                            <option value="Ms">Ms</option>
+                                            <option value="Dr">Dr</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label htmlFor="firstName" className="block text-sm font-medium text-gray-700">
+                                            First Name
                                         </label>
                                         <input
                                             type="text"
-                                            name="name"
-                                            value={formData.name}
+                                            name="firstName"
+                                            id="firstName"
+                                            value={formData.firstName}
                                             onChange={handleChange}
                                             className="mt-1 focus:ring-indigo-500 focus:border-indigo-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md"
-                                            placeholder="Enter full name"
+                                            placeholder="Enter first name"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label htmlFor="middleName" className="block text-sm font-medium text-gray-700">
+                                            Middle Name
+                                        </label>
+                                        <input
+                                            type="text"
+                                            name="middleName"
+                                            id="middleName"
+                                            value={formData.middleName}
+                                            onChange={handleChange}
+                                            className="mt-1 focus:ring-indigo-500 focus:border-indigo-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md"
+                                            placeholder="Enter middle name (optional)"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label htmlFor="lastName" className="block text-sm font-medium text-gray-700">
+                                            Last Name
+                                        </label>
+                                        <input
+                                            type="text"
+                                            name="lastName"
+                                            id="lastName"
+                                            value={formData.lastName}
+                                            onChange={handleChange}
+                                            className="mt-1 focus:ring-indigo-500 focus:border-indigo-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md"
+                                            placeholder="Enter last name"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700">
+                                            Mobile Number
+                                        </label>
+                                        <div className="mt-1 flex rounded-md shadow-sm">
+                                            <select
+                                                name="countryCode"
+                                                value={formData.countryCode}
+                                                onChange={handleChange}
+                                                className="rounded-l-md border border-r-0 border-gray-300 bg-white py-2 px-3 text-sm text-gray-700 focus:border-indigo-500 focus:outline-none focus:ring-indigo-500"
+                                            >
+                                                <option value="+1">🇺🇸 +1</option>
+                                                <option value="+44">🇬🇧 +44</option>
+                                                <option value="+61">🇦🇺 +61</option>
+                                                <option value="+91">🇮🇳 +91</option>
+                                                <option value="+81">🇯🇵 +81</option>
+                                            </select>
+                                            <input
+                                                type="tel"
+                                                name="mobile"
+                                                id="mobile"
+                                                value={formData.mobile}
+                                                onChange={handleChange}
+                                                className="block w-full min-w-0 flex-1 rounded-r-md border border-gray-300 py-2 px-3 text-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500"
+                                                placeholder="Enter mobile number"
+                                            />
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label htmlFor="email" className="block text-sm font-medium text-gray-700">
+                                            Email ID
+                                        </label>
+                                        <input
+                                            type="email"
+                                            name="email"
+                                            id="email"
+                                            value={formData.email}
+                                            onChange={handleChange}
+                                            className="mt-1 focus:ring-indigo-500 focus:border-indigo-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md"
+                                            placeholder="Enter email address"
                                         />
                                     </div>
                                     <div>
@@ -72,8 +165,8 @@ const DoctorProfile = () => {
                                             Address
                                         </label>
                                         <textarea
-                                            type="text"
                                             name="address"
+                                            id="address"
                                             rows="3"
                                             value={formData.address}
                                             onChange={handleChange}
@@ -82,87 +175,57 @@ const DoctorProfile = () => {
                                         ></textarea>
                                     </div>
                                     <div>
-                                        <label htmlFor="mobile" className="block text-sm font-medium text-gray-700">
-                                            Mobile Number:
+                                        <label htmlFor="state" className="block text-sm font-medium text-gray-700">
+                                            State
                                         </label>
-                                        <input
-                                            type="number"
-                                            name="mobile"
-                                            id="mobile"
-                                            value={formData.mobile}
+                                        <select
+                                            name="state"
+                                            id="state"
+                                            value={formData.state}
                                             onChange={handleChange}
-                                            className="focus:ring-indigo-500 focus:border-indigo-500 block w-full pl-7 pr-12 sm:text-sm border-gray-300 rounded-md"
-                                            placeholder="Enter mobile number"
-                                        />
+                                            className="mt-1 block w-full rounded-md border-gray-300 bg-white py-2 px-3 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm"
+                                        >
+                                            <option value="">Select state</option>
+                                            <option value="California">California</option>
+                                            <option value="Texas">Texas</option>
+                                            <option value="New York">New York</option>
+                                            <option value="Florida">Florida</option>
+                                            <option value="Maharashtra">Maharashtra</option>
+                                            <option value="Karnataka">Karnataka</option>
+                                            <option value="Delhi">Delhi</option>
+                                        </select>
                                     </div>
                                     <div>
-                                        <label htmlFor="weight" className="block text-sm font-medium text-gray-700">
-                                            Weight:
-                                        </label>
-                                        <input
-                                            type="number"
-                                            name="weight"
-                                            id="weight"
-                                            value={formData.weight}
-                                            onChange={handleChange}
-                                            className="focus:ring-indigo-500 focus:border-indigo-500 block w-full pl-7 pr-12 sm:text-sm border-gray-300 rounded-md"
-                                            placeholder="60kg"
-                                        />
-                                    </div>
-                                    <div>
-                                        <label htmlFor="dob" className="block text-sm font-medium text-gray-700">
-                                            D.O.B:
+                                        <label htmlFor="pincode" className="block text-sm font-medium text-gray-700">
+                                            Pincode
                                         </label>
                                         <input
                                             type="text"
-                                            name="dob"
-                                            value={formData.dob}
-                                            onChange={handleChange}
-                                            className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md"
-                                            placeholder="Enter your date of birth"
-                                        />
-                                    </div>
-                                    <div>
-                                        <label htmlFor="height" className="block text-sm font-medium text-gray-700">
-                                            Height:
-                                        </label>
-                                        <input
-                                            type="number"
-                                            name="height"
-                                            id="height"
-                                            value={formData.height}
+                                            name="pincode"
+                                            id="pincode"
+                                            value={formData.pincode}
                                             onChange={handleChange}
                                             className="mt-1 focus:ring-indigo-500 focus:border-indigo-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md"
-                                            placeholder="Enter years of experience"
+                                            placeholder="Enter pincode"
                                         />
                                     </div>
                                     <div>
                                         <label htmlFor="sex" className="block text-sm font-medium text-gray-700">
                                             Sex
                                         </label>
-                                        <input
-                                            type="text"
+                                        <select
                                             name="sex"
                                             id="sex"
                                             value={formData.sex}
                                             onChange={handleChange}
-                                            className="mt-1 focus:ring-indigo-500 focus:border-indigo-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md"
-                                            placeholder="Male/Female"
-                                        />
-                                    </div>
-                                    <div>
-                                        <label htmlFor="bloodgroup" className="block text-sm font-medium text-gray-700">
-                                            Blood Group:
-                                        </label>
-                                        <input
-                                            type="text"
-                                            name="bloodgroup"
-                                            id="bloodgroup"
-                                            value={formData.bloodgroup}
-                                            onChange={handleChange}
-                                            className="mt-1 focus:ring-indigo-500 focus:border-indigo-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md"
-                                            placeholder="Enter your blood group"
-                                        />
+                                            className="mt-1 block w-full rounded-md border-gray-300 bg-white py-2 px-3 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm"
+                                        >
+                                            <option value="">Select sex</option>
+                                            <option value="Male">Male</option>
+                                            <option value="Female">Female</option>
+                                            <option value="Other">Other</option>
+                                            <option value="Prefer not to say">Prefer not to say</option>
+                                        </select>
                                     </div>
                                     <div>
                                         <button
@@ -182,7 +245,7 @@ const DoctorProfile = () => {
     );
 };
 
-export default DoctorProfile;
+export default PatientProfile;
 
 
 

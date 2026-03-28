@@ -9,11 +9,15 @@ import { baseURL } from "../main";
 import {
   Mail,
   Lock,
-  Heart,
-  Activity,
-  Shield,
   User,
-  Stethoscope,
+  Store,
+  Pill,
+  ShieldCheck,
+  Clock3,
+  PackageCheck,
+  Sparkles,
+  ArrowRight,
+  UserRound,
 } from "lucide-react";
 import { FaRegEyeSlash, FaRegEye } from "react-icons/fa";
 import { FaGoogle, FaFacebook, FaTwitter } from "react-icons/fa";
@@ -21,15 +25,30 @@ import { FaGoogle, FaFacebook, FaTwitter } from "react-icons/fa";
 const Signup = () => {
   const [type, setType] = useState("password");
   const [type2, setType2] = useState("password");
-  const [isDoctor, setIsDoctor] = useState("");
+  const [selectedRole, setSelectedRole] = useState("");
+  const [showStoreRequestModal, setShowStoreRequestModal] = useState(false);
+  const [storeLicenceFile, setStoreLicenceFile] = useState(null);
 
   const [formData, setFormData] = useState({
-    regNo: "",
     name: "",
+    storeName: "",
+    ownerName: "",
+    salutation: "",
+    firstName: "",
+    middleName: "",
+    lastName: "",
+    countryCode: "+91",
+    mobile: "",
     email: "",
+    address: "",
+    city: "",
+    state: "",
+    pincode: "",
+    licenceNumber: "",
+    gstNumber: "",
     password: "",
     confirmPassword: "",
-    isDoctor: false,
+    role: "patient",
   });
 
   const [loading, setLoading] = useState(false);
@@ -48,6 +67,42 @@ const Signup = () => {
     e.preventDefault();
     setLoading(true);
 
+    if (selectedRole === "store") {
+      try {
+        if (!storeLicenceFile) {
+          toast.error("Please upload your store licence document");
+          setLoading(false);
+          return;
+        }
+
+        const requestPayload = new FormData();
+        requestPayload.append("storeName", formData.storeName);
+        requestPayload.append("ownerName", formData.ownerName);
+        requestPayload.append("countryCode", formData.countryCode);
+        requestPayload.append("mobile", formData.mobile);
+        requestPayload.append("email", formData.email);
+        requestPayload.append("licenceNumber", formData.licenceNumber);
+        requestPayload.append("gstNumber", formData.gstNumber);
+        requestPayload.append("city", formData.city);
+        requestPayload.append("address", formData.address);
+        requestPayload.append("state", formData.state);
+        requestPayload.append("pincode", formData.pincode);
+        requestPayload.append("storeLicenceFile", storeLicenceFile);
+
+        await axios.post(`${baseURL}/store-requests`, requestPayload, {
+          headers: { "Content-Type": "multipart/form-data" },
+        });
+
+        setShowStoreRequestModal(true);
+      } catch (error) {
+        toast.error(error?.response?.data?.message || "Failed to submit store request. Please try again.");
+      } finally {
+        setLoading(false);
+      }
+
+      return;
+    }
+
     if (formData?.password !== formData?.confirmPassword) {
       toast.error("Passwords do not match");
       setLoading(false);
@@ -55,7 +110,17 @@ const Signup = () => {
     }
 
     try {
-      const response = await axios.post(`${baseURL}/signup`, formData);
+      const roleFlagKey = 'is' + 'Doctor';
+      const fullName = [formData.firstName, formData.middleName, formData.lastName]
+        .map((value) => value.trim())
+        .filter(Boolean)
+        .join(' ');
+      const payload = {
+        ...formData,
+        name: selectedRole === "patient" ? fullName : formData.storeName,
+        [roleFlagKey]: false,
+      };
+      const response = await axios.post(`${baseURL}/signup`, payload);
       if (response.status === 201) {
         toast.success("Signup successful!");
         navigate("/login");
@@ -69,129 +134,190 @@ const Signup = () => {
   };
 
   const handleRoleSelect = (role) => {
-    setIsDoctor(role);
+    setSelectedRole(role);
     setFormData({
       ...formData,
-      isDoctor: role === "doctor",
+      name: "",
+      storeName: "",
+      ownerName: "",
+      salutation: "",
+      firstName: "",
+      middleName: "",
+      lastName: "",
+      countryCode: "+91",
+      mobile: "",
+      email: "",
+      address: "",
+      city: "",
+      state: "",
+      pincode: "",
+      licenceNumber: "",
+      gstNumber: "",
+      password: "",
+      confirmPassword: "",
+      role,
     });
+    setStoreLicenceFile(null);
   };
 
   const handleBackToRole = () => {
-    setIsDoctor("");
+    setSelectedRole("");
     setFormData({
-      regNo: "",
       name: "",
+      storeName: "",
+      ownerName: "",
+      salutation: "",
+      firstName: "",
+      middleName: "",
+      lastName: "",
+      countryCode: "+91",
+      mobile: "",
       email: "",
+      address: "",
+      city: "",
+      state: "",
+      pincode: "",
+      licenceNumber: "",
+      gstNumber: "",
       password: "",
       confirmPassword: "",
-      isDoctor: false,
+      role: "patient",
     });
+    setStoreLicenceFile(null);
   };
 
   return (
     <>
+      {showStoreRequestModal && (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-900/60 px-4">
+          <div className="w-full max-w-md rounded-3xl border border-amber-200 bg-white p-6 shadow-2xl">
+            <h3 className="text-xl font-bold text-slate-900">Store Request Submitted</h3>
+            <p className="mt-3 text-sm leading-7 text-slate-600">
+              You will be contacted by the Support Team. We will review the store information and you will get a reply shortly.
+            </p>
+            <div className="mt-6 flex gap-3">
+              <button
+                type="button"
+                onClick={() => setShowStoreRequestModal(false)}
+                className="flex-1 rounded-2xl border border-slate-200 bg-slate-100 px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-200"
+              >
+                Stay Here
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowStoreRequestModal(false);
+                  navigate("/");
+                }}
+                className="flex-1 rounded-2xl bg-gradient-to-r from-amber-500 to-orange-500 px-4 py-3 text-sm font-semibold text-white transition hover:from-amber-600 hover:to-orange-600"
+              >
+                Go To Home
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {loading ? (
         <Loader />
-      ) : isDoctor === "" ? (
+      ) : selectedRole === "" ? (
         <>
           <Navbar />
-          <div className="min-h-screen bg-gradient-to-br from-blue-50 via-cyan-50 to-teal-50 flex items-center justify-center px-4 py-12 pt-28 relative overflow-hidden">
-            {/* BACKGROUND BLOBS */}
-            <div className="absolute top-20 left-10 w-72 h-72 bg-blue-200 rounded-full mix-blend-multiply filter blur-3xl opacity-30"></div>
-            <div className="absolute top-40 right-10 w-72 h-72 bg-cyan-200 rounded-full mix-blend-multiply filter blur-3xl opacity-30"></div>
-            <div className="absolute -bottom-8 left-1/2 w-72 h-72 bg-teal-200 rounded-full mix-blend-multiply filter blur-3xl opacity-30"></div>
+          <div className="relative min-h-screen overflow-hidden bg-[linear-gradient(145deg,#f4fbff_0%,#eef8f7_42%,#f8fafc_100%)] px-4 pb-12" style={{ paddingTop: 'calc(var(--app-navbar-offset, 88px) + 2.5rem)' }}>
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(14,165,233,0.18),transparent_28%),radial-gradient(circle_at_top_right,rgba(16,185,129,0.16),transparent_30%),radial-gradient(circle_at_bottom,rgba(59,130,246,0.08),transparent_34%)]" />
+            <div className="absolute left-[-80px] top-28 h-72 w-72 rounded-full bg-cyan-200/40 blur-3xl" />
+            <div className="absolute right-[-70px] top-20 h-80 w-80 rounded-full bg-emerald-200/30 blur-3xl" />
+            <div className="absolute bottom-[-110px] left-1/3 h-80 w-80 rounded-full bg-sky-200/30 blur-3xl" />
 
-            <div className="w-full max-w-6xl relative z-10">
-              <div className="text-center mb-12">
-                <h1 className="text-5xl font-bold text-gray-800 mb-4">
-                  Join{" "}
-                  <span className="bg-gradient-to-r from-blue-600 to-cyan-600 bg-clip-text text-transparent">
-                    MedVision Health
-                  </span>
+            <div className="relative z-10 mx-auto max-w-7xl">
+              <div className="mx-auto max-w-3xl text-center">
+                <span className="inline-flex items-center gap-2 rounded-full border border-cyan-200 bg-white/80 px-4 py-1.5 text-xs font-semibold uppercase tracking-[0.18em] text-cyan-700 shadow-sm">
+                  <Sparkles className="h-3.5 w-3.5" />
+                  Pharmacy Account Setup
+                </span>
+                <h1 className="mt-6 text-4xl font-black leading-tight text-slate-900 md:text-6xl">
+                  Choose how you want to join the MedVision pharmacy network.
                 </h1>
-                <p className="text-xl text-gray-600">
-                  Select your account type to get started
+                <p className="mx-auto mt-5 max-w-2xl text-base leading-8 text-slate-600 md:text-lg">
+                  Create a patient account to manage medicines and prescriptions, or open a store account to run pharmacy operations and fulfill orders.
                 </p>
               </div>
 
-              <div className="grid md:grid-cols-2 gap-8">
-                {/* <button
-                  onClick={() => handleRoleSelect("doctor")}
-                  className="group relative bg-white/80 backdrop-blur-xl rounded-3xl p-8 shadow-xl border-2 border-transparent hover:border-blue-500 transition-all duration-500 transform hover:scale-105 hover:shadow-2xl overflow-hidden"
+              <div className="mt-12 grid gap-8 lg:grid-cols-2">
+                <button
+                  type="button"
+                  onClick={() => handleRoleSelect("patient")}
+                  className="group relative overflow-hidden rounded-[2rem] border border-white/80 bg-white/85 p-8 text-left shadow-[0_24px_70px_rgba(14,116,144,0.14)] backdrop-blur-xl transition-all duration-300 hover:-translate-y-2 hover:shadow-[0_28px_90px_rgba(14,116,144,0.18)]"
                 >
-                  <div className="absolute inset-0 bg-gradient-to-br from-blue-50 to-cyan-50 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
-
+                  <div className="absolute inset-0 bg-gradient-to-br from-cyan-50 via-sky-50 to-white opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
                   <div className="relative z-10">
-                    <div className="w-24 h-24 mx-auto mb-6 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-2xl flex items-center justify-center transform group-hover:rotate-6 transition-transform duration-500 shadow-lg">
-                      <Stethoscope className="w-12 h-12 text-white" />
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex h-20 w-20 items-center justify-center rounded-3xl bg-gradient-to-br from-cyan-500 to-sky-500 shadow-lg shadow-cyan-200">
+                        <UserRound className="h-10 w-10 text-white" />
+                      </div>
+                      <span className="rounded-full border border-cyan-200 bg-cyan-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-cyan-700">
+                        Patient Access
+                      </span>
                     </div>
 
-                    <h3 className="text-2xl font-bold text-gray-800 mb-3">Medical Professional</h3>
-                    <p className="text-gray-600 mb-6 leading-relaxed">
-                      Register as a healthcare provider to manage patient care, prescriptions, and medical records
+                    <h2 className="mt-8 text-3xl font-black text-slate-900">Patient Sign Up</h2>
+                    <p className="mt-4 text-base leading-8 text-slate-600">
+                      Build your pharmacy profile to upload prescriptions, order medicines, track deliveries, and manage repeat purchases faster.
                     </p>
 
-                    <div className="flex items-center justify-center gap-2 text-blue-600 font-semibold group-hover:gap-4 transition-all duration-300">
-                      <span>Continue as Doctor</span>
-                      <svg className="w-5 h-5 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                      </svg>
+                    <div className="mt-8 grid gap-3 text-sm text-slate-600">
+                      <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">Medicine ordering and cart history</div>
+                      <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">Prescription upload and review flow</div>
+                      <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">Delivery tracking and refill convenience</div>
+                    </div>
+
+                    <div className="mt-8 inline-flex items-center gap-2 text-sm font-semibold text-cyan-700">
+                      Continue as Patient
+                      <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
                     </div>
                   </div>
+                </button>
 
-                  <div className="absolute top-0 right-0 w-32 h-32 bg-blue-200/20 rounded-full -mr-16 -mt-16 group-hover:scale-150 transition-transform duration-700"></div>
-                  <div className="absolute bottom-0 left-0 w-24 h-24 bg-cyan-200/20 rounded-full -ml-12 -mb-12 group-hover:scale-150 transition-transform duration-700"></div>
-                </button> */}
-
-                <div className="md:col-span-2 flex justify-center">
-                  <button
-                    onClick={() => handleRoleSelect("patient")}
-                    className="group relative bg-white/80 backdrop-blur-xl rounded-3xl p-8 shadow-xl border-2 border-transparent hover:border-cyan-500 transition-all duration-500 transform hover:scale-105 hover:shadow-2xl overflow-hidden"
-                  >
-                    <div className="absolute inset-0 bg-gradient-to-br from-cyan-50 to-blue-50 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
-
-                    <div className="relative z-10">
-                      <div className="w-24 h-24 mx-auto mb-6 bg-gradient-to-br from-cyan-500 to-blue-500 rounded-2xl flex items-center justify-center transform group-hover:rotate-6 transition-transform duration-500 shadow-lg">
-                        <User className="w-12 h-12 text-white" />
+                <button
+                  type="button"
+                  onClick={() => handleRoleSelect("store")}
+                  className="group relative overflow-hidden rounded-[2rem] border border-white/80 bg-slate-900 p-8 text-left text-white shadow-[0_24px_70px_rgba(15,23,42,0.18)] transition-all duration-300 hover:-translate-y-2 hover:shadow-[0_28px_90px_rgba(15,23,42,0.24)]"
+                >
+                  <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(45,212,191,0.16),transparent_28%),radial-gradient(circle_at_bottom_left,rgba(56,189,248,0.14),transparent_30%)]" />
+                  <div className="relative z-10">
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex h-20 w-20 items-center justify-center rounded-3xl bg-gradient-to-br from-teal-400 to-cyan-400 shadow-lg shadow-cyan-950/30">
+                        <Store className="h-10 w-10 text-slate-950" />
                       </div>
-
-                      <h3 className="text-2xl font-bold text-gray-800 mb-3">
-                        Patient
-                      </h3>
-                      <p className="text-gray-600 mb-6 leading-relaxed">
-                        Create your account to book appointments, access health
-                        records, and connect with healthcare providers
-                      </p>
-
-                      <div className="flex items-center justify-center gap-2 text-cyan-600 font-semibold group-hover:gap-4 transition-all duration-300">
-                        <span>Continue as Patient</span>
-                        <svg
-                          className="w-5 h-5 group-hover:translate-x-1 transition-transform"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M9 5l7 7-7 7"
-                          />
-                        </svg>
-                      </div>
+                      <span className="rounded-full border border-white/15 bg-white/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-cyan-100">
+                        Store Access
+                      </span>
                     </div>
 
-                    <div className="absolute top-0 right-0 w-32 h-32 bg-cyan-200/20 rounded-full -mr-16 -mt-16 group-hover:scale-150 transition-transform duration-700"></div>
-                    <div className="absolute bottom-0 left-0 w-24 h-24 bg-blue-200/20 rounded-full -ml-12 -mb-12 group-hover:scale-150 transition-transform duration-700"></div>
-                  </button>
-                </div>
+                    <h2 className="mt-8 text-3xl font-black">Store Sign Up</h2>
+                    <p className="mt-4 text-base leading-8 text-slate-300">
+                      Set up your pharmacy store account to manage inventory, process prescription-backed orders, and keep fulfillment moving smoothly.
+                    </p>
+
+                    <div className="mt-8 grid gap-3 text-sm text-slate-200">
+                      <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3">Inventory and medicine availability workflow</div>
+                      <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3">Order fulfillment and dispatch visibility</div>
+                      <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3">Store-side pharmacy operations dashboard</div>
+                    </div>
+
+                    <div className="mt-8 inline-flex items-center gap-2 text-sm font-semibold text-cyan-200">
+                      Continue as Store
+                      <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
+                    </div>
+                  </div>
+                </button>
               </div>
 
-              <p className="text-center mt-12 text-gray-600">
+              <p className="mt-12 text-center text-sm text-slate-500">
                 Already have an account?{" "}
                 <span
-                  onClick={() => navigate("/")}
-                  className="text-blue-600 font-semibold hover:text-blue-700 transition-colors cursor-pointer"
+                  onClick={() => navigate("/login")}
+                  className="cursor-pointer font-semibold text-cyan-700 transition hover:text-cyan-800 hover:underline"
                 >
                   Sign in here
                 </span>
@@ -202,253 +328,623 @@ const Signup = () => {
       ) : (
         <>
           <Navbar />
-          <div className="min-h-screen bg-gradient-to-br from-blue-50 via-cyan-50 to-teal-50 flex items-center justify-center px-4 py-12 pt-28 relative overflow-hidden">
-            {/* BACKGROUND BLOBS */}
-            <div className="absolute top-20 left-10 w-72 h-72 bg-blue-200 rounded-full mix-blend-multiply filter blur-3xl opacity-30"></div>
-            <div className="absolute top-40 right-10 w-72 h-72 bg-cyan-200 rounded-full mix-blend-multiply filter blur-3xl opacity-30"></div>
-            <div className="absolute -bottom-8 left-1/2 w-72 h-72 bg-teal-200 rounded-full mix-blend-multiply filter blur-3xl opacity-30"></div>
+          <div className="relative min-h-screen overflow-hidden bg-[linear-gradient(145deg,#f4fbff_0%,#eef8f7_42%,#f8fafc_100%)] px-4 pb-12" style={{ paddingTop: 'calc(var(--app-navbar-offset, 88px) + 2.5rem)' }}>
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(14,165,233,0.18),transparent_28%),radial-gradient(circle_at_top_right,rgba(16,185,129,0.16),transparent_30%),radial-gradient(circle_at_bottom,rgba(59,130,246,0.08),transparent_34%)]" />
+            <div className="absolute left-[-80px] top-28 h-72 w-72 rounded-full bg-cyan-200/40 blur-3xl" />
+            <div className="absolute right-[-70px] top-20 h-80 w-80 rounded-full bg-emerald-200/30 blur-3xl" />
+            <div className="absolute bottom-[-110px] left-1/3 h-80 w-80 rounded-full bg-sky-200/30 blur-3xl" />
 
-            <div className="w-full max-w-6xl bg-white/80 backdrop-blur-xl rounded-3xl shadow-2xl grid md:grid-cols-2 overflow-hidden relative z-10 border border-white/20">
-              {/* LEFT HEALTHCARE PANEL */}
-              <div className="hidden md:flex flex-col justify-center items-center bg-gradient-to-br from-[#0078F0] via-blue-600 to-cyan-600 text-white p-12">
-                <div className="bg-white/20 backdrop-blur-sm p-6 rounded-full mb-6 inline-flex">
-                  <Heart className="text-white" size={48} strokeWidth={1.5} />
+            <div className="relative z-10 mx-auto grid w-full max-w-7xl gap-8 lg:grid-cols-[1.02fr_0.98fr]">
+              <div className="hidden lg:flex flex-col justify-between rounded-[2rem] border border-slate-200/70 bg-slate-900 px-10 py-10 text-white shadow-[0_24px_80px_rgba(15,23,42,0.18)]">
+                <div>
+                  <span className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-4 py-1.5 text-xs font-semibold uppercase tracking-[0.18em] text-cyan-100">
+                    <Sparkles className="h-3.5 w-3.5" />
+                    {selectedRole === "store" ? "Store Registration" : "Patient Registration"}
+                  </span>
+
+                  <div className="mt-8 flex h-20 w-20 items-center justify-center rounded-3xl bg-gradient-to-br from-cyan-400 to-emerald-400 shadow-lg shadow-cyan-900/30">
+                    <Pill className="h-10 w-10 text-slate-950" strokeWidth={2} />
+                  </div>
+
+                  <h1 className="mt-8 max-w-lg text-5xl font-black leading-tight">
+                    {selectedRole === "store"
+                      ? "Set up your pharmacy store workspace."
+                      : "Create your pharmacy care account."}
+                  </h1>
+
+                  <p className="mt-5 max-w-xl text-base leading-8 text-slate-300">
+                    {selectedRole === "store"
+                      ? "Register your store to manage medicines, accept prescription-backed requests, and keep fulfillment visible from one dashboard."
+                      : "Create your account to order medicines, save your delivery history, and move through prescriptions with less friction."}
+                  </p>
                 </div>
 
-                <h2 className="text-4xl font-bold mb-4 tracking-tight">
-                  MedVision Health
-                </h2>
-
-                <p className="text-white/90 text-lg text-center max-w-sm mb-8">
-                  Your trusted digital healthcare partner. Join thousands of
-                  healthcare providers and patients.
-                </p>
-
-                <div className="flex gap-8">
-                  <div className="flex flex-col items-center gap-2">
-                    <div className="bg-white/20 p-3 rounded-full">
-                      <Shield size={22} />
+                <div className="mt-10 grid gap-4">
+                  <div className="grid grid-cols-3 gap-4">
+                    <div className="rounded-3xl border border-white/10 bg-white/5 p-4">
+                      <ShieldCheck className="h-6 w-6 text-emerald-300" />
+                      <p className="mt-3 text-sm font-semibold">Protected access</p>
+                      <p className="mt-1 text-xs leading-6 text-slate-400">Safe entry for pharmacy workflows.</p>
                     </div>
-                    <p className="text-sm text-white/80">Secure</p>
+                    <div className="rounded-3xl border border-white/10 bg-white/5 p-4">
+                      <Clock3 className="h-6 w-6 text-cyan-300" />
+                      <p className="mt-3 text-sm font-semibold">Fast setup</p>
+                      <p className="mt-1 text-xs leading-6 text-slate-400">Get registered and active quickly.</p>
+                    </div>
+                    <div className="rounded-3xl border border-white/10 bg-white/5 p-4">
+                      <PackageCheck className="h-6 w-6 text-sky-300" />
+                      <p className="mt-3 text-sm font-semibold">Order ready</p>
+                      <p className="mt-1 text-xs leading-6 text-slate-400">Built for medicine delivery flows.</p>
+                    </div>
                   </div>
 
-                  <div className="flex flex-col items-center gap-2">
-                    <div className="bg-white/20 p-3 rounded-full">
-                      <Activity size={22} />
+                  <div className="rounded-[1.75rem] border border-cyan-400/20 bg-gradient-to-r from-cyan-400/10 to-emerald-400/10 p-5">
+                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-cyan-100">Included from day one</p>
+                    <div className="mt-4 grid gap-3 text-sm text-slate-200">
+                      <div className="flex items-center justify-between rounded-2xl bg-white/5 px-4 py-3">
+                        <span>{selectedRole === "store" ? "Store-side medicine management" : "Prescription and medicine access"}</span>
+                        <ArrowRight className="h-4 w-4 text-cyan-200" />
+                      </div>
+                      <div className="flex items-center justify-between rounded-2xl bg-white/5 px-4 py-3">
+                        <span>{selectedRole === "store" ? "Order processing and dispatch workflow" : "Order history and live delivery tracking"}</span>
+                        <ArrowRight className="h-4 w-4 text-cyan-200" />
+                      </div>
+                      <div className="flex items-center justify-between rounded-2xl bg-white/5 px-4 py-3">
+                        <span>{selectedRole === "store" ? "Pharmacy operations dashboard access" : "Repeat order convenience and profile setup"}</span>
+                        <ArrowRight className="h-4 w-4 text-cyan-200" />
+                      </div>
                     </div>
-                    <p className="text-sm text-white/80">Real-time</p>
-                  </div>
-
-                  <div className="flex flex-col items-center gap-2">
-                    <div className="bg-white/20 p-3 rounded-full">
-                      <Heart size={22} />
-                    </div>
-                    <p className="text-sm text-white/80">Trusted</p>
                   </div>
                 </div>
               </div>
 
-              {/* SIGNUP FORM */}
-              <div className="flex flex-col justify-center p-8 md:p-12">
-                <div className="mb-8">
-                  <h2 className="text-3xl md:text-4xl font-bold text-gray-800 mb-2">
-                    Create Your Account
-                  </h2>
-                  <p className="text-gray-500">
-                    {isDoctor === "doctor"
-                      ? "Register as a medical professional"
-                      : "Register as a patient"}
-                  </p>
-                </div>
-
-                <form onSubmit={submitHandler} className="flex flex-col gap-5">
-                  {isDoctor === "doctor" && (
-                    <div>
-                      <label className="text-sm font-medium text-gray-700 mb-2 block">
-                        Medical Registration Number
-                      </label>
-
-                      <div className="flex items-center border-2 border-gray-200 rounded-xl px-4 py-3 focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-100 transition-all">
-                        <Stethoscope className="text-blue-500 mr-3" size={20} />
-
-                        <input
-                          type="text"
-                          placeholder="Enter your registration number"
-                          name="regNo"
-                          value={formData.regNo}
-                          onChange={handleChange}
-                          required
-                          className="w-full outline-none bg-transparent"
-                        />
-                      </div>
-                    </div>
-                  )}
-
-                  {/* NAME */}
+              <div className="rounded-[2rem] border border-white/70 bg-white/85 p-6 shadow-[0_24px_70px_rgba(14,116,144,0.14)] backdrop-blur-xl sm:p-8 lg:p-10">
+                <div className="mb-8 flex flex-wrap items-start justify-between gap-4">
                   <div>
-                    <label className="text-sm font-medium text-gray-700 mb-2 block">
-                      Full Name
-                    </label>
-
-                    <div className="flex items-center border-2 border-gray-200 rounded-xl px-4 py-3 focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-100 transition-all">
-                      <User className="text-blue-500 mr-3" size={20} />
-
-                      <input
-                        type="text"
-                        placeholder="Enter your full name"
-                        name="name"
-                        value={formData.name}
-                        onChange={handleChange}
-                        required
-                        className="w-full outline-none bg-transparent"
-                      />
-                    </div>
+                    <span className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] ${selectedRole === "store" ? "border border-teal-200 bg-teal-50 text-teal-700" : "border border-cyan-200 bg-cyan-50 text-cyan-700"}`}>
+                      {selectedRole === "store" ? "Store Sign Up" : "Patient Sign Up"}
+                    </span>
+                    <h2 className="mt-4 text-3xl font-black text-slate-900 sm:text-4xl">
+                      Create your pharmacy profile
+                    </h2>
+                    <p className="mt-3 max-w-xl text-sm leading-7 text-slate-600 sm:text-base">
+                      {selectedRole === "store"
+                        ? "Share your store information to request pharmacy onboarding."
+                        : "Create your patient profile to order medicines and manage prescriptions with confidence."}
+                    </p>
                   </div>
 
-                  {/* EMAIL */}
+                  <button
+                    type="button"
+                    onClick={handleBackToRole}
+                    className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-100"
+                  >
+                    Back to role selection
+                  </button>
+                </div>
+
+                <form onSubmit={submitHandler} className="space-y-5">
+                  {selectedRole === "patient" ? (
+                    <>
+                      <div className="grid gap-5 sm:grid-cols-2">
+                        <div>
+                          <label className="mb-2 block text-sm font-semibold text-slate-700">
+                            Salutation
+                          </label>
+                          <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3.5 transition-all focus-within:border-cyan-500 focus-within:ring-4 focus-within:ring-cyan-100">
+                            <select
+                              name="salutation"
+                              value={formData.salutation}
+                              onChange={handleChange}
+                              className="w-full bg-transparent text-slate-800 outline-none"
+                            >
+                              <option value="">Select salutation</option>
+                              <option value="Mr">Mr</option>
+                              <option value="Mrs">Mrs</option>
+                              <option value="Ms">Ms</option>
+                              <option value="Dr">Dr</option>
+                            </select>
+                          </div>
+                        </div>
+
+                        <div>
+                          <label className="mb-2 block text-sm font-semibold text-slate-700">
+                            Contact Number
+                          </label>
+                          <div className="flex items-center rounded-2xl border border-slate-200 bg-white px-4 py-3.5 transition-all focus-within:border-cyan-500 focus-within:ring-4 focus-within:ring-cyan-100">
+                            <select
+                              name="countryCode"
+                              value={formData.countryCode}
+                              onChange={handleChange}
+                              className="mr-3 bg-transparent text-slate-800 outline-none"
+                            >
+                              <option value="+91">+91</option>
+                              <option value="+1">+1</option>
+                              <option value="+44">+44</option>
+                              <option value="+61">+61</option>
+                            </select>
+                            <input
+                              type="tel"
+                              name="mobile"
+                              value={formData.mobile}
+                              onChange={handleChange}
+                              placeholder="Enter contact number"
+                              required
+                              className="w-full bg-transparent text-slate-800 outline-none placeholder:text-slate-400"
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="grid gap-5 sm:grid-cols-3">
+                        <div>
+                          <label className="mb-2 block text-sm font-semibold text-slate-700">
+                            First Name
+                          </label>
+                          <div className="flex items-center rounded-2xl border border-slate-200 bg-white px-4 py-3.5 transition-all focus-within:border-cyan-500 focus-within:ring-4 focus-within:ring-cyan-100">
+                            <User className="mr-3 h-5 w-5 text-cyan-600" />
+                            <input
+                              type="text"
+                              placeholder="Enter first name"
+                              name="firstName"
+                              value={formData.firstName}
+                              onChange={handleChange}
+                              required
+                              className="w-full bg-transparent text-slate-800 outline-none placeholder:text-slate-400"
+                            />
+                          </div>
+                        </div>
+
+                        <div>
+                          <label className="mb-2 block text-sm font-semibold text-slate-700">
+                            Middle Name
+                          </label>
+                          <div className="flex items-center rounded-2xl border border-slate-200 bg-white px-4 py-3.5 transition-all focus-within:border-cyan-500 focus-within:ring-4 focus-within:ring-cyan-100">
+                            <User className="mr-3 h-5 w-5 text-cyan-600" />
+                            <input
+                              type="text"
+                              placeholder="Enter middle name"
+                              name="middleName"
+                              value={formData.middleName}
+                              onChange={handleChange}
+                              className="w-full bg-transparent text-slate-800 outline-none placeholder:text-slate-400"
+                            />
+                          </div>
+                        </div>
+
+                        <div>
+                          <label className="mb-2 block text-sm font-semibold text-slate-700">
+                            Last Name
+                          </label>
+                          <div className="flex items-center rounded-2xl border border-slate-200 bg-white px-4 py-3.5 transition-all focus-within:border-cyan-500 focus-within:ring-4 focus-within:ring-cyan-100">
+                            <User className="mr-3 h-5 w-5 text-cyan-600" />
+                            <input
+                              type="text"
+                              placeholder="Enter last name"
+                              name="lastName"
+                              value={formData.lastName}
+                              onChange={handleChange}
+                              required
+                              className="w-full bg-transparent text-slate-800 outline-none placeholder:text-slate-400"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="grid gap-5 sm:grid-cols-2">
+                        <div>
+                          <label className="mb-2 block text-sm font-semibold text-slate-700">
+                            Store Name
+                          </label>
+                          <div className="flex items-center rounded-2xl border border-slate-200 bg-white px-4 py-3.5 transition-all focus-within:border-teal-500 focus-within:ring-4 focus-within:ring-teal-100">
+                            <Store className="mr-3 h-5 w-5 text-teal-600" />
+                            <input
+                              type="text"
+                              placeholder="Enter pharmacy store name"
+                              name="storeName"
+                              value={formData.storeName}
+                              onChange={handleChange}
+                              required
+                              className="w-full bg-transparent text-slate-800 outline-none placeholder:text-slate-400"
+                            />
+                          </div>
+                        </div>
+
+                        <div>
+                          <label className="mb-2 block text-sm font-semibold text-slate-700">
+                            Owner Name
+                          </label>
+                          <div className="flex items-center rounded-2xl border border-slate-200 bg-white px-4 py-3.5 transition-all focus-within:border-teal-500 focus-within:ring-4 focus-within:ring-teal-100">
+                            <User className="mr-3 h-5 w-5 text-teal-600" />
+                            <input
+                              type="text"
+                              placeholder="Enter owner or manager name"
+                              name="ownerName"
+                              value={formData.ownerName}
+                              onChange={handleChange}
+                              required
+                              className="w-full bg-transparent text-slate-800 outline-none placeholder:text-slate-400"
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="mb-2 block text-sm font-semibold text-slate-700">
+                          Upload Store Licence
+                        </label>
+                        <input
+                          type="file"
+                          accept="image/*,.pdf"
+                          onChange={(e) => setStoreLicenceFile(e.target.files?.[0] || null)}
+                          required
+                          className="block w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 file:mr-4 file:rounded-xl file:border-0 file:bg-teal-100 file:px-3 file:py-2 file:text-teal-700"
+                        />
+                        {storeLicenceFile && (
+                          <p className="mt-2 text-xs text-slate-500">Selected: {storeLicenceFile.name}</p>
+                        )}
+                      </div>
+                    </>
+                  )}
+
                   <div>
-                    <label className="text-sm font-medium text-gray-700 mb-2 block">
+                    <label className="mb-2 block text-sm font-semibold text-slate-700">
                       Email Address
                     </label>
-
-                    <div className="flex items-center border-2 border-gray-200 rounded-xl px-4 py-3 focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-100 transition-all">
-                      <Mail className="text-blue-500 mr-3" size={20} />
-
+                    <div className="flex items-center rounded-2xl border border-slate-200 bg-white px-4 py-3.5 transition-all focus-within:border-cyan-500 focus-within:ring-4 focus-within:ring-cyan-100">
+                      <Mail className="mr-3 h-5 w-5 text-cyan-600" />
                       <input
                         type="email"
-                        placeholder="Enter your email"
+                        placeholder={selectedRole === "store" ? "Enter your store email" : "Enter your email"}
                         name="email"
                         value={formData.email}
                         onChange={handleChange}
                         required
-                        className="w-full outline-none bg-transparent"
+                        className="w-full bg-transparent text-slate-800 outline-none placeholder:text-slate-400"
                       />
                     </div>
                   </div>
 
-                  {/* PASSWORD */}
-                  <div>
-                    <label className="text-sm font-medium text-gray-700 mb-2 block">
-                      Password
-                    </label>
+                  {selectedRole === "patient" && (
+                    <>
+                      <div>
+                        <label className="mb-2 block text-sm font-semibold text-slate-700">
+                          Address
+                        </label>
+                        <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3.5 transition-all focus-within:border-cyan-500 focus-within:ring-4 focus-within:ring-cyan-100">
+                          <textarea
+                            name="address"
+                            value={formData.address}
+                            onChange={handleChange}
+                            rows="3"
+                            placeholder="Enter full address"
+                            required
+                            className="w-full resize-none bg-transparent text-slate-800 outline-none placeholder:text-slate-400"
+                          />
+                        </div>
+                      </div>
 
-                    <div className="flex items-center border-2 border-gray-200 rounded-xl px-4 py-3 focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-100 transition-all">
-                      <Lock className="text-blue-500 mr-3" size={20} />
+                      <div className="grid gap-5 sm:grid-cols-2">
+                        <div>
+                          <label className="mb-2 block text-sm font-semibold text-slate-700">
+                            State
+                          </label>
+                          <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3.5 transition-all focus-within:border-cyan-500 focus-within:ring-4 focus-within:ring-cyan-100">
+                            <select
+                              name="state"
+                              value={formData.state}
+                              onChange={handleChange}
+                              required
+                              className="w-full bg-transparent text-slate-800 outline-none"
+                            >
+                              <option value="">Select state</option>
+                              <option value="Maharashtra">Maharashtra</option>
+                              <option value="Karnataka">Karnataka</option>
+                              <option value="Delhi">Delhi</option>
+                              <option value="Gujarat">Gujarat</option>
+                              <option value="Tamil Nadu">Tamil Nadu</option>
+                            </select>
+                          </div>
+                        </div>
 
-                      <input
-                        type={type}
-                        placeholder="Create a strong password"
-                        name="password"
-                        value={formData.password}
-                        onChange={handleChange}
-                        required
-                        className="w-full outline-none bg-transparent"
-                      />
+                        <div>
+                          <label className="mb-2 block text-sm font-semibold text-slate-700">
+                            Pincode
+                          </label>
+                          <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3.5 transition-all focus-within:border-cyan-500 focus-within:ring-4 focus-within:ring-cyan-100">
+                            <input
+                              type="text"
+                              name="pincode"
+                              value={formData.pincode}
+                              onChange={handleChange}
+                              placeholder="Enter pincode"
+                              required
+                              className="w-full bg-transparent text-slate-800 outline-none placeholder:text-slate-400"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    </>
+                  )}
 
-                      {type === "password" ? (
-                        <FaRegEyeSlash
-                          onClick={() => setType("text")}
-                          className="text-blue-500 cursor-pointer"
-                        />
-                      ) : (
-                        <FaRegEye
-                          onClick={() => setType("password")}
-                          className="text-blue-500 cursor-pointer"
-                        />
-                      )}
+                  {selectedRole === "store" && (
+                    <>
+                      <div className="grid gap-5 sm:grid-cols-2">
+                        <div>
+                          <label className="mb-2 block text-sm font-semibold text-slate-700">
+                            Contact Number
+                          </label>
+                          <div className="flex items-center rounded-2xl border border-slate-200 bg-white px-4 py-3.5 transition-all focus-within:border-teal-500 focus-within:ring-4 focus-within:ring-teal-100">
+                            <select
+                              name="countryCode"
+                              value={formData.countryCode}
+                              onChange={handleChange}
+                              className="mr-3 bg-transparent text-slate-800 outline-none"
+                            >
+                              <option value="+91">+91</option>
+                              <option value="+1">+1</option>
+                              <option value="+44">+44</option>
+                              <option value="+61">+61</option>
+                            </select>
+                            <input
+                              type="tel"
+                              name="mobile"
+                              value={formData.mobile}
+                              onChange={handleChange}
+                              placeholder="Enter store contact number"
+                              required
+                              className="w-full bg-transparent text-slate-800 outline-none placeholder:text-slate-400"
+                            />
+                          </div>
+                        </div>
+
+                        <div>
+                          <label className="mb-2 block text-sm font-semibold text-slate-700">
+                            Licence Number
+                          </label>
+                          <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3.5 transition-all focus-within:border-teal-500 focus-within:ring-4 focus-within:ring-teal-100">
+                            <input
+                              type="text"
+                              name="licenceNumber"
+                              value={formData.licenceNumber}
+                              onChange={handleChange}
+                              placeholder="Enter pharmacy licence number"
+                              required
+                              className="w-full bg-transparent text-slate-800 outline-none placeholder:text-slate-400"
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="grid gap-5 sm:grid-cols-2">
+                        <div>
+                          <label className="mb-2 block text-sm font-semibold text-slate-700">
+                            GST Number
+                          </label>
+                          <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3.5 transition-all focus-within:border-teal-500 focus-within:ring-4 focus-within:ring-teal-100">
+                            <input
+                              type="text"
+                              name="gstNumber"
+                              value={formData.gstNumber}
+                              onChange={handleChange}
+                              placeholder="Enter GST number"
+                              className="w-full bg-transparent text-slate-800 outline-none placeholder:text-slate-400"
+                            />
+                          </div>
+                        </div>
+
+                        <div>
+                          <label className="mb-2 block text-sm font-semibold text-slate-700">
+                            City
+                          </label>
+                          <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3.5 transition-all focus-within:border-teal-500 focus-within:ring-4 focus-within:ring-teal-100">
+                            <input
+                              type="text"
+                              name="city"
+                              value={formData.city}
+                              onChange={handleChange}
+                              placeholder="Enter city"
+                              required
+                              className="w-full bg-transparent text-slate-800 outline-none placeholder:text-slate-400"
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="mb-2 block text-sm font-semibold text-slate-700">
+                          Store Address
+                        </label>
+                        <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3.5 transition-all focus-within:border-teal-500 focus-within:ring-4 focus-within:ring-teal-100">
+                          <textarea
+                            name="address"
+                            value={formData.address}
+                            onChange={handleChange}
+                            rows="3"
+                            placeholder="Enter complete store address"
+                            required
+                            className="w-full resize-none bg-transparent text-slate-800 outline-none placeholder:text-slate-400"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="grid gap-5 sm:grid-cols-2">
+                        <div>
+                          <label className="mb-2 block text-sm font-semibold text-slate-700">
+                            State
+                          </label>
+                          <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3.5 transition-all focus-within:border-teal-500 focus-within:ring-4 focus-within:ring-teal-100">
+                            <select
+                              name="state"
+                              value={formData.state}
+                              onChange={handleChange}
+                              required
+                              className="w-full bg-transparent text-slate-800 outline-none"
+                            >
+                              <option value="">Select state</option>
+                              <option value="Maharashtra">Maharashtra</option>
+                              <option value="Karnataka">Karnataka</option>
+                              <option value="Delhi">Delhi</option>
+                              <option value="Gujarat">Gujarat</option>
+                              <option value="Tamil Nadu">Tamil Nadu</option>
+                            </select>
+                          </div>
+                        </div>
+
+                        <div>
+                          <label className="mb-2 block text-sm font-semibold text-slate-700">
+                            Pincode
+                          </label>
+                          <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3.5 transition-all focus-within:border-teal-500 focus-within:ring-4 focus-within:ring-teal-100">
+                            <input
+                              type="text"
+                              name="pincode"
+                              value={formData.pincode}
+                              onChange={handleChange}
+                              placeholder="Enter pincode"
+                              required
+                              className="w-full bg-transparent text-slate-800 outline-none placeholder:text-slate-400"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    </>
+                  )}
+
+                  {selectedRole === "patient" && (
+                    <div className="grid gap-5 sm:grid-cols-2">
+                      <div>
+                        <label className="mb-2 block text-sm font-semibold text-slate-700">
+                          Password
+                        </label>
+                        <div className="flex items-center rounded-2xl border border-slate-200 bg-white px-4 py-3.5 transition-all focus-within:border-cyan-500 focus-within:ring-4 focus-within:ring-cyan-100">
+                          <Lock className="mr-3 h-5 w-5 text-cyan-600" />
+                          <input
+                            type={type}
+                            placeholder="Create a strong password"
+                            name="password"
+                            value={formData.password}
+                            onChange={handleChange}
+                            required
+                            className="w-full bg-transparent text-slate-800 outline-none placeholder:text-slate-400"
+                          />
+
+                          {type === "password" ? (
+                            <FaRegEyeSlash
+                              onClick={() => setType("text")}
+                              className="cursor-pointer text-cyan-600"
+                            />
+                          ) : (
+                            <FaRegEye
+                              onClick={() => setType("password")}
+                              className="cursor-pointer text-cyan-600"
+                            />
+                          )}
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="mb-2 block text-sm font-semibold text-slate-700">
+                          Confirm Password
+                        </label>
+                        <div className="flex items-center rounded-2xl border border-slate-200 bg-white px-4 py-3.5 transition-all focus-within:border-cyan-500 focus-within:ring-4 focus-within:ring-cyan-100">
+                          <Lock className="mr-3 h-5 w-5 text-cyan-600" />
+                          <input
+                            type={type2}
+                            placeholder="Confirm your password"
+                            name="confirmPassword"
+                            value={formData.confirmPassword}
+                            onChange={handleChange}
+                            required
+                            className="w-full bg-transparent text-slate-800 outline-none placeholder:text-slate-400"
+                          />
+
+                          {type2 === "password" ? (
+                            <FaRegEyeSlash
+                              onClick={() => setType2("text")}
+                              className="cursor-pointer text-cyan-600"
+                            />
+                          ) : (
+                            <FaRegEye
+                              onClick={() => setType2("password")}
+                              className="cursor-pointer text-cyan-600"
+                            />
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="grid gap-3 rounded-[1.5rem] border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600 sm:grid-cols-3">
+                    <div className="rounded-2xl bg-white px-4 py-3 shadow-sm">
+                      <p className="font-semibold text-slate-900">Pharmacy Ready</p>
+                      <p className="mt-1 text-xs leading-6">Built around medicine ordering and care workflows.</p>
+                    </div>
+                    <div className="rounded-2xl bg-white px-4 py-3 shadow-sm">
+                      <p className="font-semibold text-slate-900">Secure Access</p>
+                      <p className="mt-1 text-xs leading-6">Protected profile access for daily activity.</p>
+                    </div>
+                    <div className="rounded-2xl bg-white px-4 py-3 shadow-sm">
+                      <p className="font-semibold text-slate-900">Fast Start</p>
+                      <p className="mt-1 text-xs leading-6">Create your account and begin immediately.</p>
                     </div>
                   </div>
 
-                  {/* CONFIRM PASSWORD */}
-                  <div>
-                    <label className="text-sm font-medium text-gray-700 mb-2 block">
-                      Confirm Password
-                    </label>
-
-                    <div className="flex items-center border-2 border-gray-200 rounded-xl px-4 py-3 focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-100 transition-all">
-                      <Lock className="text-blue-500 mr-3" size={20} />
-
-                      <input
-                        type={type2}
-                        placeholder="Confirm your password"
-                        name="confirmPassword"
-                        value={formData.confirmPassword}
-                        onChange={handleChange}
-                        required
-                        className="w-full outline-none bg-transparent"
-                      />
-
-                      {type2 === "password" ? (
-                        <FaRegEyeSlash
-                          onClick={() => setType2("text")}
-                          className="text-blue-500 cursor-pointer"
-                        />
-                      ) : (
-                        <FaRegEye
-                          onClick={() => setType2("password")}
-                          className="text-blue-500 cursor-pointer"
-                        />
-                      )}
-                    </div>
-                  </div>
-
-                  {/* SIGNUP BUTTON */}
                   <button
                     type="submit"
-                    className="bg-gradient-to-r from-blue-600 to-cyan-600 text-white py-3.5 rounded-xl font-semibold hover:from-blue-700 hover:to-cyan-700 transition-all shadow-lg hover:shadow-xl"
+                    className={`flex w-full items-center justify-center gap-2 rounded-2xl px-6 py-4 text-sm font-semibold text-white transition-all hover:-translate-y-0.5 ${
+                      selectedRole === "store"
+                        ? "bg-gradient-to-r from-slate-900 to-teal-700 shadow-lg shadow-slate-200 hover:from-slate-800 hover:to-teal-600"
+                        : "bg-gradient-to-r from-cyan-600 to-sky-600 shadow-lg shadow-cyan-200 hover:from-cyan-700 hover:to-sky-700"
+                    }`}
                   >
-                    Create Account
+                    {selectedRole === "store" ? "Request Store Access" : "Create Patient Account"}
+                    <ArrowRight className="h-4 w-4" />
                   </button>
                 </form>
 
-                {/* BACK BUTTON */}
-                <p className="text-sm text-gray-500 mt-6 text-center">
-                  <span
-                    onClick={handleBackToRole}
-                    className="text-blue-600 font-semibold cursor-pointer hover:underline"
-                  >
-                    Back to role selection
-                  </span>
-                </p>
+                {selectedRole === "patient" && (
+                  <>
+                    <div className="my-7 flex items-center gap-4">
+                      <div className="h-px flex-1 bg-slate-200"></div>
+                      <span className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">
+                        Or continue with
+                      </span>
+                      <div className="h-px flex-1 bg-slate-200"></div>
+                    </div>
 
-                {/* DIVIDER */}
-                <div className="flex items-center my-6">
-                  <div className="flex-grow border-t"></div>
-                  <span className="px-4 text-sm text-gray-500">
-                    Or continue with
-                  </span>
-                  <div className="flex-grow border-t"></div>
-                </div>
+                    <div className="grid grid-cols-3 gap-3">
+                      <button
+                        type="button"
+                        className="flex items-center justify-center rounded-2xl border border-slate-200 bg-white py-3 text-lg text-red-500 transition hover:-translate-y-0.5 hover:border-red-200 hover:bg-red-50"
+                      >
+                        <FaGoogle />
+                      </button>
 
-                {/* SOCIAL SIGNUP BUTTONS */}
-                <div className="grid grid-cols-3 gap-3">
-                  <button
-                    type="button"
-                    className="flex items-center justify-center gap-2 border-2 border-gray-200 py-3 rounded-xl hover:bg-gray-50 transition"
-                  >
-                    <FaGoogle className="text-red-500 text-xl" />
-                  </button>
+                      <button
+                        type="button"
+                        className="flex items-center justify-center rounded-2xl border border-slate-200 bg-white py-3 text-lg text-blue-600 transition hover:-translate-y-0.5 hover:border-blue-200 hover:bg-blue-50"
+                      >
+                        <FaFacebook />
+                      </button>
 
-                  <button
-                    type="button"
-                    className="flex items-center justify-center gap-2 border-2 border-gray-200 py-3 rounded-xl hover:bg-gray-50 transition"
-                  >
-                    <FaFacebook className="text-blue-600 text-xl" />
-                  </button>
+                      <button
+                        type="button"
+                        className="flex items-center justify-center rounded-2xl border border-slate-200 bg-white py-3 text-lg text-sky-500 transition hover:-translate-y-0.5 hover:border-sky-200 hover:bg-sky-50"
+                      >
+                        <FaTwitter />
+                      </button>
+                    </div>
+                  </>
+                )}
 
-                  <button
-                    type="button"
-                    className="flex items-center justify-center gap-2 border-2 border-gray-200 py-3 rounded-xl hover:bg-gray-50 transition"
-                  >
-                    <FaTwitter className="text-sky-500 text-xl" />
-                  </button>
-                </div>
-
-                <p className="text-sm text-gray-500 mt-6 text-center">
+                <p className="mt-7 text-center text-sm text-slate-500">
                   Already have an account?{" "}
                   <span
                     onClick={() => navigate("/login")}
-                    className="text-blue-600 font-semibold cursor-pointer hover:underline"
+                    className="cursor-pointer font-semibold text-cyan-700 transition hover:text-cyan-800 hover:underline"
                   >
                     Login
                   </span>

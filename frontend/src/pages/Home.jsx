@@ -1,310 +1,340 @@
-import React, { useState } from "react";
-import arrow from "../assets/arrow.png";
-import semicircle from "../assets/semicircle.png";
-import doctor from "../assets/doctor.png";
-import bgelement from "../assets/bg element.png";
-import search from "../assets/search.png";
-import pharm from "../assets/pharm.png";
+import React, { useEffect } from "react";
 import emergency from "../assets/emergency.png";
 import info from "../assets/info.png";
-import consultation from "../assets/consultation.png";
 import tracking from "../assets/tracking.png";
-import feedback from "../assets/feedback.png";
 import Footer from "../components/Footer";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import FeedbackCarousal from "../components/FeedbackCarousal";
-import toast from "react-hot-toast";
-import { baseURL } from "../main";
-import axios from "axios";
-import { Heart, Zap, Shield, Clock, Users, TrendingUp } from "lucide-react";
+import {
+  Shield,
+  Clock,
+  Truck,
+  Pill,
+  FileText,
+  Search,
+  ShoppingCart,
+  PackageCheck,
+  Sparkles,
+  ArrowRight,
+  HeartPulse,
+  CheckCircle2,
+} from "lucide-react";
 
 const Home = () => {
   const navigate = useNavigate();
-  const [formData, setFormData] = useState({
-    name: "",
-    location: "",
-  });
+  const location = useLocation();
 
-  const handleChange = (e) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value,
-    });
-  };
-
-  const handleClickSearch = () => navigate("/searchdoctor");
-  const handleConsultation = () => navigate("/");
   const handleOnlinePharmacy = () => navigate("/onlinepharmacy");
-  const handleMLPharmacy = () => navigate("/disease");
   const handleEmergencyPharmacy = () => navigate("/emergencyguidelines");
-  const handleDoctorSearch = () => navigate("/searchdoctor");
+  const handlePrescriptionHelp = () => navigate("/dashboard", { state: { openSection: "prescriptions" } });
 
-  const handleEmergencyComingSoon = () => {
-    toast("Coming Soon...", {
-      style: {
-        background: "#2563eb",
-        color: "#fff",
-      },
-    });
-  };
+  useEffect(() => {
+    const sectionId = location.state?.scrollToSection;
+    if (!sectionId) return;
+
+    const scrollToRequestedSection = () => {
+      const headerOffsetValue = parseInt(
+        getComputedStyle(document.documentElement).getPropertyValue('--app-navbar-offset') || '88',
+        10,
+      );
+      const element = document.getElementById(sectionId);
+
+      if (!element) return;
+
+      const offsetPosition = element.getBoundingClientRect().top + window.pageYOffset - headerOffsetValue - 8;
+      window.scrollTo({ top: offsetPosition, behavior: 'smooth' });
+      navigate('.', { replace: true, state: null });
+    };
+
+    const timeoutId = window.setTimeout(scrollToRequestedSection, 80);
+    return () => window.clearTimeout(timeoutId);
+  }, [location.state, navigate]);
 
   return (
-    <div className="w-full overflow-hidden">
-      {/* ================= HERO SECTION ================= */}
-      <div
+    <div className="w-full overflow-hidden bg-[#f7fbff]">
+      <section
         id="head"
-        className="relative w-full lg:min-h-screen bg-gradient-to-br from-blue-50 via-white to-emerald-50 flex items-start lg:items-center px-4 sm:px-6 lg:px-16 pt-24 lg:pt-0 pb-12 lg:pb-0 overflow-hidden"
+        className="relative overflow-hidden px-4 sm:px-6 lg:px-16 pb-16 lg:pb-24"
+        style={{ paddingTop: 'calc(var(--app-navbar-offset, 88px) + 1.5rem)' }}
       >
-        {/* Animated Background Elements */}
-        <div className="absolute top-10 left-10 w-72 h-72 bg-blue-200/20 rounded-full blur-3xl animate-pulse"></div>
-        <div className="absolute bottom-0 right-20 w-96 h-96 bg-emerald-200/20 rounded-full blur-3xl animate-pulse" style={{ animationDelay: "1s" }}></div>
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_18%,rgba(56,189,248,0.25),transparent_35%),radial-gradient(circle_at_78%_18%,rgba(34,197,94,0.16),transparent_30%),radial-gradient(circle_at_55%_82%,rgba(14,165,233,0.16),transparent_30%)]" />
+        <div className="absolute -right-20 top-0 h-72 w-72 rounded-full bg-cyan-300/25 blur-3xl" />
+        <div className="absolute -left-12 bottom-0 h-80 w-80 rounded-full bg-sky-300/25 blur-3xl" />
 
-        {/* Left Content */}
-        <div className="w-full lg:w-1/2 z-10 relative">
-          <div className="space-y-6 animate-fade-in">
-            <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold leading-tight text-gray-900">
-              Find & Search Your
+        <div className="relative z-10 mx-auto grid max-w-7xl items-center gap-10 lg:grid-cols-[1.1fr_0.9fr]">
+          <div className="space-y-7 animate-fade-in-up">
+            <span className="inline-flex items-center gap-2 rounded-full border border-cyan-200 bg-white/70 px-4 py-1.5 text-xs font-semibold uppercase tracking-[0.2em] text-cyan-700 shadow-sm">
+              <Sparkles className="h-3.5 w-3.5" />
+              Smart Pharmacy Experience
+            </span>
+
+            <h1 className="max-w-3xl text-4xl font-black leading-tight text-slate-900 md:text-6xl">
+              Medicines Delivered
+              <span className="block bg-gradient-to-r from-cyan-600 via-sky-600 to-emerald-500 bg-clip-text text-transparent">
+                Faster. Safer. Smarter.
+              </span>
             </h1>
 
-            <div className="flex flex-wrap items-center gap-3 lg:gap-4">
-              <div className="text-blue-600 relative">
-                <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold leading-tight">
-                  Favourite
-                </h1>
-                <div className="absolute -bottom-2 left-0 w-full h-1 bg-gradient-to-r from-blue-600 to-transparent rounded-full"></div>
-              </div>
-
-              <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold leading-tight text-gray-900">
-                Doctor
-              </h1>
-            </div>
-
-            <p className="text-gray-600 text-base lg:text-lg lg:w-4/5 leading-relaxed">
-              Connect with experienced medical professionals, book appointments, and manage your healthcare journey effortlessly. Access trusted specialists in your area.
+            <p className="max-w-2xl text-base leading-8 text-slate-600 md:text-lg">
+              From prescription upload to doorstep delivery, MedVision blends trust, speed, and clarity into one seamless pharmacy journey.
             </p>
 
-            <div className="flex flex-col sm:flex-row gap-4 pt-4">
+            <div className="flex flex-col gap-3 sm:flex-row">
               <button
-                onClick={handleClickSearch}
-                className="px-8 py-3.5 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl font-semibold
-                shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-300 active:scale-95
-                flex items-center justify-center gap-2 sm:w-auto"
+                onClick={handleOnlinePharmacy}
+                className="inline-flex items-center justify-center gap-2 rounded-xl bg-slate-900 px-7 py-3.5 text-sm font-semibold text-white shadow-lg shadow-slate-300 transition hover:-translate-y-0.5 hover:bg-slate-800"
               >
-                <Zap className="w-5 h-5" />
-                Get Started
+                <ShoppingCart className="h-5 w-5" />
+                Start Shopping
               </button>
-
               <button
-                onClick={handleDoctorSearch}
-                className="px-8 py-3.5 border-2 border-blue-600 text-blue-600 rounded-xl font-semibold
-                hover:bg-blue-50 transition-all duration-300 active:scale-95"
+                onClick={handlePrescriptionHelp}
+                className="inline-flex items-center justify-center gap-2 rounded-xl border border-violet-200 bg-violet-50 px-7 py-3.5 text-sm font-semibold text-violet-700 transition hover:bg-violet-100"
               >
-                Explore Doctors
+                <FileText className="h-5 w-5" />
+                Prescription Help
+              </button>
+              <button
+                onClick={handleEmergencyPharmacy}
+                className="inline-flex items-center justify-center gap-2 rounded-xl border border-cyan-300 bg-white px-7 py-3.5 text-sm font-semibold text-cyan-700 transition hover:bg-cyan-50"
+              >
+                <HeartPulse className="h-5 w-5" />
+                Emergency Guidance
               </button>
             </div>
 
-            {/* Stats */}
-            <div className="grid grid-cols-3 gap-4 pt-8 border-t border-gray-200">
-              <div className="flex items-center gap-2">
-                <Users className="w-5 h-5 text-blue-600" />
-                <div>
-                  <p className="font-bold text-gray-900">5000+</p>
-                  <p className="text-xs text-gray-500">Doctors</p>
+            <div className="grid grid-cols-3 gap-3 pt-5">
+              <div className="rounded-2xl border border-sky-100 bg-white/80 p-4 shadow-sm">
+                <p className="text-2xl font-bold text-sky-700">12K+</p>
+                <p className="mt-1 text-xs font-medium text-slate-500">Orders Delivered</p>
+              </div>
+              <div className="rounded-2xl border border-cyan-100 bg-white/80 p-4 shadow-sm">
+                <p className="text-2xl font-bold text-cyan-700">1.5L+</p>
+                <p className="mt-1 text-xs font-medium text-slate-500">Medicines Listed</p>
+              </div>
+              <div className="rounded-2xl border border-emerald-100 bg-white/80 p-4 shadow-sm">
+                <p className="text-2xl font-bold text-emerald-700">30 Min</p>
+                <p className="mt-1 text-xs font-medium text-slate-500">Avg Dispatch</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="relative hidden lg:block animate-fade-in-right">
+            <div className="rounded-[2rem] border border-white/70 bg-white/80 p-7 shadow-2xl backdrop-blur-xl">
+              <div className="rounded-2xl bg-gradient-to-r from-slate-900 to-cyan-700 p-6 text-white">
+                <p className="text-xs uppercase tracking-[0.2em] text-cyan-200">Pharmacy Store Highlights</p>
+                <h3 className="mt-3 text-2xl font-bold">Everything You Need, Organized Better</h3>
+                <p className="mt-2 text-sm text-cyan-100">Explore medicine categories, discover essentials, and order confidently.</p>
+
+                <div className="mt-5 grid grid-cols-2 gap-3">
+                  <div className="rounded-xl bg-white/10 px-3 py-3 text-sm">
+                    <p className="text-cyan-100">OTC & Wellness</p>
+                    <p className="font-semibold">18K+ products</p>
+                  </div>
+                  <div className="rounded-xl bg-white/10 px-3 py-3 text-sm">
+                    <p className="text-cyan-100">Prescription</p>
+                    <p className="font-semibold">Upload & verify</p>
+                  </div>
+                  <div className="rounded-xl bg-white/10 px-3 py-3 text-sm">
+                    <p className="text-cyan-100">Family Care</p>
+                    <p className="font-semibold">Daily essentials</p>
+                  </div>
+                  <div className="rounded-xl bg-white/10 px-3 py-3 text-sm">
+                    <p className="text-cyan-100">Devices</p>
+                    <p className="font-semibold">Monitors & kits</p>
+                  </div>
                 </div>
               </div>
-              <div className="flex items-center gap-2">
-                <Heart className="w-5 h-5 text-emerald-600" />
-                <div>
-                  <p className="font-bold text-gray-900">50K+</p>
-                  <p className="text-xs text-gray-500">Happy Patients</p>
+
+              <div className="mt-5 grid grid-cols-2 gap-3">
+                <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                  <img src={tracking} alt="tracking" className="h-10 w-10 object-contain" />
+                  <p className="mt-3 text-sm font-semibold text-slate-800">Store Categories</p>
+                  <p className="text-xs text-slate-500">Browse by needs: fever, cold, diabetes, immunity.</p>
+                </div>
+                <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                  <img src={info} alt="info" className="h-10 w-10 object-contain" />
+                  <p className="mt-3 text-sm font-semibold text-slate-800">Smart Refill</p>
+                  <p className="text-xs text-slate-500">Reorder your routine medicines in a click.</p>
                 </div>
               </div>
-              <div className="flex items-center gap-2">
-                <TrendingUp className="w-5 h-5 text-blue-600" />
-                <div>
-                  <p className="font-bold text-gray-900">4.8★</p>
-                  <p className="text-xs text-gray-500">Rating</p>
-                </div>
+
+              <div className="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3">
+                <p className="text-xs font-semibold uppercase tracking-[0.15em] text-emerald-700">Most Ordered Today</p>
+                <p className="mt-1 text-sm text-emerald-800">Paracetamol, Vitamin D3, Cough Syrup, ORS Packs</p>
               </div>
             </div>
           </div>
         </div>
+      </section>
 
-        {/* Right Image */}
-        <div className="hidden lg:flex w-1/2 relative justify-center items-end">
-          <img
-            src={semicircle}
-            alt="semicircle"
-            className="absolute bottom-0 right-0 w-full opacity-20 animate-pulse"
-          />
-          <div className="relative h-[85vh] drop-shadow-2xl animate-float">
-            <img
-              src={doctor}
-              alt="doctor"
-              className="h-full object-contain"
-            />
-          </div>
-        </div>
-      </div>
-
-      {/* ================= FEATURES HIGHLIGHT ================= */}
-      <div className="bg-white py-12 px-4 sm:px-6 lg:px-16 border-b border-gray-100">
-        <div className="max-w-7xl mx-auto grid grid-cols-2 md:grid-cols-4 gap-6">
+      <section className="px-4 sm:px-6 lg:px-16 pb-10">
+        <div className="mx-auto grid max-w-7xl grid-cols-2 gap-4 md:grid-cols-4">
           {[
-            { icon: Clock, label: "24/7 Available", color: "blue" },
-            { icon: Shield, label: "Secure & Safe", color: "emerald" },
-            { icon: Zap, label: "Instant Booking", color: "blue" },
-            { icon: Heart, label: "Best Doctors", color: "emerald" },
+            { icon: Clock, label: "24/7 Order Support", tone: "text-sky-700 bg-sky-100 border-sky-200" },
+            { icon: Shield, label: "100% Genuine Medicines", tone: "text-cyan-700 bg-cyan-100 border-cyan-200" },
+            { icon: Truck, label: "Fast Doorstep Delivery", tone: "text-emerald-700 bg-emerald-100 border-emerald-200" },
+            { icon: FileText, label: "Quick Prescription Upload", tone: "text-violet-700 bg-violet-100 border-violet-200" },
           ].map((feature, i) => (
-            <div
-              key={i}
-              className="flex flex-col items-center text-center p-4 rounded-xl hover:bg-blue-50 transition-colors duration-300 group"
-            >
-              <div className={`p-3 rounded-lg bg-${feature.color}-100 group-hover:scale-110 transition-transform duration-300 mb-3`}>
-                <feature.icon className={`w-6 h-6 text-${feature.color}-600`} />
+            <div key={i} className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm transition hover:-translate-y-1 hover:shadow-md">
+              <div className={`mb-3 inline-flex rounded-xl border p-2.5 ${feature.tone}`}>
+                <feature.icon className="h-5 w-5" />
               </div>
-              <p className="font-semibold text-gray-800 text-sm">{feature.label}</p>
+              <p className="text-sm font-semibold text-slate-800">{feature.label}</p>
             </div>
           ))}
         </div>
-      </div>
+      </section>
 
-      {/* ================= SERVICES SECTION ================= */}
-      <div id="about" className="py-20 px-4 sm:px-6 lg:px-16 relative bg-gradient-to-br from-gray-50 to-white overflow-hidden">
+      <section id="about" className="relative overflow-hidden px-4 sm:px-6 lg:px-16 py-20">
+        <div className="absolute -left-24 top-10 h-64 w-64 rounded-full bg-cyan-200/25 blur-3xl" />
+        <div className="absolute -right-24 bottom-0 h-72 w-72 rounded-full bg-sky-200/25 blur-3xl" />
 
-        {/* Decorative Elements */}
-        <div className="absolute -top-40 -right-40 w-80 h-80 bg-blue-200/30 rounded-full blur-3xl"></div>
-        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-emerald-200/30 rounded-full blur-3xl"></div>
-
-        <div className="relative z-10 max-w-7xl mx-auto">
-          <div className="text-center mb-16">
-            <h2 className="text-4xl md:text-5xl font-bold text-gray-900 mb-4">
-              Comprehensive Healthcare <span className="text-blue-600">Solutions</span>
-            </h2>
-
-            <p className="text-gray-600 text-lg max-w-3xl mx-auto">
-              We provide tailored healthcare solutions designed around your needs. Experience seamless medical assistance with trusted professionals.
+        <div className="relative mx-auto max-w-7xl">
+          <div className="mb-12 text-center">
+            <h2 className="text-4xl font-extrabold text-slate-900 md:text-5xl">Designed For Daily Care</h2>
+            <p className="mx-auto mt-4 max-w-3xl text-lg text-slate-600">
+              Everything you need to search medicines, get prescription support, and manage urgent needs without switching platforms.
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+          <div className="grid grid-cols-1 gap-7 md:grid-cols-2 lg:grid-cols-3">
             {[
               {
-                img: consultation,
-                title: "Book Appointments",
-                desc: "Choose your doctor from thousands of specialists and trusted hospitals.",
-                onClick: handleDoctorSearch,
-                icon: "📅",
+                img: info,
+                title: "Search Medicines",
+                desc: "Find medicines by name, compare options, and add items to your cart in seconds.",
+                onClick: handleOnlinePharmacy,
+                icon: <Search className="h-8 w-8 text-sky-600" />,
+                accent: "from-sky-50 to-cyan-50",
+                cta: "Open Pharmacy",
               },
               {
-                img: pharm,
-                title: "Online Pharmacy",
-                desc: "Buy medicines with easy and secure doorstep delivery.",
-                onClick: handleOnlinePharmacy,
-                icon: "💊",
+                img: tracking,
+                title: "Prescription Help",
+                desc: "Upload prescriptions, review active meds, and get guided support from your dashboard.",
+                onClick: handlePrescriptionHelp,
+                icon: <FileText className="h-8 w-8 text-violet-600" />,
+                accent: "from-violet-50 to-fuchsia-50",
+                cta: "Open Prescription Help",
               },
               {
                 img: emergency,
-                title: "Emergency Care",
-                desc: "Immediate care services available anytime for your family.",
-                onClick: handleEmergencyComingSoon,
-                icon: "🚑",
+                title: "Emergency Guidance",
+                desc: "Access first-step medicine guidance and emergency support instructions quickly.",
+                onClick: handleEmergencyPharmacy,
+                icon: <Shield className="h-8 w-8 text-emerald-600" />,
+                accent: "from-emerald-50 to-teal-50",
+                cta: "Open Emergency Help",
               },
             ].map((service, index) => (
-              <div
+              <button
+                type="button"
                 key={index}
                 onClick={service.onClick}
-                className="group relative bg-white rounded-2xl p-8 shadow-md hover:shadow-2xl transition-all duration-300 cursor-pointer hover:-translate-y-3 border border-gray-100 hover:border-blue-200 overflow-hidden"
+                className="group relative overflow-hidden rounded-3xl border border-slate-100 bg-white p-7 text-left shadow-md transition-all duration-300 hover:-translate-y-2 hover:shadow-2xl"
               >
-                {/* Hover gradient background */}
-                <div className="absolute inset-0 bg-gradient-to-br from-blue-50 to-emerald-50 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-
+                <div className={`absolute inset-0 bg-gradient-to-br ${service.accent} opacity-0 transition-opacity duration-300 group-hover:opacity-100`} />
                 <div className="relative z-10">
-                  <div className="flex items-center justify-between mb-4">
-                    <img
-                      src={service.img}
-                      alt={service.title}
-                      className="h-16 w-16 object-contain"
-                    />
-                    <span className="text-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-300 transform group-hover:scale-125">
+                  <div className="mb-4 flex items-center justify-between">
+                    <img src={service.img} alt={service.title} className="h-14 w-14 object-contain" />
+                    <span className="opacity-0 transition-all duration-300 group-hover:translate-x-0 group-hover:opacity-100">
                       {service.icon}
                     </span>
                   </div>
-
-                  <h3 className="text-xl font-bold text-gray-900 mb-3">
-                    {service.title}
-                  </h3>
-
-                  <p className="text-gray-600 text-sm leading-relaxed">
-                    {service.desc}
-                  </p>
-
-                  <div className="mt-6 pt-6 border-t border-gray-100 group-hover:border-blue-200 transition-colors duration-300">
-                    <p className="text-blue-600 font-semibold text-sm flex items-center gap-2">
-                      Learn More
-                      <span className="group-hover:translate-x-2 transition-transform duration-300">→</span>
-                    </p>
+                  <h3 className="text-2xl font-bold text-slate-900">{service.title}</h3>
+                  <p className="mt-3 text-sm leading-7 text-slate-600">{service.desc}</p>
+                  <div className="mt-6 inline-flex items-center gap-2 text-sm font-semibold text-slate-900">
+                    {service.cta}
+                    <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
                   </div>
                 </div>
-              </div>
+              </button>
             ))}
           </div>
-        </div>
-      </div>
 
-      {/* ================= TESTIMONIAL SECTION ================= */}
-      <div
-        id="feedback"
-        className="lg:min-h-screen bg-gradient-to-r from-blue-50 via-white to-emerald-50 flex flex-col lg:flex-row items-center px-4 sm:px-6 lg:px-16 py-20 lg:py-0 relative overflow-hidden"
-      >
-        {/* Decorative Elements */}
-        <div className="absolute top-20 left-10 w-64 h-64 bg-blue-200/20 rounded-full blur-3xl"></div>
-        <div className="absolute bottom-10 right-10 w-72 h-72 bg-emerald-200/20 rounded-full blur-3xl"></div>
-
-        {/* Left Text */}
-        <div className="w-full lg:w-1/2 text-center lg:text-left relative z-10 mb-12 lg:mb-0">
-          <h2 className="text-4xl md:text-5xl font-bold text-gray-900 leading-tight mb-2">
-            What Our
-          </h2>
-          <h2 className="text-4xl md:text-5xl font-bold mb-6">
-            <span className="bg-gradient-to-r from-blue-600 to-emerald-600 bg-clip-text text-transparent">
-              Patients Say
-            </span>
-          </h2>
-
-          <p className="text-gray-600 text-lg lg:w-4/5 leading-relaxed mb-8">
-            Trusted by thousands of patients for reliable and efficient healthcare services. Your satisfaction is our priority.
-          </p>
-
-          <div className="flex gap-4 lg:gap-8">
-            <div>
-              <p className="text-3xl font-bold text-blue-600">98%</p>
-              <p className="text-sm text-gray-600">Satisfaction</p>
-            </div>
-            <div>
-              <p className="text-3xl font-bold text-emerald-600">24/7</p>
-              <p className="text-sm text-gray-600">Support</p>
-            </div>
-            <div>
-              <p className="text-3xl font-bold text-blue-600">50K+</p>
-              <p className="text-sm text-gray-600">Reviews</p>
+          <div className="mt-12 rounded-[2rem] border border-slate-200 bg-white p-6 shadow-lg md:p-8">
+            <div className="grid gap-5 md:grid-cols-[1.3fr_1fr_1fr_1fr] md:items-center">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-cyan-700">How It Works</p>
+                <h3 className="mt-2 text-2xl font-bold text-slate-900">Three steps. One smooth flow.</h3>
+              </div>
+              {[
+                "Search and add medicines",
+                "Confirm shipping and payment",
+                "Track order in real time",
+              ].map((step, idx) => (
+                <div key={step} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                  <p className="text-sm font-semibold text-cyan-700">Step {idx + 1}</p>
+                  <p className="mt-2 text-sm text-slate-700">{step}</p>
+                </div>
+              ))}
             </div>
           </div>
         </div>
+      </section>
 
-        {/* Carousel */}
-        <div className="w-full lg:w-1/2 flex justify-center relative z-10">
-          <div className="w-full max-w-md">
+      <section
+        id="feedback"
+        className="relative overflow-hidden px-4 sm:px-6 lg:px-16 py-20"
+      >
+        <div className="absolute inset-0 bg-gradient-to-r from-slate-900 via-cyan-900 to-slate-900" />
+        <div className="absolute top-8 left-10 h-72 w-72 rounded-full bg-cyan-400/20 blur-3xl" />
+        <div className="absolute bottom-10 right-10 h-72 w-72 rounded-full bg-emerald-400/20 blur-3xl" />
+
+        <div className="relative mx-auto grid max-w-7xl gap-10 lg:grid-cols-[1fr_1fr] lg:items-center">
+          <div className="text-white">
+            <p className="text-xs font-semibold uppercase tracking-[0.3em] text-cyan-200">Patient Voices</p>
+            <h2 className="mt-3 text-4xl font-black leading-tight md:text-5xl">
+              First-time users become loyal in one order.
+            </h2>
+            <p className="mt-5 max-w-xl text-base leading-8 text-cyan-100">
+              Consistent delivery, genuine medicines, and transparent tracking create a pharmacy experience people trust.
+            </p>
+            <div className="mt-8 flex gap-8">
+              <div>
+                <p className="text-3xl font-bold text-white">98%</p>
+                <p className="text-sm text-cyan-100">Satisfaction</p>
+              </div>
+              <div>
+                <p className="text-3xl font-bold text-white">24/7</p>
+                <p className="text-sm text-cyan-100">Support</p>
+              </div>
+              <div>
+                <p className="text-3xl font-bold text-white">50K+</p>
+                <p className="text-sm text-cyan-100">Reviews</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="rounded-3xl border border-white/15 bg-white/10 p-5 backdrop-blur-md">
             <FeedbackCarousal />
           </div>
         </div>
-      </div>
+      </section>
 
-      {/* ================= FOOTER ================= */}
+      <section className="px-4 sm:px-6 lg:px-16 py-12">
+        <div className="mx-auto max-w-7xl rounded-[2rem] bg-gradient-to-r from-cyan-600 to-emerald-500 px-8 py-10 text-white shadow-2xl">
+          <div className="flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
+            <div>
+              <p className="text-xs uppercase tracking-[0.2em] text-cyan-100">Ready To Begin?</p>
+              <h3 className="mt-2 text-3xl font-black">Your medicines are just a few clicks away.</h3>
+            </div>
+            <button
+              onClick={handleOnlinePharmacy}
+              className="inline-flex items-center gap-2 rounded-xl bg-white px-6 py-3 text-sm font-semibold text-slate-900 transition hover:scale-[1.02]"
+            >
+              Go To Pharmacy
+              <ArrowRight className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+      </section>
+
       <Footer />
 
       <style>{`
-        @keyframes fadeIn {
+        @keyframes fadeInUp {
           from {
             opacity: 0;
             transform: translateY(20px);
@@ -315,21 +345,23 @@ const Home = () => {
           }
         }
 
-        @keyframes float {
-          0%, 100% {
-            transform: translateY(0px);
+        @keyframes fadeInRight {
+          from {
+            opacity: 0;
+            transform: translateX(20px);
           }
-          50% {
-            transform: translateY(-20px);
+          to {
+            opacity: 1;
+            transform: translateX(0);
           }
         }
 
-        .animate-fade-in {
-          animation: fadeIn 0.8s ease-out;
+        .animate-fade-in-up {
+          animation: fadeInUp 0.8s ease-out;
         }
 
-        .animate-float {
-          animation: float 3s ease-in-out infinite;
+        .animate-fade-in-right {
+          animation: fadeInRight 0.9s ease-out;
         }
       `}</style>
     </div>

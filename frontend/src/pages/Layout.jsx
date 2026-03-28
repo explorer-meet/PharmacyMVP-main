@@ -8,7 +8,7 @@ const Layout = () => {
     const location = useLocation();
 
     // Define the routes where Navbar should be shown
-    const showNavbarRoutes = ['/dashboard', '/searchdoctor', '/onlinepharmacy', '/login', '/signup', '/admindashboard', '/kidneyprediction', '/disease', '/heart-disease', '/lungcancerprediction', '/addmedicine', '/updatemedicine','/admintracking', '/deletemedicine',];
+    const showNavbarRoutes = ['/dashboard', '/onlinepharmacy', '/login', '/signup', '/admindashboard', '/kidneyprediction', '/disease', '/heart-disease', '/lungcancerprediction', '/addmedicine', '/updatemedicine','/admintracking', '/deletemedicine',];
 
     return (
         <div>

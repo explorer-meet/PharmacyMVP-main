@@ -3,13 +3,12 @@ import { Pill } from 'lucide-react';
 import SearchBar from '../components/SearchBar';
 import MedicineCard from '../components/MedicineCard';
 import CartButton from '../components/CartButton';
-import PromoBanner from '../components/PromoBanner';
-import PrescriptionDialog from '../components/PrescriptionDialog';
 import axios from 'axios';
 import { baseURL } from '../main';
 import { useLocation } from 'react-router-dom';
 import { useNavigate } from 'react-router-dom';
 import Navbar from '../components/Navbar';
+import CheckoutFooter from '../components/CheckoutFooter';
 
 function OnlinePharmacy() {
   const [searchTerm, setSearchTerm] = useState('');
@@ -20,7 +19,7 @@ function OnlinePharmacy() {
   const location = useLocation();
   const navigate = useNavigate();
   const [medicinename, setMedicineName] = useState(location.state?.medicinename || null);
-  const [isPrescriptionDialogOpen, setIsPrescriptionDialogOpen] = useState(false);
+  const [openCartOnLoad, setOpenCartOnLoad] = useState(Boolean(location.state?.openCart));
 
   const fetchmedicines = async () => {
     try {
@@ -69,6 +68,13 @@ function OnlinePharmacy() {
   }, [location, navigate]);
 
   useEffect(() => {
+    if (location.state?.openCart) {
+      setOpenCartOnLoad(true);
+      navigate(location.pathname, { replace: true, state: null });
+    }
+  }, [location, navigate]);
+
+  useEffect(() => {
     if (medicinename) {
       // Find a medicine that includes the medicinename (case insensitive)
       const matchedMedicine = medicines.find(med =>
@@ -99,7 +105,7 @@ function OnlinePharmacy() {
   return (
     <div className="relative z-[100]">
       <Navbar />
-      <div className="mt-20 min-h-screen bg-gray-50 relative">
+      <div className="min-h-screen bg-gray-50 relative" style={{ paddingTop: 'calc(var(--app-navbar-offset, 88px) + 0.5rem)' }}>
       <div className="bg-white/80 backdrop-blur-sm border-b border-gray-100 mb-8">
         <div className="max-w-6xl mx-auto px-4 py-4">
           <div className="flex items-center justify-center gap-3">
@@ -109,21 +115,9 @@ function OnlinePharmacy() {
         </div>
       </div>
 
-      <CartButton />
+      <CartButton openOnMount={openCartOnLoad} />
 
       <div className="max-w-6xl mx-auto px-4 pb-8">
-        <div className="text-center mb-8">
-          <p className="text-gray-600 max-w-2xl mx-auto">
-            Search our extensive catalog of medicines and check their availability
-          </p>
-          <button
-            onClick={() => setIsPrescriptionDialogOpen(true)}
-            className="mt-4 px-6 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors"
-          >
-            Upload Prescription
-          </button>
-        </div>
-
         <SearchBar onSearchChange={setSearchTerm} />
 
         <div className="mt-8">
@@ -134,10 +128,11 @@ function OnlinePharmacy() {
           ) : (
             <div>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                {displayedMedicines.map((medicine) => (
+                {displayedMedicines.map((medicine, index) => (
                   <MedicineCard
                     key={medicine.id}
                     {...medicine}
+                    requiresPrescription={index === 0 ? true : (medicine.requiresPrescription || false)}
                     onAddToCart={() => setCartCount((prev) => prev + 1)}
                   />
                 ))}
@@ -151,14 +146,9 @@ function OnlinePharmacy() {
           )}
         </div>
 
-        <PromoBanner />
       </div>
+      <CheckoutFooter />
     </div>
-
-    <PrescriptionDialog
-      isOpen={isPrescriptionDialogOpen}
-      onClose={() => setIsPrescriptionDialogOpen(false)}
-    />
     </div>
   );
 }

@@ -6,18 +6,29 @@ import Loader from "../components/Loader";
 import Navbar from "../components/Navbar";
 import { baseURL } from "../main";
 
-import { Mail, Lock, Heart, Activity, Shield } from "lucide-react";
+import {
+  Mail,
+  Lock,
+  Pill,
+  ShieldCheck,
+  Clock3,
+  PackageCheck,
+  Sparkles,
+  ArrowRight,
+  UserRound,
+  Store,
+} from "lucide-react";
 import { FaRegEyeSlash, FaRegEye } from "react-icons/fa";
-import {  FaGoogle, FaFacebook, FaTwitter } from "react-icons/fa";
+import { FaGoogle, FaFacebook, FaTwitter } from "react-icons/fa";
 
 const Login = () => {
 
   const [type, setType] = useState("password");
+  const [userType, setUserType] = useState("patient");
 
   const [formData, setFormData] = useState({
     email: "",
     password: "",
-    isDoctor: false,
   });
 
   const [loading, setLoading] = useState(false);
@@ -42,30 +53,37 @@ const Login = () => {
     setLoading(true);
 
     try {
-
-      const response = await axios.post(`${baseURL}/login`, formData);
-
-      if (response.status === 200) {
-
-        toast.success("Login successful!");
-
-        localStorage.setItem("medVisionToken", response.data.token);
-
-        navigate("/dashboard");
-
+      if (formData.email === 'admin@admin.com' && formData.password === 'admin') {
+        toast.success("Admin login successful!");
+        localStorage.setItem("medVisionToken", "admin-temp-token");
+        localStorage.setItem("medVisionUserType", 'admin');
+        navigate("/admindashboard");
+        return;
       }
 
+      const loginEndpoint = `${baseURL}/login`;
+      const loginPayload = {
+        ...formData,
+        isDoctor: false,
+        userType,
+      };
+      const response = await axios.post(loginEndpoint, loginPayload);
+
+      toast.success("Login successful!");
+      localStorage.setItem("medVisionToken", response.data.token);
+      localStorage.setItem("medVisionUserType", userType);
+
+      if (userType === 'store') {
+        navigate("/storeDashboard");
+      } else {
+        navigate("/");
+      }
     } catch (error) {
-
-      toast.error("Login failed. Please try again.");
+      toast.error(error?.response?.data?.message || "Login failed. Please try again.");
       console.error(error);
-
     } finally {
-
       setLoading(false);
-
     }
-
   };
 
   return (
@@ -76,116 +94,174 @@ const Login = () => {
         <>
           <Navbar />
 
-          <div className="min-h-screen bg-gradient-to-br from-blue-50 via-cyan-50 to-teal-50 flex items-center justify-center px-4 py-12 pt-28 relative overflow-hidden">
+          <div className="relative min-h-screen overflow-hidden bg-[linear-gradient(145deg,#f4fbff_0%,#eef8f7_42%,#f8fafc_100%)] px-4 pb-12" style={{ paddingTop: 'calc(var(--app-navbar-offset, 88px) + 2.5rem)' }}>
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(14,165,233,0.18),transparent_28%),radial-gradient(circle_at_top_right,rgba(16,185,129,0.16),transparent_30%),radial-gradient(circle_at_bottom,rgba(59,130,246,0.08),transparent_34%)]" />
+            <div className="absolute left-[-80px] top-28 h-72 w-72 rounded-full bg-cyan-200/40 blur-3xl" />
+            <div className="absolute right-[-70px] top-20 h-80 w-80 rounded-full bg-emerald-200/30 blur-3xl" />
+            <div className="absolute bottom-[-110px] left-1/3 h-80 w-80 rounded-full bg-sky-200/30 blur-3xl" />
 
-            {/* BACKGROUND BLOBS */}
-            <div className="absolute top-20 left-10 w-72 h-72 bg-blue-200 rounded-full mix-blend-multiply filter blur-3xl opacity-30"></div>
-            <div className="absolute top-40 right-10 w-72 h-72 bg-cyan-200 rounded-full mix-blend-multiply filter blur-3xl opacity-30"></div>
-            <div className="absolute -bottom-8 left-1/2 w-72 h-72 bg-teal-200 rounded-full mix-blend-multiply filter blur-3xl opacity-30"></div>
+            <div className="relative z-10 mx-auto grid w-full max-w-7xl gap-8 lg:grid-cols-[1.05fr_0.95fr]">
+              <div className="hidden lg:flex flex-col justify-between rounded-[2rem] border border-slate-200/70 bg-slate-900 px-10 py-10 text-white shadow-[0_24px_80px_rgba(15,23,42,0.18)]">
+                <div>
+                  <span className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-4 py-1.5 text-xs font-semibold uppercase tracking-[0.18em] text-cyan-100">
+                    <Sparkles className="h-3.5 w-3.5" />
+                    Pharmacy Login Portal
+                  </span>
 
-            <div className="w-full max-w-6xl bg-white/80 backdrop-blur-xl rounded-3xl shadow-2xl grid md:grid-cols-2 overflow-hidden relative z-10 border border-white/20">
-
-              {/* LEFT HEALTHCARE PANEL */}
-
-              <div className="hidden md:flex flex-col justify-center items-center bg-gradient-to-br from-[#0078F0] via-blue-600 to-cyan-600 text-white p-12">
-
-                <div className="bg-white/20 backdrop-blur-sm p-6 rounded-full mb-6 inline-flex">
-                  <Heart className="text-white text-5xl" strokeWidth={1.5} />
-                </div>
-
-                <h2 className="text-4xl font-bold mb-4 tracking-tight">
-                  MedVision Health
-                </h2>
-
-                <p className="text-white/90 text-lg text-center max-w-sm mb-8">
-                  Your trusted digital healthcare partner. Access prescriptions,
-                  manage appointments, and stay connected with pharmacy care.
-                </p>
-
-                <div className="flex gap-8">
-
-                  <div className="flex flex-col items-center gap-2">
-                    <div className="bg-white/20 p-3 rounded-full">
-                      <Shield size={22} />
-                    </div>
-                    <p className="text-sm text-white/80">Secure</p>
+                  <div className="mt-8 flex h-20 w-20 items-center justify-center rounded-3xl bg-gradient-to-br from-cyan-400 to-emerald-400 shadow-lg shadow-cyan-900/30">
+                    <Pill className="h-10 w-10 text-slate-950" strokeWidth={2} />
                   </div>
 
-                  <div className="flex flex-col items-center gap-2">
-                    <div className="bg-white/20 p-3 rounded-full">
-                      <Activity size={22} />
-                    </div>
-                    <p className="text-sm text-white/80">Real-time</p>
-                  </div>
+                  <h1 className="mt-8 max-w-lg text-5xl font-black leading-tight">
+                    Welcome back to a smarter pharmacy experience.
+                  </h1>
 
-                  <div className="flex flex-col items-center gap-2">
-                    <div className="bg-white/20 p-3 rounded-full">
-                      <Heart size={22} />
-                    </div>
-                    <p className="text-sm text-white/80">Trusted</p>
-                  </div>
-
-                </div>
-
-              </div>
-
-
-              {/* LOGIN FORM */}
-
-              <div className="flex flex-col justify-center p-8 md:p-12">
-
-                <div className="mb-8">
-                  <h2 className="text-3xl md:text-4xl font-bold text-gray-800 mb-2">
-                    Welcome Back
-                  </h2>
-
-                  <p className="text-gray-500">
-                    Sign in to access your healthcare portal
+                  <p className="mt-5 max-w-xl text-base leading-8 text-slate-300">
+                    Sign in to manage prescriptions, track orders, monitor deliveries, and keep your medicine workflow fast and dependable.
                   </p>
                 </div>
 
+                <div className="mt-10 grid gap-4">
+                  <div className="grid grid-cols-3 gap-4">
+                    <div className="rounded-3xl border border-white/10 bg-white/5 p-4">
+                      <ShieldCheck className="h-6 w-6 text-emerald-300" />
+                      <p className="mt-3 text-sm font-semibold">Verified access</p>
+                      <p className="mt-1 text-xs leading-6 text-slate-400">Protected patient and store sessions.</p>
+                    </div>
+                    <div className="rounded-3xl border border-white/10 bg-white/5 p-4">
+                      <Clock3 className="h-6 w-6 text-cyan-300" />
+                      <p className="mt-3 text-sm font-semibold">Quick refill flow</p>
+                      <p className="mt-1 text-xs leading-6 text-slate-400">Return to ongoing orders without friction.</p>
+                    </div>
+                    <div className="rounded-3xl border border-white/10 bg-white/5 p-4">
+                      <PackageCheck className="h-6 w-6 text-sky-300" />
+                      <p className="mt-3 text-sm font-semibold">Live order status</p>
+                      <p className="mt-1 text-xs leading-6 text-slate-400">Check deliveries and medicine progress instantly.</p>
+                    </div>
+                  </div>
 
-                <form onSubmit={submitHandler} className="flex flex-col gap-5">
+                  <div className="rounded-[1.75rem] border border-cyan-400/20 bg-gradient-to-r from-cyan-400/10 to-emerald-400/10 p-5">
+                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-cyan-100">What you unlock</p>
+                    <div className="mt-4 grid gap-3 text-sm text-slate-200">
+                      <div className="flex items-center justify-between rounded-2xl bg-white/5 px-4 py-3">
+                        <span>Prescription upload and verification</span>
+                        <ArrowRight className="h-4 w-4 text-cyan-200" />
+                      </div>
+                      <div className="flex items-center justify-between rounded-2xl bg-white/5 px-4 py-3">
+                        <span>Medicine cart, payment, and order history</span>
+                        <ArrowRight className="h-4 w-4 text-cyan-200" />
+                      </div>
+                      <div className="flex items-center justify-between rounded-2xl bg-white/5 px-4 py-3">
+                        <span>Store inventory workflow and delivery updates</span>
+                        <ArrowRight className="h-4 w-4 text-cyan-200" />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
 
-                  {/* EMAIL */}
-
+              <div className="rounded-[2rem] border border-white/70 bg-white/85 p-6 shadow-[0_24px_70px_rgba(14,116,144,0.14)] backdrop-blur-xl sm:p-8 lg:p-10">
+                <div className="mb-8 flex flex-wrap items-start justify-between gap-4">
                   <div>
+                    <span className="inline-flex items-center gap-2 rounded-full border border-cyan-200 bg-cyan-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-cyan-700">
+                      Secure Sign In
+                    </span>
+                    <h2 className="mt-4 text-3xl font-black text-slate-900 sm:text-4xl">
+                      Access your pharmacy dashboard
+                    </h2>
+                    <p className="mt-3 max-w-xl text-sm leading-7 text-slate-600 sm:text-base">
+                      Choose your access type and continue with your medicine orders, prescriptions, or store operations.
+                    </p>
+                  </div>
 
-                    <label className="text-sm font-medium text-gray-700 mb-2 block">
+                  <div className="rounded-3xl border border-slate-200 bg-slate-50 px-4 py-3 text-right">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Current portal</p>
+                    <p className="mt-1 text-sm font-bold text-slate-900">
+                      {userType === "store" ? "Store Operations" : "Patient Care"}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="mb-8 grid gap-3 sm:grid-cols-2">
+                  <button
+                    type="button"
+                    onClick={() => setUserType("patient")}
+                    className={`rounded-[1.5rem] border px-4 py-4 text-left transition-all ${
+                      userType === "patient"
+                        ? "border-cyan-500 bg-gradient-to-br from-cyan-500 to-sky-500 text-white shadow-lg shadow-cyan-200"
+                        : "border-slate-200 bg-white text-slate-700 hover:border-cyan-300 hover:bg-cyan-50/60"
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className={`flex h-12 w-12 items-center justify-center rounded-2xl ${userType === "patient" ? "bg-white/20" : "bg-cyan-100 text-cyan-700"}`}>
+                        <UserRound className="h-5 w-5" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-semibold">Patient Login</p>
+                        <p className={`mt-1 text-xs ${userType === "patient" ? "text-cyan-50" : "text-slate-500"}`}>
+                          Manage prescriptions, orders, and deliveries.
+                        </p>
+                      </div>
+                    </div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setUserType("store")}
+                    className={`rounded-[1.5rem] border px-4 py-4 text-left transition-all ${
+                      userType === "store"
+                        ? "border-slate-900 bg-gradient-to-br from-slate-900 to-teal-800 text-white shadow-lg shadow-slate-200"
+                        : "border-slate-200 bg-white text-slate-700 hover:border-teal-300 hover:bg-teal-50/60"
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className={`flex h-12 w-12 items-center justify-center rounded-2xl ${userType === "store" ? "bg-white/15" : "bg-teal-100 text-teal-700"}`}>
+                        <Store className="h-5 w-5" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-semibold">Store Login</p>
+                        <p className={`mt-1 text-xs ${userType === "store" ? "text-teal-50" : "text-slate-500"}`}>
+                          Handle inventory, orders, and pharmacy fulfillment.
+                        </p>
+                      </div>
+                    </div>
+                  </button>
+                </div>
+
+                <form onSubmit={submitHandler} className="space-y-5">
+                  <div>
+                    <label className="mb-2 block text-sm font-semibold text-slate-700">
                       Email Address
                     </label>
-
-                    <div className="flex items-center border-2 border-gray-200 rounded-xl px-4 py-3 focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-100 transition-all">
-
-                      <Mail className="text-blue-500 mr-3" size={20} />
-
+                    <div className="flex items-center rounded-2xl border border-slate-200 bg-white px-4 py-3.5 transition-all focus-within:border-cyan-500 focus-within:ring-4 focus-within:ring-cyan-100">
+                      <Mail className="mr-3 h-5 w-5 text-cyan-600" />
                       <input
                         type="email"
-                        placeholder="Enter your email"
+                        placeholder={userType === "store" ? "Enter your store email" : "Enter your email"}
                         name="email"
                         value={formData.email}
                         onChange={handleChange}
                         required
-                        className="w-full outline-none bg-transparent"
+                        className="w-full bg-transparent text-slate-800 outline-none placeholder:text-slate-400"
                       />
-
                     </div>
-
                   </div>
 
-
-                  {/* PASSWORD */}
-
                   <div>
+                    <div className="mb-2 flex items-center justify-between gap-4">
+                      <label className="block text-sm font-semibold text-slate-700">
+                        Password
+                      </label>
+                      <span
+                        onClick={() => navigate("/forgot-password")}
+                        className="cursor-pointer text-sm font-semibold text-cyan-700 transition hover:text-cyan-800 hover:underline"
+                      >
+                        Forgot Password?
+                      </span>
+                    </div>
 
-                    <label className="text-sm font-medium text-gray-700 mb-2 block">
-                      Password
-                    </label>
-
-                    <div className="flex items-center border-2 border-gray-200 rounded-xl px-4 py-3 focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-100 transition-all">
-
-                      <Lock className="text-blue-500 mr-3" size={20} />
-
+                    <div className="flex items-center rounded-2xl border border-slate-200 bg-white px-4 py-3.5 transition-all focus-within:border-cyan-500 focus-within:ring-4 focus-within:ring-cyan-100">
+                      <Lock className="mr-3 h-5 w-5 text-cyan-600" />
                       <input
                         type={type}
                         placeholder="Enter your password"
@@ -193,99 +269,82 @@ const Login = () => {
                         value={formData.password}
                         onChange={handleChange}
                         required
-                        className="w-full outline-none bg-transparent"
+                        className="w-full bg-transparent text-slate-800 outline-none placeholder:text-slate-400"
                       />
 
                       {type === "password" ? (
                         <FaRegEyeSlash
                           onClick={() => setType("text")}
-                          className="text-blue-500 cursor-pointer"
+                          className="cursor-pointer text-cyan-600"
                         />
                       ) : (
                         <FaRegEye
                           onClick={() => setType("password")}
-                          className="text-blue-500 cursor-pointer"
+                          className="cursor-pointer text-cyan-600"
                         />
                       )}
-
                     </div>
-
                   </div>
 
-
-                  {/* FORGOT PASSWORD */}
-
-                  <div className="flex justify-end text-sm">
-
-                    <span
-                      onClick={() => navigate("/forgot-password")}
-                      className="text-blue-600 cursor-pointer hover:underline font-medium"
-                    >
-                      Forgot Password?
-                    </span>
-
+                  <div className="grid gap-3 rounded-[1.5rem] border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600 sm:grid-cols-3">
+                    <div className="rounded-2xl bg-white px-4 py-3 shadow-sm">
+                      <p className="font-semibold text-slate-900">Prescriptions</p>
+                      <p className="mt-1 text-xs leading-6">Upload and review medicine guidance.</p>
+                    </div>
+                    <div className="rounded-2xl bg-white px-4 py-3 shadow-sm">
+                      <p className="font-semibold text-slate-900">Orders</p>
+                      <p className="mt-1 text-xs leading-6">Track current deliveries and history.</p>
+                    </div>
+                    <div className="rounded-2xl bg-white px-4 py-3 shadow-sm">
+                      <p className="font-semibold text-slate-900">Store Tools</p>
+                      <p className="mt-1 text-xs leading-6">Access inventory and pharmacy operations.</p>
+                    </div>
                   </div>
-
-
-                  {/* LOGIN BUTTON */}
 
                   <button
                     type="submit"
-                    className="bg-gradient-to-r from-blue-600 to-cyan-600 text-white py-3.5 rounded-xl font-semibold hover:from-blue-700 hover:to-cyan-700 transition-all shadow-lg hover:shadow-xl"
+                    className={`flex w-full items-center justify-center gap-2 rounded-2xl px-6 py-4 text-sm font-semibold text-white transition-all hover:-translate-y-0.5 ${
+                      userType === "store"
+                        ? "bg-gradient-to-r from-slate-900 to-teal-700 shadow-lg shadow-slate-200 hover:from-slate-800 hover:to-teal-600"
+                        : "bg-gradient-to-r from-cyan-600 to-sky-600 shadow-lg shadow-cyan-200 hover:from-cyan-700 hover:to-sky-700"
+                    }`}
                   >
-                    Login to your account
+                    {userType === "store" ? "Login to Store Dashboard" : "Login to Patient Dashboard"}
+                    <ArrowRight className="h-4 w-4" />
                   </button>
-
                 </form>
 
-
-                {/* SIGNUP */}
-
-                <p className="text-sm text-gray-500 mt-6 text-center">
-
-                  Don’t have an account?{" "}
-
-                  <span
-                    onClick={() => navigate("/signup")}
-                    className="text-blue-600 font-semibold cursor-pointer hover:underline"
-                  >
-                    Sign up here
-                  </span>
-
-                </p>
-
-                {/* DIVIDER */}
-                <div className="flex items-center my-6">
-                  <div className="flex-grow border-t"></div>
-                  <span className="px-4 text-sm text-gray-500">
+                <div className="my-7 flex items-center gap-4">
+                  <div className="h-px flex-1 bg-slate-200"></div>
+                  <span className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">
                     Or continue with
                   </span>
-                  <div className="flex-grow border-t"></div>
+                  <div className="h-px flex-1 bg-slate-200"></div>
                 </div>
-
-
-                {/* SOCIAL LOGIN BUTTONS */}
 
                 <div className="grid grid-cols-3 gap-3">
-
-                  <button className="flex items-center justify-center gap-2 border-2 border-gray-200 py-3 rounded-xl hover:bg-gray-50 transition">
-                    <FaGoogle className="text-red-500 text-xl" />
+                  <button className="flex items-center justify-center rounded-2xl border border-slate-200 bg-white py-3 text-lg text-red-500 transition hover:-translate-y-0.5 hover:border-red-200 hover:bg-red-50">
+                    <FaGoogle />
                   </button>
-
-                  <button className="flex items-center justify-center gap-2 border-2 border-gray-200 py-3 rounded-xl hover:bg-gray-50 transition">
-                    <FaFacebook className="text-blue-600 text-xl" />
+                  <button className="flex items-center justify-center rounded-2xl border border-slate-200 bg-white py-3 text-lg text-blue-600 transition hover:-translate-y-0.5 hover:border-blue-200 hover:bg-blue-50">
+                    <FaFacebook />
                   </button>
-
-                  <button className="flex items-center justify-center gap-2 border-2 border-gray-200 py-3 rounded-xl hover:bg-gray-50 transition">
-                    <FaTwitter className="text-sky-500 text-xl" />
+                  <button className="flex items-center justify-center rounded-2xl border border-slate-200 bg-white py-3 text-lg text-sky-500 transition hover:-translate-y-0.5 hover:border-sky-200 hover:bg-sky-50">
+                    <FaTwitter />
                   </button>
-
                 </div>
 
+                <p className="mt-7 text-center text-sm text-slate-500">
+                  Don&apos;t have an account?{" "}
+                  <span
+                    onClick={() => navigate("/signup")}
+                    className="cursor-pointer font-semibold text-cyan-700 transition hover:text-cyan-800 hover:underline"
+                  >
+                    Create one here
+                  </span>
+                </p>
               </div>
-
             </div>
-
           </div>
         </>
       )}

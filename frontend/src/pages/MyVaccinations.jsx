@@ -44,8 +44,7 @@ function MyVaccinations() {
 
     return (
         <>
-            <div className="h-16" /> {/* Spacer equal to navbar height */}
-            <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50 p-6 pt-24">
+            <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50 p-6" style={{ paddingTop: 'calc(var(--app-navbar-offset, 88px) + 1.5rem)' }}>
                 <div className="max-w-6xl mx-auto">
 
                     {/* Header */}
