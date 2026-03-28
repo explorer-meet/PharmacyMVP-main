@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import axios from 'axios';
-import { Activity, Calendar, Pill, FileText, Clock, User, Mail, Phone, Menu, X, Home, CircleUser as UserCircle, ShoppingBag, Syringe, Bell, MessageSquare, Mail as MailIcon, Pencil, ClipboardList, IndianRupee, Package, Truck, ChevronDown, ChevronUp, CreditCard } from 'lucide-react';
+import { Activity, Calendar, Pill, FileText, Clock, User, Mail, Phone, Menu, X, Home, CircleUser as UserCircle, ShoppingBag, Syringe, Bell, MessageSquare, Mail as MailIcon, Pencil, ClipboardList, IndianRupee, Package, Truck, ChevronDown, ChevronUp, CreditCard, Plus, Minus, Trash2 } from 'lucide-react';
 import { baseURL } from '../main';
 import Loader from '../components/Loader';
 import PrescriptionDialog from '../components/PrescriptionDialog';
@@ -25,6 +25,13 @@ const Dashboard = () => {
     const [queryForm, setQueryForm] = useState({ subject: '', message: '' });
     const [queryErrors, setQueryErrors] = useState({});
     const [querySubmitted, setQuerySubmitted] = useState(false);
+    const [isRefillModalOpen, setIsRefillModalOpen] = useState(false);
+    const [placingPrescriptionOrder, setPlacingPrescriptionOrder] = useState(false);
+    const [refillDraft, setRefillDraft] = useState({
+        prescriptionId: null,
+        prescriptionTitle: '',
+        items: [],
+    });
 
     const querySubjects = [
         'Order & Delivery Issue',
@@ -145,6 +152,112 @@ const Dashboard = () => {
         setIsEditingProfile(false);
     };
 
+    const isApprovedPrescription = (status) => {
+        const value = String(status || '').toLowerCase();
+        return value === 'approved' || value === 'active';
+    };
+
+    const getPrescriptionItems = (prescription) => {
+        if (Array.isArray(prescription?.medicines) && prescription.medicines.length > 0) {
+            return prescription.medicines
+                .map((item, index) => ({
+                    id: `${prescription.id || 'rx'}-${index}`,
+                    name: item.name || item.medicineName || `Medicine ${index + 1}`,
+                    dosage: item.dosage || prescription.dosage || '-',
+                    quantity: Math.max(1, Number(item.quantity || item.prescribedQuantity || 1)),
+                    price: Number(item.price || 0),
+                }))
+                .filter((item) => item.name);
+        }
+
+        if (prescription?.medicineName) {
+            return [{
+                id: `${prescription.id || 'rx'}-0`,
+                name: prescription.medicineName,
+                dosage: prescription.dosage || '-',
+                quantity: Math.max(1, Number(prescription.quantity || 1)),
+                price: Number(prescription.price || 0),
+            }];
+        }
+
+        return [];
+    };
+
+    const handleStartPrescriptionOrder = (prescription) => {
+        const draftItems = getPrescriptionItems(prescription);
+        if (!draftItems.length) return;
+
+        setRefillDraft({
+            prescriptionId: prescription.id,
+            prescriptionTitle: prescription.medicineName || 'Prescription Refill',
+            items: draftItems,
+        });
+        setIsRefillModalOpen(true);
+    };
+
+    const updateRefillQuantity = (itemId, type) => {
+        setRefillDraft((prev) => ({
+            ...prev,
+            items: prev.items
+                .map((item) => {
+                    if (item.id !== itemId) return item;
+                    if (type === 'increase') {
+                        return { ...item, quantity: item.quantity + 1 };
+                    }
+                    return { ...item, quantity: Math.max(1, item.quantity - 1) };
+                }),
+        }));
+    };
+
+    const removeRefillItem = (itemId) => {
+        setRefillDraft((prev) => ({
+            ...prev,
+            items: prev.items.filter((item) => item.id !== itemId),
+        }));
+    };
+
+    const handlePlacePrescriptionOrder = async () => {
+        if (!userData?._id) {
+            alert('Please login again to continue checkout.');
+            return;
+        }
+
+        const selectedItems = refillDraft.items
+            .filter((item) => item.quantity > 0)
+            .map((item, index) => ({
+                id: index + 1,
+                name: item.name,
+                price: Number(item.price || 0),
+                quantity: Number(item.quantity || 1),
+            }));
+
+        if (!selectedItems.length) {
+            alert('Please keep at least one medicine to place the order.');
+            return;
+        }
+
+        try {
+            setPlacingPrescriptionOrder(true);
+
+            await axios.post(`${baseURL}/additemstocart`, {
+                id: userData._id,
+                items: selectedItems,
+            });
+
+            setIsRefillModalOpen(false);
+            navigate('/addresspage', {
+                state: {
+                    cartItems: selectedItems,
+                },
+            });
+        } catch (error) {
+            console.error('Error creating prescription order:', error.message);
+            alert('Could not start checkout right now. Please try again.');
+        } finally {
+            setPlacingPrescriptionOrder(false);
+        }
+    };
+
     const navigate = useNavigate();
     const location = useLocation();
 
@@ -174,7 +287,11 @@ const Dashboard = () => {
                     duration: "7 days",
                     prescriber: "Pharmacy Team",
                     date: "2024-03-15",
-                    status: "active"
+                    status: "approved",
+                    medicines: [
+                        { name: 'Amoxicillin 500mg', dosage: '500mg', quantity: 2, price: 120 },
+                        { name: 'Probiotic Capsule', dosage: '250mg', quantity: 1, price: 180 },
+                    ],
                 },
                 {
                     id: 2,
@@ -184,7 +301,10 @@ const Dashboard = () => {
                     duration: "30 days",
                     prescriber: "Pharmacy Team",
                     date: "2024-03-10",
-                    status: "active"
+                    status: "pending",
+                    medicines: [
+                        { name: 'Ibuprofen 200mg', dosage: '200mg', quantity: 1, price: 95 },
+                    ],
                 },
                 {
                     id: 3,
@@ -194,7 +314,10 @@ const Dashboard = () => {
                     duration: "Ongoing",
                     prescriber: "Pharmacy Team",
                     date: "2024-02-28",
-                    status: "expired"
+                    status: "rejected",
+                    medicines: [
+                        { name: 'Lisinopril 10mg', dosage: '10mg', quantity: 1, price: 150 },
+                    ],
                 }
             ];
 
@@ -218,7 +341,11 @@ const Dashboard = () => {
                         duration: "7 days",
                         prescriber: "Pharmacy Team",
                         date: "2024-03-15",
-                        status: "active"
+                        status: "approved",
+                        medicines: [
+                            { name: 'Amoxicillin 500mg', dosage: '500mg', quantity: 2, price: 120 },
+                            { name: 'Probiotic Capsule', dosage: '250mg', quantity: 1, price: 180 },
+                        ],
                     },
                     {
                         id: 2,
@@ -228,7 +355,10 @@ const Dashboard = () => {
                         duration: "30 days",
                         prescriber: "Pharmacy Team",
                         date: "2024-03-10",
-                        status: "active"
+                        status: "pending",
+                        medicines: [
+                            { name: 'Ibuprofen 200mg', dosage: '200mg', quantity: 1, price: 95 },
+                        ],
                     },
                     {
                         id: 3,
@@ -238,7 +368,10 @@ const Dashboard = () => {
                         duration: "Ongoing",
                         prescriber: "Pharmacy Team",
                         date: "2024-02-28",
-                        status: "expired"
+                        status: "rejected",
+                        medicines: [
+                            { name: 'Lisinopril 10mg', dosage: '10mg', quantity: 1, price: 150 },
+                        ],
                     }
                 ]
             });
@@ -308,13 +441,13 @@ const Dashboard = () => {
     };
 
     const sidebarItems = [
-        { icon: Home,         text: "Dashboard",      onClick: () => { resetDashboardPanels(); setSidebarOpen(false); },                                                                     color: "text-blue-500"   },
-        { icon: Pill,         text: "My Prescriptions",onClick: () => { const n = !showPrescriptions;  resetDashboardPanels(); setShowPrescriptions(n);  setSidebarOpen(false); },           color: "text-violet-500" },
-        { icon: ShoppingBag,  text: "My Orders",       onClick: () => { const n = !showMyOrders;        resetDashboardPanels(); setShowMyOrders(n);        setSidebarOpen(false); },           color: "text-orange-500" },
-        { icon: Syringe,      text: "My Vaccinations", onClick: () => { const n = !showMyVaccinations;  resetDashboardPanels(); setShowMyVaccinations(n);  setSidebarOpen(false); },           color: "text-teal-500"   },
-        { icon: UserCircle,   text: "Profile",         onClick: () => { const n = !showProfile;         resetDashboardPanels(); setShowProfile(n);         setSidebarOpen(false); },           color: "text-emerald-500"},
-        { icon: Bell,         text: "Notifications",   onClick: () => { const n = !showNotifications;   resetDashboardPanels(); setShowNotifications(n);   setSidebarOpen(false); },           color: "text-yellow-500" },
-        { icon: MessageSquare,text: "Raise a Query",   onClick: () => { const n = !showRaiseQuery;      resetDashboardPanels(); setShowRaiseQuery(n);      setSidebarOpen(false); },           color: "text-cyan-500"   },
+        { icon: Home,         text: "Dashboard",      onClick: () => { resetDashboardPanels(); setSidebarOpen(false); },                                                                     color: "text-cyan-600"   },
+        { icon: Pill,         text: "My Prescriptions",onClick: () => { const n = !showPrescriptions;  resetDashboardPanels(); setShowPrescriptions(n);  setSidebarOpen(false); },           color: "text-sky-600" },
+        { icon: ShoppingBag,  text: "My Orders",       onClick: () => { const n = !showMyOrders;        resetDashboardPanels(); setShowMyOrders(n);        setSidebarOpen(false); },           color: "text-emerald-600" },
+        { icon: Syringe,      text: "My Vaccinations", onClick: () => { const n = !showMyVaccinations;  resetDashboardPanels(); setShowMyVaccinations(n);  setSidebarOpen(false); },           color: "text-teal-600"   },
+        { icon: UserCircle,   text: "Profile",         onClick: () => { const n = !showProfile;         resetDashboardPanels(); setShowProfile(n);         setSidebarOpen(false); },           color: "text-slate-600"},
+        { icon: Bell,         text: "Notifications",   onClick: () => { const n = !showNotifications;   resetDashboardPanels(); setShowNotifications(n);   setSidebarOpen(false); },           color: "text-amber-500" },
+        { icon: MessageSquare,text: "Raise a Query",   onClick: () => { const n = !showRaiseQuery;      resetDashboardPanels(); setShowRaiseQuery(n);      setSidebarOpen(false); },           color: "text-cyan-600"   },
     ];
 
     const statsCards = [
@@ -323,7 +456,7 @@ const Dashboard = () => {
             label: "Prescriptions",
             value: userData?.prescriptions?.length || 0,
             change: "Upload & manage prescriptions",
-            color: "bg-gradient-to-br from-violet-400 to-purple-500",
+            color: "bg-gradient-to-br from-cyan-500 to-sky-600",
             onClick: () => { resetDashboardPanels(); setShowPrescriptions(true); }
         },
         {
@@ -351,21 +484,21 @@ const Dashboard = () => {
     }
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
+        <div className="min-h-screen bg-[#f7fbff]">
             {/* Mobile Header */}
-            <div className="lg:hidden sticky top-0 z-30 bg-blue-50 shadow-md">
-                <div className="flex items-center justify-between px-4 py-4">
+            <div className="lg:hidden sticky top-0 z-30 bg-slate-950 border-b border-cyan-900/50 shadow-lg">
+                <div className="flex items-center justify-between px-4 py-3.5">
                     <div>
-                        <h1 className="text-xl font-bold bg-gradient-to-r from-blue-400 to-blue-600 bg-clip-text text-transparent">
+                        <h1 className="text-xl font-bold bg-gradient-to-r from-cyan-400 to-emerald-400 bg-clip-text text-transparent">
                             MedVision
                         </h1>
-                        <p className="text-xs text-blue-600">Patient Dashboard</p>
+                        <p className="text-xs text-cyan-300 font-medium">Patient Dashboard</p>
                     </div>
                     <button
-                        className="p-2 rounded-lg bg-gradient-to-r from-blue-300 to-blue-400 text-blue-900 hover:shadow-lg transition-shadow"
+                        className="p-2 rounded-xl bg-cyan-600 text-white hover:bg-cyan-700 transition"
                         onClick={() => setSidebarOpen(true)}
                     >
-                        <Menu size={24} />
+                        <Menu size={22} />
                     </button>
                 </div>
             </div>
@@ -373,7 +506,7 @@ const Dashboard = () => {
 
             <div className="flex relative">
                 {/* Sidebar */}
-                <aside className={`fixed lg:sticky top-0 h-screen w-72 bg-white shadow-xl transform transition-all duration-300 z-40
+                <aside className={`fixed lg:sticky top-0 h-screen w-72 bg-slate-950 border-r border-cyan-900/40 shadow-xl transform transition-all duration-300 z-40
 ${sidebarOpen ? "translate-x-0" : "-translate-x-full"} lg:translate-x-0`}>
 
                     <div className="h-full flex flex-col">
@@ -381,7 +514,7 @@ ${sidebarOpen ? "translate-x-0" : "-translate-x-full"} lg:translate-x-0`}>
                         {/* Sidebar Header - close button only on mobile */}
                         <div className="flex lg:hidden items-center justify-end px-4 pt-4">
                             <button
-                                className="text-gray-500 hover:bg-gray-100 p-2 rounded-lg transition-colors"
+                                className="text-slate-400 hover:text-white p-2 rounded-lg transition-colors"
                                 onClick={() => setSidebarOpen(false)}
                             >
                                 <X size={22} />
@@ -389,10 +522,10 @@ ${sidebarOpen ? "translate-x-0" : "-translate-x-full"} lg:translate-x-0`}>
                         </div>
 
                         {/* User Profile Section */}
-                        <div className="px-5 pt-4 pb-5 border-b border-slate-100">
+                        <div className="px-5 pt-4 pb-5 border-b border-white/10">
                             <div className="flex items-center space-x-3">
                                 <div className="relative flex-shrink-0">
-                                    <div className="w-14 h-14 rounded-2xl overflow-hidden bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-bold text-xl shadow-md">
+                                    <div className="w-14 h-14 rounded-2xl overflow-hidden bg-gradient-to-br from-cyan-500 to-teal-600 flex items-center justify-center text-white font-bold text-xl shadow-md">
                                         {profileImage ? (
                                             <img
                                                 src={profileImage}
@@ -403,7 +536,7 @@ ${sidebarOpen ? "translate-x-0" : "-translate-x-full"} lg:translate-x-0`}>
                                             userData?.name?.charAt(0) || 'U'
                                         )}
                                     </div>
-                                    <label className="absolute -bottom-1.5 -right-1.5 w-6 h-6 rounded-full bg-blue-600 text-white flex items-center justify-center shadow-lg cursor-pointer hover:bg-blue-700 transition border-2 border-white">
+                                    <label className="absolute -bottom-1.5 -right-1.5 w-6 h-6 rounded-full bg-cyan-600 text-white flex items-center justify-center shadow-lg cursor-pointer hover:bg-cyan-700 transition border-2 border-slate-950">
                                         <Pencil size={11} />
                                         <input
                                             type="file"
@@ -414,10 +547,10 @@ ${sidebarOpen ? "translate-x-0" : "-translate-x-full"} lg:translate-x-0`}>
                                     </label>
                                 </div>
                                 <div className="flex-1 min-w-0">
-                                    <p className="font-bold text-slate-800 truncate text-base">
+                                    <p className="font-bold text-white truncate text-base">
                                         {userData?.name || 'Unknown User'}
                                     </p>
-                                    <p className="text-xs text-slate-400 font-medium mt-0.5">
+                                    <p className="text-xs text-cyan-300 font-medium mt-0.5">
                                         Patient Account
                                     </p>
                                 </div>
@@ -429,13 +562,13 @@ ${sidebarOpen ? "translate-x-0" : "-translate-x-full"} lg:translate-x-0`}>
                             {sidebarItems.map((item, index) => (
                                 <button
                                     key={index}
-                                    className="flex items-center w-full px-4 py-3 space-x-3 text-left rounded-2xl hover:bg-slate-50 active:bg-slate-100 transition-all group"
+                                    className="flex items-center w-full px-4 py-3 space-x-3 text-left rounded-2xl hover:bg-white/10 active:bg-white/15 transition-all group"
                                     onClick={item.onClick}
                                 >
-                                    <div className={`w-9 h-9 rounded-xl flex items-center justify-center bg-white shadow-sm border border-slate-100 group-hover:shadow-md transition-shadow`}>
+                                    <div className={`w-9 h-9 rounded-xl flex items-center justify-center bg-white/10 border border-white/10 group-hover:bg-white/20 transition`}>
                                         <item.icon className={`w-4 h-4 ${item.color}`} />
                                     </div>
-                                    <span className="font-semibold text-slate-600 group-hover:text-slate-900 text-sm">
+                                    <span className="font-semibold text-slate-300 group-hover:text-white text-sm">
                                         {item.text}
                                     </span>
                                 </button>
@@ -456,72 +589,63 @@ ${sidebarOpen ? "translate-x-0" : "-translate-x-full"} lg:translate-x-0`}>
                 <main className="flex-1 overflow-auto">
                     <div className="max-w-7xl mx-auto p-4 lg:p-8 space-y-8">
                         {/* Welcome Section */}
-                        <div className="bg-gradient-to-r from-blue-200 via-blue-300 to-blue-400 rounded-2xl shadow-xl p-8 text-blue-900">
-                            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between">
+                        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-slate-900 via-cyan-950 to-emerald-900 p-8 text-white shadow-2xl">
+                            <div className="absolute -right-12 -top-12 h-48 w-48 rounded-full bg-cyan-400/15 blur-3xl" />
+                            <div className="absolute -left-10 bottom-0 h-40 w-40 rounded-full bg-emerald-400/15 blur-3xl" />
+                            <div className="relative z-10 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
                                 <div>
-                                    <h1 className="text-3xl lg:text-4xl font-bold mb-2">
+                                    <p className="text-xs font-semibold uppercase tracking-[0.25em] text-cyan-200">Patient Dashboard</p>
+                                    <h1 className="mt-2 text-3xl lg:text-4xl font-black leading-tight">
                                         Welcome back, {userData?.name?.split(' ')[0] || 'User'}!
                                     </h1>
-                                    <p className="text-blue-700 text-lg">
+                                    <p className="mt-2 text-cyan-100 text-base">
                                         Here's your health overview for today
                                     </p>
-
                                 </div>
 
-                                <div className="mt-6 lg:mt-0 lg:min-w-[280px]">
-                                    <div className="bg-white/70 backdrop-blur-sm rounded-2xl px-6 py-5 shadow space-y-4">
+                                <div className="lg:min-w-[260px]">
+                                    <div className="rounded-2xl border border-white/15 bg-white/10 backdrop-blur-sm px-5 py-4 space-y-3">
                                         <div>
-                                            <p className="text-sm text-blue-600">Today's Date</p>
-                                            <p className="text-xl font-bold text-blue-900">
+                                            <p className="text-xs text-cyan-200 uppercase tracking-widest">Today's Date</p>
+                                            <p className="text-lg font-bold text-white mt-1">
                                                 {new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                                             </p>
                                         </div>
-
-                                        <div className="rounded-xl bg-white/70 px-4 py-3 border border-blue-100">
-                                            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-blue-500">Quick Exit</p>
-                                            <button
-                                                onClick={() => navigate('/')}
-                                                className="mt-2 inline-flex items-center gap-2 text-sm font-semibold text-blue-800 hover:text-blue-950 transition"
-                                            >
-                                                <Home size={16} />
-                                                Return to Home Page
-                                            </button>
-                                        </div>
+                                        <button
+                                            onClick={() => navigate('/')}
+                                            className="w-full inline-flex items-center gap-2 rounded-xl border border-white/20 bg-white/10 px-4 py-2.5 text-sm font-semibold text-white hover:bg-white/20 transition"
+                                        >
+                                            <Home size={15} />
+                                            Return to Home
+                                        </button>
                                     </div>
                                 </div>
                             </div>
                         </div>
                         {/* Dashboard Overview */}
-                        {!hasActivePanel && <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        {!hasActivePanel && <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
                             {statsCards.map((stat, index) => (
                                 <div
                                     key={index}
                                     onClick={stat.onClick}
-                                    className="h-full bg-white/90 backdrop-blur-sm rounded-3xl shadow-lg p-6 hover:shadow-2xl transition-all duration-300 hover:-translate-y-1 cursor-pointer relative border border-white"
+                                    className="h-full bg-white rounded-3xl border border-slate-200 shadow-sm p-6 hover:shadow-lg transition-all duration-300 hover:-translate-y-1 cursor-pointer"
                                     data-prescription-card={stat.label === 'Prescriptions' ? 'true' : undefined}
                                 >
-
                                     <div className="flex items-center justify-between mb-5">
-                                        <div className={`${stat.color} p-3 rounded-2xl text-white shadow-lg`}>
-                                            <stat.icon size={24} />
+                                        <div className={`${stat.color} p-3 rounded-2xl text-white shadow-md`}>
+                                            <stat.icon size={22} />
                                         </div>
-                                        <span className="text-xs font-semibold text-gray-400 uppercase tracking-[0.2em]">Overview</span>
+                                        <span className="text-xs font-semibold text-slate-400 uppercase tracking-[0.18em]">Overview</span>
                                     </div>
-
-                                    <h3 className="text-gray-500 text-sm font-medium mb-2">
+                                    <h3 className="text-slate-500 text-sm font-medium mb-1">
                                         {stat.label}
                                     </h3>
-
-                                    <p className="text-3xl font-bold text-gray-800 mb-2">
+                                    <p className="text-3xl font-black text-slate-900 mb-2">
                                         {stat.value}
                                     </p>
-
                                     {stat.change && (
-                                        <p className="text-sm text-gray-500 font-medium leading-5">
-                                            {stat.change}
-                                        </p>
+                                        <p className="text-sm text-slate-500 leading-5">{stat.change}</p>
                                     )}
-
                                 </div>
                             ))}
                         </div>}
@@ -610,15 +734,18 @@ ${sidebarOpen ? "translate-x-0" : "-translate-x-full"} lg:translate-x-0`}>
 
                         {/* Prescriptions List */}
                         {showPrescriptions && (
-                            <div className="bg-white rounded-2xl shadow-lg p-6">
+                            <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-6">
                                 <div className="flex items-center justify-between mb-6">
-                                    <h2 className="text-xl font-bold text-gray-800">My Prescriptions</h2>
+                                    <div>
+                                        <h2 className="text-xl font-bold text-slate-900">My Prescriptions</h2>
+                                        <p className="text-sm text-slate-500 mt-0.5">Approved prescriptions can be ordered directly.</p>
+                                    </div>
                                     <button
                                         onClick={() => setIsPrescriptionDialogOpen(true)}
-                                        className="bg-gradient-to-r from-purple-500 to-purple-600 text-white px-4 py-2 rounded-lg hover:shadow-lg transition-all duration-300 flex items-center space-x-2"
+                                        className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800 transition"
                                     >
-                                        <Pill size={16} />
-                                        <span>Upload New</span>
+                                        <Pill size={15} />
+                                        Upload New
                                     </button>
                                 </div>
 
@@ -671,20 +798,50 @@ ${sidebarOpen ? "translate-x-0" : "-translate-x-full"} lg:translate-x-0`}>
                                                                 </span>
                                                             </div>
                                                         </div>
+
+                                                        {Array.isArray(prescription.medicines) && prescription.medicines.length > 0 && (
+                                                            <div className="mt-4 flex flex-wrap gap-2">
+                                                                {prescription.medicines.map((medicine, idx) => (
+                                                                    <span
+                                                                        key={`${prescription.id}-${idx}`}
+                                                                        className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs text-slate-700"
+                                                                    >
+                                                                        {medicine.name} x{medicine.quantity || 1}
+                                                                    </span>
+                                                                ))}
+                                                            </div>
+                                                        )}
+
+                                                        {isApprovedPrescription(prescription.status) && (
+                                                            <div className="mt-4">
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => handleStartPrescriptionOrder(prescription)}
+                                                                    className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 transition"
+                                                                >
+                                                                    <ShoppingBag size={16} />
+                                                                    Place Order From Prescription
+                                                                </button>
+                                                            </div>
+                                                        )}
                                                     </div>
 
                                                     <div className="ml-4 flex items-center space-x-2">
                                                         <span className={`w-3 h-3 rounded-full ${
-                                                            prescription.status === 'active'
+                                                            isApprovedPrescription(prescription.status)
                                                                 ? 'bg-green-500'
-                                                                : 'bg-red-500'
+                                                                : prescription.status === 'pending'
+                                                                    ? 'bg-amber-500'
+                                                                    : 'bg-red-500'
                                                         }`} />
-                                                        <span className={`text-xs font-semibold ${
-                                                            prescription.status === 'active'
+                                                        <span className={`text-xs font-semibold capitalize ${
+                                                            isApprovedPrescription(prescription.status)
                                                                 ? 'text-green-800'
-                                                                : 'text-red-800'
+                                                                : prescription.status === 'pending'
+                                                                    ? 'text-amber-800'
+                                                                    : 'text-red-800'
                                                         }`}>
-                                                            {prescription.status === 'active' ? 'Active' : 'Expired'}
+                                                            {isApprovedPrescription(prescription.status) ? 'Approved' : (prescription.status || 'pending')}
                                                         </span>
                                                     </div>
                                                 </div>
@@ -698,7 +855,7 @@ ${sidebarOpen ? "translate-x-0" : "-translate-x-full"} lg:translate-x-0`}>
                                         <p className="text-gray-500 mb-6">Upload your first prescription to get started</p>
                                         <button
                                             onClick={() => setIsPrescriptionDialogOpen(true)}
-                                            className="bg-gradient-to-r from-purple-500 to-purple-600 text-white px-6 py-3 rounded-lg hover:shadow-lg transition-all duration-300"
+                                            className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-6 py-3 text-sm font-semibold text-white hover:bg-slate-800 transition"
                                         >
                                             Upload Prescription
                                         </button>
@@ -709,9 +866,9 @@ ${sidebarOpen ? "translate-x-0" : "-translate-x-full"} lg:translate-x-0`}>
 
                         {/* Notifications Settings */}
                         {showNotifications && (
-                            <div className="bg-white rounded-2xl shadow-lg p-6">
+                            <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-6">
                                 <div className="flex items-center justify-between mb-6">
-                                    <h2 className="text-xl font-bold text-gray-800">Notification Settings</h2>
+                                    <h2 className="text-xl font-bold text-slate-900">Notification Settings</h2>
                                     <Bell className="text-yellow-500" size={24} />
                                 </div>
 
@@ -733,7 +890,7 @@ ${sidebarOpen ? "translate-x-0" : "-translate-x-full"} lg:translate-x-0`}>
                                                 checked={notifications.sms}
                                                 onChange={(e) => setNotifications(prev => ({ ...prev, sms: e.target.checked }))}
                                             />
-                                            <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                                            <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-cyan-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-cyan-600"></div>
                                         </label>
                                     </div>
 
@@ -754,13 +911,13 @@ ${sidebarOpen ? "translate-x-0" : "-translate-x-full"} lg:translate-x-0`}>
                                                 checked={notifications.email}
                                                 onChange={(e) => setNotifications(prev => ({ ...prev, email: e.target.checked }))}
                                             />
-                                            <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-green-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-600"></div>
+                                            <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-cyan-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-cyan-600"></div>
                                         </label>
                                     </div>
 
-                                    <div className="mt-6 p-4 bg-blue-50 rounded-xl">
-                                        <h4 className="font-semibold text-blue-800 mb-2">What you'll receive:</h4>
-                                        <ul className="text-sm text-blue-700 space-y-1">
+                                    <div className="mt-6 p-4 bg-cyan-50 rounded-xl border border-cyan-100">
+                                        <h4 className="font-semibold text-cyan-900 mb-2">What you'll receive:</h4>
+                                        <ul className="text-sm text-cyan-700 space-y-1">
                                             <li>• Prescription Refill Notifications</li>
                                         
                                             <li>• Health Reports</li>
@@ -771,10 +928,9 @@ ${sidebarOpen ? "translate-x-0" : "-translate-x-full"} lg:translate-x-0`}>
                                     <div className="flex justify-end">
                                         <button
                                             onClick={() => {
-                                                // Here you could save the preferences to backend
                                                 alert(`Notification preferences saved!\nSMS: ${notifications.sms ? 'Enabled' : 'Disabled'}\nEmail: ${notifications.email ? 'Enabled' : 'Disabled'}`);
                                             }}
-                                            className="bg-gradient-to-r from-blue-500 to-blue-600 text-white px-6 py-2 rounded-lg hover:shadow-lg transition-all duration-300"
+                                            className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-6 py-2.5 text-sm font-semibold text-white hover:bg-slate-800 transition"
                                         >
                                             Save Preferences
                                         </button>
@@ -818,15 +974,15 @@ ${sidebarOpen ? "translate-x-0" : "-translate-x-full"} lg:translate-x-0`}>
                                 ) : (
                                     <form onSubmit={handleQuerySubmit} noValidate className="space-y-6">
                                         {/* Pre-filled patient info banner */}
-                                        <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 flex items-center gap-4">
-                                            <div className="w-10 h-10 rounded-full bg-blue-200 flex items-center justify-center">
-                                                <User className="text-blue-700" size={20} />
+                                        <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 flex items-center gap-4">
+                                            <div className="w-10 h-10 rounded-full bg-slate-200 flex items-center justify-center">
+                                                <User className="text-slate-700" size={20} />
                                             </div>
                                             <div>
-                                                <p className="font-semibold text-blue-900 text-sm">{userData?.name || 'Patient'}</p>
-                                                <p className="text-blue-600 text-xs">{userData?.email || ''}</p>
+                                                <p className="font-semibold text-slate-900 text-sm">{userData?.name || 'Patient'}</p>
+                                                <p className="text-slate-500 text-xs">{userData?.email || ''}</p>
                                             </div>
-                                            <span className="ml-auto text-xs bg-blue-200 text-blue-800 px-3 py-1 rounded-full font-medium">Logged In</span>
+                                            <span className="ml-auto text-xs bg-cyan-100 text-cyan-800 px-3 py-1 rounded-full font-medium">Logged In</span>
                                         </div>
 
                                         {/* Subject */}
@@ -1098,7 +1254,7 @@ ${sidebarOpen ? "translate-x-0" : "-translate-x-full"} lg:translate-x-0`}>
                                                             <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ${
                                                                 order.status === 'Delivered'
                                                                     ? 'bg-emerald-50 border border-emerald-200 text-emerald-700'
-                                                                    : 'bg-blue-50 border border-blue-200 text-blue-700'
+                                                                    : 'bg-amber-50 border border-amber-200 text-amber-700'
                                                             }`}>
                                                                 <Truck className="w-3.5 h-3.5" />
                                                                 {order.status}
@@ -1117,7 +1273,7 @@ ${sidebarOpen ? "translate-x-0" : "-translate-x-full"} lg:translate-x-0`}>
 
                                                     <div className="flex items-center gap-3 flex-wrap">
                                                         <button
-                                                            className="bg-blue-600 hover:bg-blue-700 text-white py-2.5 px-4 rounded-xl shadow transition-colors"
+                                                            className="bg-slate-900 hover:bg-slate-800 text-white py-2.5 px-4 rounded-xl shadow transition-colors"
                                                             onClick={() => navigate(`/tracking/${order.id}`)}
                                                         >
                                                             Track Order
@@ -1244,6 +1400,99 @@ ${sidebarOpen ? "translate-x-0" : "-translate-x-full"} lg:translate-x-0`}>
                 isOpen={isPrescriptionDialogOpen}
                 onClose={() => setIsPrescriptionDialogOpen(false)}
             />
+
+            {isRefillModalOpen && (
+                <div className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-sm">
+                    <div className="w-full max-w-3xl overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl">
+                        <div className="flex items-center justify-between bg-gradient-to-r from-emerald-600 to-teal-600 px-6 py-4 text-white">
+                            <div>
+                                <p className="text-xs uppercase tracking-[0.22em] text-emerald-100">Approved Prescription</p>
+                                <h3 className="mt-1 text-xl font-bold">Adjust Quantity And Place Order</h3>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => setIsRefillModalOpen(false)}
+                                className="rounded-full p-2 text-white/80 hover:bg-white/15 hover:text-white"
+                                disabled={placingPrescriptionOrder}
+                            >
+                                <X size={18} />
+                            </button>
+                        </div>
+
+                        <div className="p-6">
+                            <p className="text-sm text-slate-600">
+                                Prescription: <span className="font-semibold text-slate-900">{refillDraft.prescriptionTitle}</span>
+                            </p>
+
+                            <div className="mt-4 space-y-3 max-h-[360px] overflow-y-auto pr-1">
+                                {refillDraft.items.map((item) => (
+                                    <div key={item.id} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                                        <div className="flex items-start justify-between gap-3">
+                                            <div>
+                                                <p className="font-semibold text-slate-900">{item.name}</p>
+                                                <p className="mt-1 text-xs text-slate-500">{item.dosage} {item.price > 0 ? `• Rs ${item.price}` : ''}</p>
+                                            </div>
+
+                                            <button
+                                                type="button"
+                                                onClick={() => removeRefillItem(item.id)}
+                                                className="inline-flex items-center gap-1 rounded-lg border border-rose-200 bg-rose-50 px-2.5 py-1.5 text-xs font-semibold text-rose-700 hover:bg-rose-100"
+                                            >
+                                                <Trash2 size={14} /> Remove
+                                            </button>
+                                        </div>
+
+                                        <div className="mt-3 inline-flex items-center rounded-xl border border-slate-200 bg-white p-1">
+                                            <button
+                                                type="button"
+                                                onClick={() => updateRefillQuantity(item.id, 'decrease')}
+                                                className="rounded-lg p-2 hover:bg-slate-100"
+                                                aria-label="Decrease quantity"
+                                            >
+                                                <Minus size={14} />
+                                            </button>
+                                            <span className="min-w-10 text-center text-sm font-semibold text-slate-900">{item.quantity}</span>
+                                            <button
+                                                type="button"
+                                                onClick={() => updateRefillQuantity(item.id, 'increase')}
+                                                className="rounded-lg p-2 hover:bg-slate-100"
+                                                aria-label="Increase quantity"
+                                            >
+                                                <Plus size={14} />
+                                            </button>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+
+                            {refillDraft.items.length === 0 && (
+                                <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                                    All medicines removed. Add at least one medicine to proceed.
+                                </div>
+                            )}
+
+                            <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+                                <button
+                                    type="button"
+                                    onClick={() => setIsRefillModalOpen(false)}
+                                    className="rounded-xl border border-slate-300 px-5 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                                    disabled={placingPrescriptionOrder}
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={handlePlacePrescriptionOrder}
+                                    className="rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
+                                    disabled={placingPrescriptionOrder || refillDraft.items.length === 0}
+                                >
+                                    {placingPrescriptionOrder ? 'Preparing Checkout...' : 'Proceed To Place Order'}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

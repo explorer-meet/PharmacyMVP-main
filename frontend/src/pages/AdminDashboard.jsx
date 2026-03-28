@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
-import { Store, PlusSquare, Home, ShieldCheck, BarChart3, ClipboardCheck, FileText } from 'lucide-react';
+import { Store, PlusSquare, ShieldCheck, BarChart3, ClipboardCheck, FileText } from 'lucide-react';
 import { baseURL } from '../main';
 
 const AdminDashboard = () => {
@@ -266,14 +266,6 @@ const AdminDashboard = () => {
               <p className="mt-2 text-sm text-slate-600">Manage stores and store approval workflows.</p>
             </div>
             <div className="space-y-3">
-              <button
-                type="button"
-                onClick={() => navigate('/')}
-                className="flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-left text-sm font-medium transition bg-slate-50 text-slate-700 hover:bg-slate-100"
-              >
-                <Home className="w-5 h-5 text-blue-600" />
-                <span>Home</span>
-              </button>
               {sidebarItems.map((item) => {
                 const active = activePanel === item.key;
                 return (

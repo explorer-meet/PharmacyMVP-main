@@ -23,10 +23,18 @@ import {
 const Home = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const token = localStorage.getItem("medVisionToken");
 
   const handleOnlinePharmacy = () => navigate("/onlinepharmacy");
   const handleEmergencyPharmacy = () => navigate("/emergencyguidelines");
   const handlePrescriptionHelp = () => navigate("/dashboard", { state: { openSection: "prescriptions" } });
+  const handleQuickRefill = () => {
+    if (token) {
+      navigate("/dashboard", { state: { openSection: "prescriptions" } });
+      return;
+    }
+    navigate("/login");
+  };
 
   useEffect(() => {
     const sectionId = location.state?.scrollToSection;
@@ -183,6 +191,64 @@ const Home = () => {
               <p className="text-sm font-semibold text-slate-800">{feature.label}</p>
             </div>
           ))}
+        </div>
+      </section>
+
+      <section className="px-4 sm:px-6 lg:px-16 pb-14">
+        <div className="mx-auto max-w-7xl rounded-[2rem] border border-cyan-100 bg-gradient-to-r from-cyan-50 via-white to-emerald-50 p-6 shadow-lg md:p-8">
+          <div className="grid gap-7 lg:grid-cols-[1.2fr_1fr] lg:items-center">
+            <div>
+              <p className="inline-flex items-center gap-2 rounded-full border border-cyan-200 bg-white px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-cyan-700">
+                <PackageCheck className="h-3.5 w-3.5" />
+                New On MedVision
+              </p>
+              <h2 className="mt-4 text-3xl font-black text-slate-900 md:text-4xl">Quick Refill</h2>
+              <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-600 md:text-base">
+                Refill your regular medicines in under a minute. Upload your latest prescription, verify quantity, and place repeat orders without searching everything again.
+              </p>
+
+              <div className="mt-6 flex flex-wrap gap-3">
+                <button
+                  onClick={handleQuickRefill}
+                  className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-6 py-3 text-sm font-semibold text-white transition hover:bg-slate-800"
+                >
+                  Start Quick Refill
+                  <ArrowRight className="h-4 w-4" />
+                </button>
+                <button
+                  onClick={handleOnlinePharmacy}
+                  className="inline-flex items-center gap-2 rounded-xl border border-cyan-300 bg-white px-6 py-3 text-sm font-semibold text-cyan-700 transition hover:bg-cyan-50"
+                >
+                  Browse Alternatives
+                </button>
+              </div>
+            </div>
+
+            <div className="rounded-3xl border border-slate-200 bg-white p-5 md:p-6">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Refill Flow</p>
+              <div className="mt-4 space-y-3">
+                {[
+                  "Upload prescription or choose previous order",
+                  "Confirm quantity, dosage, and delivery address",
+                  "Get verification and fast doorstep dispatch",
+                ].map((step, idx) => (
+                  <div key={step} className="flex items-start gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-3">
+                    <span className="mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-[11px] font-bold text-emerald-700">
+                      {idx + 1}
+                    </span>
+                    <p className="text-sm text-slate-700">{step}</p>
+                  </div>
+                ))}
+              </div>
+
+              <div className="mt-5 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3">
+                <p className="inline-flex items-center gap-2 text-sm font-semibold text-emerald-800">
+                  <CheckCircle2 className="h-4 w-4" />
+                  Best for chronic and monthly medicines.
+                </p>
+              </div>
+            </div>
+          </div>
         </div>
       </section>
 

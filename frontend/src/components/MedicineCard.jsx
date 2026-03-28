@@ -117,10 +117,10 @@ const MedicineCard = ({ id, name, manufacturer, dosage, price, stock, type, requ
   }, []);
 
   return (
-    <div className="bg-white rounded-lg shadow-sm p-4 hover:shadow-md transition-shadow w-full">
+    <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 w-full">
       <div className="flex flex-col">
         <div className="flex items-center gap-2 mb-2">
-          <Pill className="w-5 h-5 text-blue-500" />
+          <Pill className="w-5 h-5 text-cyan-600" />
           <h3 className="text-lg font-semibold text-gray-900 truncate">{name}</h3>
         </div>
         <p className="text-sm text-gray-600">{manufacturer}</p>
@@ -142,7 +142,7 @@ const MedicineCard = ({ id, name, manufacturer, dosage, price, stock, type, requ
           )}
         </div> 
         <div className="flex items-center justify-between mt-4">
-          <div className="text-lg font-bold text-blue-600">Rs {price}/-</div>
+          <div className="text-lg font-bold text-cyan-700">Rs {price}/-</div>
           <div className={`text-sm ${stock > 0 ? 'text-green-600' : 'text-red-500'}`}>
             {stock > 0 ? `In Stock (${stock} left)` : 'Out of Stock'}
           </div>
@@ -184,7 +184,7 @@ const MedicineCard = ({ id, name, manufacturer, dosage, price, stock, type, requ
         requiresPrescription && prescriptionStatus === 'pending'
           ? 'bg-amber-100 text-amber-600 cursor-not-allowed'
           : userData?._id && stock > 0
-            ? 'bg-blue-600 text-white hover:bg-blue-700 active:scale-95 hover:scale-[1.02]'
+            ? 'bg-slate-900 text-white hover:bg-slate-800 active:scale-95 hover:scale-[1.02]'
             : 'bg-gray-100 text-gray-400 cursor-not-allowed'
       }`}
           >

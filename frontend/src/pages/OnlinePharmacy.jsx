@@ -105,12 +105,28 @@ function OnlinePharmacy() {
   return (
     <div className="relative z-[100]">
       <Navbar />
-      <div className="min-h-screen bg-gray-50 relative" style={{ paddingTop: 'calc(var(--app-navbar-offset, 88px) + 0.5rem)' }}>
-      <div className="bg-white/80 backdrop-blur-sm border-b border-gray-100 mb-8">
-        <div className="max-w-6xl mx-auto px-4 py-4">
-          <div className="flex items-center justify-center gap-3">
-            <Pill className="w-8 h-8 text-blue-600" />
-            <h1 className="text-2xl font-bold text-gray-900">Online Pharmacy</h1>
+      <div className="min-h-screen bg-[#f7fbff] relative" style={{ paddingTop: 'calc(var(--app-navbar-offset, 88px) + 0.5rem)' }}>
+      {/* Pharmacy header banner */}
+      <div className="relative overflow-hidden bg-gradient-to-r from-slate-900 via-cyan-950 to-emerald-900 mb-10">
+        <div className="absolute -right-16 -top-16 h-56 w-56 rounded-full bg-cyan-400/10 blur-3xl" />
+        <div className="absolute -left-10 bottom-0 h-40 w-40 rounded-full bg-emerald-400/10 blur-3xl" />
+        <div className="max-w-6xl mx-auto px-4 py-10 relative z-10 flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <div className="w-14 h-14 rounded-2xl bg-white/10 border border-white/20 flex items-center justify-center">
+              <Pill className="w-7 h-7 text-cyan-300" />
+            </div>
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-widest text-cyan-300">MedVision</p>
+              <h1 className="text-2xl font-black text-white leading-tight">Online Pharmacy</h1>
+              <p className="text-sm text-cyan-100 mt-0.5">Browse medicines &amp; order with ease</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-6 text-center text-white/80 text-sm">
+            <div><p className="text-2xl font-black text-white">100+</p><p>Medicines</p></div>
+            <div className="w-px h-8 bg-white/20" />
+            <div><p className="text-2xl font-black text-white">24h</p><p>Delivery</p></div>
+            <div className="w-px h-8 bg-white/20" />
+            <div><p className="text-2xl font-black text-white">Rx</p><p>Accepted</p></div>
           </div>
         </div>
       </div>
@@ -139,7 +155,7 @@ function OnlinePharmacy() {
               </div>
               {!searchTerm && medicines.length > 6 && (
                 <div className="text-center mt-4">
-                  <p className="text-blue-600 font-semibold">Many more medicines available...(100+)</p>
+                  <p className="text-cyan-700 font-semibold">Many more medicines available...(100+)</p>
                 </div>
               )}
             </div>
