@@ -1,0 +1,1338 @@
+import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import Navbar from '../components/Navbar';
+import {
+  Users,
+  Package,
+  ClipboardList,
+  ShoppingBag,
+  BarChart3,
+  FileUp,
+  UserPlus,
+  Trash2,
+  CheckCircle2,
+  XCircle,
+  ChevronRight,
+  MessageSquare,
+  Send,
+} from 'lucide-react';
+
+const StoreDashboard = () => {
+  const navigate = useNavigate();
+  const [selectedSection, setSelectedSection] = useState('staff');
+  const [staffMembers, setStaffMembers] = useState([
+    {
+      id: 1,
+      firstName: 'Asha',
+      middleName: '',
+      lastName: 'Patel',
+      role: 'Pharmacist',
+      email: 'asha@store.com',
+      contact: '+91 98765 43210',
+      address: '21 Tulip Street, Mumbai',
+      idProof: 'Aadhar',
+    },
+    {
+      id: 2,
+      firstName: 'Rohit',
+      middleName: '',
+      lastName: 'Kumar',
+      role: 'Store Assistant',
+      email: 'rohit@store.com',
+      contact: '+91 91234 56789',
+      address: '9 Lotus Avenue, Pune',
+      idProof: 'PAN Card',
+    },
+  ]);
+  const [newStaff, setNewStaff] = useState({
+    firstName: '',
+    middleName: '',
+    lastName: '',
+    contact: '',
+    email: '',
+    address: '',
+    idProof: '',
+    idProofFile: null,
+    role: 'Pharmacist',
+  });
+  const [editingStaffId, setEditingStaffId] = useState(null);
+  const [showStaffForm, setShowStaffForm] = useState(false);
+  const [showStaffSearchFields, setShowStaffSearchFields] = useState(false);
+  const [staffSearchFirstName, setStaffSearchFirstName] = useState('');
+  const [staffSearchLastName, setStaffSearchLastName] = useState('');
+  const [staffSearchContact, setStaffSearchContact] = useState('');
+  const [staffSearchEmail, setStaffSearchEmail] = useState('');
+  const [inventoryItems, setInventoryItems] = useState([
+    { id: 1, name: 'Paracetamol 500mg', stock: 120, status: 'In Stock' },
+    { id: 2, name: 'Cough Syrup', stock: 18, status: 'Low Stock' },
+    { id: 3, name: 'Vitamin D Capsules', stock: 42, status: 'In Stock' },
+    { id: 4, name: 'Insulin Syringes', stock: 7, status: 'Low Stock' },
+  ]);
+  const [newMedicine, setNewMedicine] = useState({ name: '', stock: '', status: 'In Stock' });
+  const [editingMedicineId, setEditingMedicineId] = useState(null);
+  const [editMedicine, setEditMedicine] = useState({ name: '', stock: '' });
+  const [orders] = useState([
+    {
+      id: 1087,
+      customer: 'Meera Singh',
+      total: '₹1,245',
+      status: 'Completed',
+      date: 'Mar 26',
+      address: '12 Magnolia Lane, Mumbai',
+      payment: 'Credit Card',
+      items: [
+        { name: 'Paracetamol 500mg', qty: 2, price: '₹180' },
+        { name: 'Cough Syrup', qty: 1, price: '₹320' },
+        { name: 'Vitamin D Capsules', qty: 1, price: '₹745' },
+      ],
+      tracking: [
+        { step: 'Order placed', date: 'Mar 24', status: 'complete' },
+        { step: 'Dispatched', date: 'Mar 25', status: 'complete' },
+        { step: 'Delivered', date: 'Mar 26', status: 'complete' },
+      ],
+    },
+    {
+      id: 1085,
+      customer: 'Amit Shah',
+      total: '₹860',
+      status: 'Pending',
+      date: 'Mar 26',
+      address: '77 Pearl Street, Pune',
+      payment: 'UPI',
+      items: [
+        { name: 'Metformin 500mg', qty: 1, price: '₹250' },
+        { name: 'Saline Nasal Spray', qty: 2, price: '₹220' },
+        { name: 'Multivitamin Tablets', qty: 1, price: '₹390' },
+      ],
+      tracking: [
+        { step: 'Order placed', date: 'Mar 26', status: 'complete' },
+        { step: 'Packed', date: 'Mar 26', status: 'active' },
+        { step: 'Out for delivery', date: '', status: 'upcoming' },
+      ],
+    },
+    {
+      id: 1083,
+      customer: 'Sneha Patel',
+      total: '₹2,050',
+      status: 'Completed',
+      date: 'Mar 25',
+      address: '45 Garden Avenue, Delhi',
+      payment: 'Debit Card',
+      items: [
+        { name: 'Aspirin 75mg', qty: 1, price: '₹150' },
+        { name: 'Antacid Tablets', qty: 2, price: '₹400' },
+        { name: 'Protein Powder', qty: 1, price: '₹1,500' },
+      ],
+      tracking: [
+        { step: 'Order placed', date: 'Mar 23', status: 'complete' },
+        { step: 'Dispatched', date: 'Mar 24', status: 'complete' },
+        { step: 'Delivered', date: 'Mar 25', status: 'complete' },
+      ],
+    },
+    {
+      id: 1081,
+      customer: 'Rajeev Nair',
+      total: '₹1,360',
+      status: 'Pending',
+      date: 'Mar 24',
+      address: '18 Lotus Road, Chennai',
+      payment: 'Cash on Delivery',
+      items: [
+        { name: 'Blood Pressure Monitor', qty: 1, price: '₹1,000' },
+        { name: 'Hand Sanitizer', qty: 2, price: '₹180' },
+      ],
+      tracking: [
+        { step: 'Order placed', date: 'Mar 24', status: 'complete' },
+        { step: 'Packed', date: 'Mar 24', status: 'active' },
+        { step: 'Out for delivery', date: '', status: 'upcoming' },
+      ],
+    },
+  ]);
+  const [selectedOrderId, setSelectedOrderId] = useState(orders[0]?.id || null);
+  const selectedOrder = orders.find((item) => item.id === selectedOrderId);
+  const [prescriptions, setPrescriptions] = useState([
+    {
+      id: 'RX-1024',
+      patient: 'Neha Sharma',
+      medicines: 'Amoxicillin 500mg',
+      status: 'Pending',
+      date: 'Mar 24',
+      file: {
+        name: 'neha-prescription.jpg',
+        type: 'image/jpeg',
+        url: 'https://via.placeholder.com/600x400?text=Neha+Prescription',
+      },
+    },
+    {
+      id: 'RX-1027',
+      patient: 'Vikram Joshi',
+      medicines: 'Ibuprofen 200mg',
+      status: 'Approved',
+      date: 'Mar 25',
+      file: {
+        name: 'vikram-prescription.pdf',
+        type: 'application/pdf',
+        url: 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf',
+      },
+    },
+    {
+      id: 'RX-1031',
+      patient: 'Priya Singh',
+      medicines: 'Lisinopril 10mg',
+      status: 'Pending',
+      date: 'Mar 26',
+      file: {
+        name: 'priya-prescription.png',
+        type: 'image/png',
+        url: 'https://images.unsplash.com/photo-1551836022-d5d88e9218df?auto=format&fit=crop&w=600&q=80',
+      },
+    },
+  ]);
+  const [selectedPrescriptionId, setSelectedPrescriptionId] = useState(prescriptions[0]?.id || null);
+  const selectedPrescription = prescriptions.find((item) => item.id === selectedPrescriptionId);
+  const [patientsCsvFile, setPatientsCsvFile] = useState(null);
+  const [csvUploadMessage, setCsvUploadMessage] = useState('');
+  const [revenueSummary] = useState({ monthly: '₹6.2L', weekly: '₹1.4L', growth: '14%', orders: 211, revenueToday: '₹38,600' });
+  const [queries, setQueries] = useState([
+    { id: 1, patientName: 'Meera Singh', email: 'meera@email.com', subject: 'Order & Delivery Issue', message: 'My order was supposed to arrive by March 27. It still hasn\'t arrived. Order ID: 1087', status: 'pending', date: 'Mar 26' },
+    { id: 2, patientName: 'Amit Shah', email: 'amit@email.com', subject: 'Medicine Availability Query', message: 'Is Metformin 500mg tablet available in 30-tab packs?', status: 'pending', date: 'Mar 26' },
+    { id: 3, patientName: 'Sneha Patel', email: 'sneha@email.com', subject: 'Refund / Return Request', message: 'I received the wrong medicine. I need to return Antacid tablets. Can you help?', status: 'answered', date: 'Mar 25', answer: 'We apologize for the inconvenience. Please visit our store with your order details for a prompt replacement.' },
+  ]);
+  const [selectedQueryId, setSelectedQueryId] = useState(queries[0]?.id || null);
+  const [answerText, setAnswerText] = useState('');
+  const selectedQuery = queries.find((item) => item.id === selectedQueryId);
+
+  const sectionConfig = [
+    { key: 'staff', label: 'Staff Members', icon: Users },
+    { key: 'importPatients', label: 'Import Patients', icon: FileUp },
+    { key: 'inventory', label: 'Inventory', icon: Package },
+    { key: 'orders', label: 'Orders', icon: ShoppingBag },
+    { key: 'prescription', label: 'Prescription', icon: ClipboardList },
+    { key: 'queries', label: 'Queries', icon: MessageSquare },
+    { key: 'reports', label: 'Reports', icon: BarChart3 },
+  ];
+
+  const handleStaffChange = (e) => {
+    const { name, value } = e.target;
+    setNewStaff((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const handleStaffFileChange = (e) => {
+    const file = e.target.files?.[0] || null;
+    setNewStaff((prev) => ({ ...prev, idProofFile: file, idProof: file?.name || '' }));
+  };
+
+  const openStaffForm = () => {
+    setEditingStaffId(null);
+    setShowStaffForm(true);
+    setNewStaff({
+      firstName: '',
+      middleName: '',
+      lastName: '',
+      contact: '',
+      email: '',
+      address: '',
+      idProof: '',
+      idProofFile: null,
+      role: 'Pharmacist',
+    });
+  };
+
+  const addStaffMember = (e) => {
+    e.preventDefault();
+    if (!newStaff.firstName || !newStaff.lastName || !newStaff.email || !newStaff.contact) return;
+
+    if (editingStaffId) {
+      setStaffMembers((prev) =>
+        prev.map((member) =>
+          member.id === editingStaffId
+            ? {
+                ...member,
+                firstName: newStaff.firstName,
+                middleName: newStaff.middleName,
+                lastName: newStaff.lastName,
+                role: newStaff.role,
+                email: newStaff.email,
+                contact: newStaff.contact,
+                address: newStaff.address,
+                idProof: newStaff.idProof || newStaff.idProofFile?.name || member.idProof,
+              }
+            : member,
+        ),
+      );
+      setEditingStaffId(null);
+    } else {
+      setStaffMembers((prev) => [
+        ...prev,
+        {
+          id: prev.length + 1,
+          firstName: newStaff.firstName,
+          middleName: newStaff.middleName,
+          lastName: newStaff.lastName,
+          role: newStaff.role,
+          email: newStaff.email,
+          contact: newStaff.contact,
+          address: newStaff.address,
+          idProof: newStaff.idProof || newStaff.idProofFile?.name || '',
+        },
+      ]);
+    }
+
+    setNewStaff({
+      firstName: '',
+      middleName: '',
+      lastName: '',
+      contact: '',
+      email: '',
+      address: '',
+      idProof: '',
+      idProofFile: null,
+      role: 'Pharmacist',
+    });
+    setShowStaffForm(false);
+  };
+
+  const handleEditStaff = (staff) => {
+    setEditingStaffId(staff.id);
+    setShowStaffForm(true);
+    setNewStaff({
+      firstName: staff.firstName,
+      middleName: staff.middleName,
+      lastName: staff.lastName,
+      contact: staff.contact,
+      email: staff.email,
+      address: staff.address,
+      idProof: staff.idProof,
+      idProofFile: null,
+      role: staff.role,
+    });
+  };
+
+  const cancelStaffEdit = () => {
+    setEditingStaffId(null);
+    setShowStaffForm(false);
+    setNewStaff({
+      firstName: '',
+      middleName: '',
+      lastName: '',
+      contact: '',
+      email: '',
+      address: '',
+      idProof: '',
+      idProofFile: null,
+      role: 'Pharmacist',
+    });
+  };
+
+  const removeStaffMember = (id) => {
+    setStaffMembers((prev) => prev.filter((member) => member.id !== id));
+  };
+
+  const handleNewMedicineChange = (e) => {
+    const { name, value } = e.target;
+    setNewMedicine((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const addMedicine = (e) => {
+    e.preventDefault();
+    if (!newMedicine.name || !newMedicine.stock) return;
+    const stock = Number(newMedicine.stock);
+    setInventoryItems((prev) => [
+      ...prev,
+      {
+        id: prev.length + 1,
+        name: newMedicine.name,
+        stock,
+        status: stock > 20 ? 'In Stock' : stock > 0 ? 'Low Stock' : 'Out of Stock',
+      },
+    ]);
+    setNewMedicine({ name: '', stock: '', status: 'In Stock' });
+  };
+
+  const startEditMedicine = (item) => {
+    setEditingMedicineId(item.id);
+    setEditMedicine({ name: item.name, stock: String(item.stock) });
+  };
+
+  const handleEditMedicineChange = (e) => {
+    const { name, value } = e.target;
+    setEditMedicine((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const saveMedicine = (id) => {
+    const stock = Number(editMedicine.stock);
+    setInventoryItems((prev) =>
+      prev.map((item) =>
+        item.id === id
+          ? {
+              ...item,
+              name: editMedicine.name,
+              stock,
+              status: stock > 20 ? 'In Stock' : stock > 0 ? 'Low Stock' : 'Out of Stock',
+            }
+          : item,
+      ),
+    );
+    setEditingMedicineId(null);
+    setEditMedicine({ name: '', stock: '' });
+  };
+
+  const cancelEditMedicine = () => {
+    setEditingMedicineId(null);
+    setEditMedicine({ name: '', stock: '' });
+  };
+
+  const updateMedicineStock = (id, delta) => {
+    setInventoryItems((prev) =>
+      prev.map((item) => {
+        if (item.id !== id) return item;
+        const stock = Math.max(0, item.stock + delta);
+        return {
+          ...item,
+          stock,
+          status: stock > 20 ? 'In Stock' : stock > 0 ? 'Low Stock' : 'Out of Stock',
+        };
+      }),
+    );
+  };
+
+  const updatePrescriptionStatus = (id, status) => {
+    setPrescriptions((prev) => prev.map((item) => (item.id === id ? { ...item, status } : item)));
+  };
+
+  const handleSubmitAnswer = (queryId) => {
+    if (!answerText.trim()) return;
+    setQueries((prev) =>
+      prev.map((q) =>
+        q.id === queryId ? { ...q, status: 'answered', answer: answerText } : q
+      )
+    );
+    setAnswerText('');
+  };
+
+  const handlePatientsCsvUpload = (e) => {
+    const file = e.target.files?.[0] || null;
+    setPatientsCsvFile(file);
+    if (file) {
+      setCsvUploadMessage(`CSV selected: ${file.name}`);
+    } else {
+      setCsvUploadMessage('');
+    }
+  };
+
+  const filteredStaffMembers = staffMembers.filter((member) => {
+    const firstNameQuery = staffSearchFirstName.trim().toLowerCase();
+    const lastNameQuery = staffSearchLastName.trim().toLowerCase();
+    const contactQuery = staffSearchContact.trim().toLowerCase();
+    const emailQuery = staffSearchEmail.trim().toLowerCase();
+
+    const firstNameMatch = firstNameQuery ? member.firstName.toLowerCase().includes(firstNameQuery) : true;
+    const lastNameMatch = lastNameQuery ? member.lastName.toLowerCase().includes(lastNameQuery) : true;
+    const contactMatch = contactQuery ? member.contact.toLowerCase().includes(contactQuery) : true;
+    const emailMatch = emailQuery ? member.email.toLowerCase().includes(emailQuery) : true;
+
+    return firstNameMatch && lastNameMatch && contactMatch && emailMatch;
+  });
+
+  return (
+    <div className="min-h-screen bg-slate-50">
+      <Navbar />
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-12" style={{ paddingTop: 'calc(var(--app-navbar-offset, 88px) + 3rem)' }}>
+        <div className="mb-6 overflow-hidden rounded-3xl border border-slate-200 bg-gradient-to-r from-slate-900 via-slate-800 to-teal-900 p-6 text-white shadow-sm sm:p-8">
+          <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-cyan-200">Store Operations Hub</p>
+              <h1 className="mt-3 text-3xl font-bold sm:text-4xl">Pharmacy Store Dashboard</h1>
+              <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-200 sm:text-base">
+                Manage staff, inventory, orders, prescriptions, and customer queries from one central control panel.
+              </p>
+            </div>
+            <div className="grid w-full gap-3 sm:w-auto sm:grid-cols-2">
+              <button
+                type="button"
+                onClick={() => setSelectedSection('inventory')}
+                className="rounded-2xl border border-cyan-300/30 bg-cyan-500/20 px-4 py-3 text-sm font-semibold text-cyan-100 transition hover:bg-cyan-500/30"
+              >
+                Manage Inventory
+              </button>
+              <button
+                type="button"
+                onClick={() => setSelectedSection('reports')}
+                className="rounded-2xl border border-emerald-300/30 bg-emerald-500/20 px-4 py-3 text-sm font-semibold text-emerald-100 transition hover:bg-emerald-500/30"
+              >
+                View Reports
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div className="grid gap-6 xl:grid-cols-[260px_1fr]">
+          <aside className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+            <div className="mb-8">
+              <p className="text-sm text-slate-500">Store Manager</p>
+              <h2 className="text-2xl font-semibold text-slate-900 mt-2">Control Panel</h2>
+              <p className="mt-2 text-sm text-slate-600">Select a section to manage your store.</p>
+            </div>
+            <div className="space-y-3">
+              {sectionConfig.map((section) => {
+                const Icon = section.icon;
+                const active = selectedSection === section.key;
+                return (
+                  <button
+                    key={section.key}
+                    type="button"
+                    onClick={() => setSelectedSection(section.key)}
+                    className={`flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-left transition ${active ? 'bg-blue-600 text-white shadow-lg' : 'bg-slate-50 text-slate-700 hover:bg-slate-100'}`}
+                  >
+                    <Icon className={`${active ? 'text-white' : 'text-blue-600'}`} size={20} />
+                    <span className="font-medium">{section.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </aside>
+
+          <main className="space-y-6">
+            <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <p className="text-sm text-slate-500">Current View</p>
+                  <h1 className="text-2xl font-semibold text-slate-900 capitalize">{sectionConfig.find((item) => item.key === selectedSection)?.label}</h1>
+                </div>
+              </div>
+            </div>
+
+            {selectedSection === 'staff' && (
+              <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-6">
+                  <div className="flex items-center gap-3">
+                    <Users className="text-indigo-600" size={24} />
+                    <div>
+                      <h2 className="text-xl font-semibold text-slate-900">Staff Members</h2>
+                      <p className="text-sm text-slate-500">
+                        {showStaffForm ? (editingStaffId ? 'Update staff details and save changes.' : 'Add a new staff member.') : 'View all staff, search records, or manage updates.'}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2 justify-end">
+                    {!showStaffForm ? (
+                      <>
+                        <button
+                          type="button"
+                          onClick={openStaffForm}
+                          className="inline-flex items-center rounded-2xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 transition"
+                        >
+                          Add Staff Member
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setShowStaffSearchFields(true)}
+                          className="inline-flex items-center rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition"
+                        >
+                          Search Staff
+                        </button>
+                        {showStaffSearchFields && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setShowStaffSearchFields(false);
+                              setStaffSearchFirstName('');
+                              setStaffSearchLastName('');
+                              setStaffSearchContact('');
+                              setStaffSearchEmail('');
+                            }}
+                            className="inline-flex items-center rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition"
+                          >
+                            Clear Search
+                          </button>
+                        )}
+                      </>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowStaffForm(false);
+                          setEditingStaffId(null);
+                          setNewStaff({
+                            firstName: '',
+                            middleName: '',
+                            lastName: '',
+                            contact: '',
+                            email: '',
+                            address: '',
+                            idProof: '',
+                            idProofFile: null,
+                            role: 'Pharmacist',
+                          });
+                        }}
+                        className="inline-flex items-center rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition"
+                      >
+                        Back to Staff List
+                      </button>
+                    )}
+                  </div>
+                </div>
+                {!showStaffForm ? (
+                  <div className="space-y-6">
+                    {showStaffSearchFields && (
+                      <div className="grid gap-4 sm:grid-cols-2">
+                        <div>
+                          <label className="sr-only" htmlFor="search-firstname">Search by First Name</label>
+                          <input
+                            id="search-firstname"
+                            type="text"
+                            value={staffSearchFirstName}
+                            onChange={(e) => setStaffSearchFirstName(e.target.value)}
+                            placeholder="Search by first name"
+                            className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-blue-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="sr-only" htmlFor="search-lastname">Search by Last Name</label>
+                          <input
+                            id="search-lastname"
+                            type="text"
+                            value={staffSearchLastName}
+                            onChange={(e) => setStaffSearchLastName(e.target.value)}
+                            placeholder="Search by last name"
+                            className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-blue-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="sr-only" htmlFor="search-contact">Search by Mobile Number</label>
+                          <input
+                            id="search-contact"
+                            type="text"
+                            value={staffSearchContact}
+                            onChange={(e) => setStaffSearchContact(e.target.value)}
+                            placeholder="Search by mobile number"
+                            className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-blue-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="sr-only" htmlFor="search-email">Search by Email ID</label>
+                          <input
+                            id="search-email"
+                            type="text"
+                            value={staffSearchEmail}
+                            onChange={(e) => setStaffSearchEmail(e.target.value)}
+                            placeholder="Search by email ID"
+                            className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-blue-500"
+                          />
+                        </div>
+                      </div>
+                    )}
+                    <div className="space-y-4">
+                      {filteredStaffMembers.length ? (
+                        filteredStaffMembers.map((member) => (
+                          <div key={member.id} className="flex flex-col gap-3 rounded-3xl border border-slate-200 p-4 sm:flex-row sm:items-center sm:justify-between">
+                            <div>
+                              <p className="font-semibold text-slate-900">{`${member.firstName} ${member.middleName ? `${member.middleName} ` : ''}${member.lastName}`}</p>
+                              <p className="text-sm text-slate-500">{member.role}</p>
+                              <p className="text-sm text-slate-500">{member.contact}</p>
+                              <p className="text-sm text-slate-500">{member.email}</p>
+                              <p className="text-sm text-slate-500">{member.address}</p>
+                              <p className="text-sm text-slate-500">ID: {member.idProof}</p>
+                            </div>
+                            <div className="flex flex-wrap gap-2">
+                              <button
+                                onClick={() => handleEditStaff(member)}
+                                className="inline-flex items-center gap-2 rounded-2xl bg-sky-600 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-700 transition"
+                              >
+                                Update
+                              </button>
+                              <button
+                                onClick={() => removeStaffMember(member.id)}
+                                className="inline-flex items-center gap-2 rounded-2xl bg-red-50 px-4 py-2 text-sm font-semibold text-red-600 hover:bg-red-100 transition"
+                              >
+                                <Trash2 size={16} /> Remove
+                              </button>
+                            </div>
+                          </div>
+                        ))
+                      ) : (
+                        <div className="rounded-3xl border border-slate-200 bg-slate-50 p-8 text-center text-sm text-slate-500">
+                          No staff members match your search.
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <div>
+                    <div className="flex items-center gap-3 mb-6">
+                      <UserPlus className="text-slate-700" size={24} />
+                      <div>
+                        <h2 className="text-xl font-semibold text-slate-900">{editingStaffId ? 'Update Staff Member' : 'Add Staff Member'}</h2>
+                        <p className="text-sm text-slate-500">{editingStaffId ? 'Edit the staff member details below.' : 'Fill in the staff details to add a new member.'}</p>
+                      </div>
+                    </div>
+                    <form className="space-y-4" onSubmit={addStaffMember}>
+                      <div className="grid gap-4 sm:grid-cols-2">
+                        <div>
+                          <label className="block text-sm font-medium text-slate-700">First Name</label>
+                          <input
+                            name="firstName"
+                            value={newStaff.firstName}
+                            onChange={handleStaffChange}
+                            className="mt-1 block w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-blue-500"
+                            placeholder="Enter first name"
+                            required
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-slate-700">Middle Name</label>
+                          <input
+                            name="middleName"
+                            value={newStaff.middleName}
+                            onChange={handleStaffChange}
+                            className="mt-1 block w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-blue-500"
+                            placeholder="Enter middle name"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-slate-700">Last Name</label>
+                          <input
+                            name="lastName"
+                            value={newStaff.lastName}
+                            onChange={handleStaffChange}
+                            className="mt-1 block w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-blue-500"
+                            placeholder="Enter last name"
+                            required
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-slate-700">Contact Number</label>
+                          <input
+                            name="contact"
+                            value={newStaff.contact}
+                            onChange={handleStaffChange}
+                            className="mt-1 block w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-blue-500"
+                            placeholder="Enter contact number"
+                            required
+                          />
+                        </div>
+                        <div className="sm:col-span-2">
+                          <label className="block text-sm font-medium text-slate-700">Email ID</label>
+                          <input
+                            name="email"
+                            type="email"
+                            value={newStaff.email}
+                            onChange={handleStaffChange}
+                            className="mt-1 block w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-blue-500"
+                            placeholder="Enter email address"
+                            required
+                          />
+                        </div>
+                        <div className="sm:col-span-2">
+                          <label className="block text-sm font-medium text-slate-700">Address</label>
+                          <input
+                            name="address"
+                            value={newStaff.address}
+                            onChange={handleStaffChange}
+                            className="mt-1 block w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-blue-500"
+                            placeholder="Enter address"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-slate-700">Upload ID Proof</label>
+                          <input
+                            type="file"
+                            accept="image/*,.pdf"
+                            onChange={handleStaffFileChange}
+                            className="mt-1 block w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-blue-500"
+                          />
+                          {newStaff.idProofFile && (
+                            <p className="mt-2 text-sm text-slate-500">Selected file: {newStaff.idProofFile.name}</p>
+                          )}
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-slate-700">Role</label>
+                          <select
+                            name="role"
+                            value={newStaff.role}
+                            onChange={handleStaffChange}
+                            className="mt-1 block w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-blue-500"
+                          >
+                            <option value="Pharmacist">Pharmacist</option>
+                            <option value="Store Assistant">Store Assistant</option>
+                            <option value="Inventory Manager">Inventory Manager</option>
+                          </select>
+                        </div>
+                      </div>
+                      <button
+                        type="submit"
+                        className="w-full rounded-2xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white hover:bg-blue-700 transition"
+                      >
+                        {editingStaffId ? 'Update Staff Member' : 'Add Staff Member'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowStaffForm(false);
+                          setEditingStaffId(null);
+                          setNewStaff({
+                            firstName: '',
+                            middleName: '',
+                            lastName: '',
+                            contact: '',
+                            email: '',
+                            address: '',
+                            idProof: '',
+                            idProofFile: null,
+                            role: 'Pharmacist',
+                          });
+                        }}
+                        className="w-full rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition"
+                      >
+                        Cancel
+                      </button>
+                    </form>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {selectedSection === 'inventory' && (
+              <div className="grid gap-6 xl:grid-cols-[1fr_420px]">
+                <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+                  <div className="flex items-center gap-3 mb-6">
+                    <Package className="text-emerald-600" size={24} />
+                    <div>
+                      <h2 className="text-xl font-semibold text-slate-900">Inventory Management</h2>
+                      <p className="text-sm text-slate-500">Track stock, update quantities, and manage products.</p>
+                    </div>
+                  </div>
+                  <div className="space-y-4">
+                    {inventoryItems.map((item) => (
+                      <div key={item.id} className="rounded-3xl border border-slate-200 p-4">
+                        {editingMedicineId === item.id ? (
+                          <div className="space-y-3">
+                            <div>
+                              <label className="block text-sm font-medium text-slate-700">Medicine Name</label>
+                              <input
+                                name="name"
+                                value={editMedicine.name}
+                                onChange={handleEditMedicineChange}
+                                className="mt-1 block w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-blue-500"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-sm font-medium text-slate-700">Stock</label>
+                              <input
+                                name="stock"
+                                type="number"
+                                min="0"
+                                value={editMedicine.stock}
+                                onChange={handleEditMedicineChange}
+                                className="mt-1 block w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-blue-500"
+                              />
+                            </div>
+                            <div className="flex gap-2">
+                              <button
+                                type="button"
+                                onClick={() => saveMedicine(item.id)}
+                                className="inline-flex items-center justify-center rounded-2xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 transition"
+                              >
+                                Save
+                              </button>
+                              <button
+                                type="button"
+                                onClick={cancelEditMedicine}
+                                className="inline-flex items-center justify-center rounded-2xl bg-slate-100 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-200 transition"
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div>
+                            <div className="flex items-center justify-between mb-3">
+                              <div>
+                                <p className="font-semibold text-slate-900">{item.name}</p>
+                                <p className="text-sm text-slate-500">Stock left: <span className="font-semibold text-slate-900">{item.stock}</span></p>
+                              </div>
+                              <span className={`rounded-full px-3 py-1 text-xs font-semibold ${item.status === 'Low Stock' ? 'bg-amber-100 text-amber-700' : item.status === 'Out of Stock' ? 'bg-red-100 text-red-700' : 'bg-emerald-100 text-emerald-700'}`}>
+                                {item.status}
+                              </span>
+                            </div>
+                            <div className="flex flex-wrap gap-2">
+                              <button
+                                type="button"
+                                onClick={() => updateMedicineStock(item.id, -1)}
+                                className="inline-flex items-center justify-center rounded-2xl bg-slate-100 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-200 transition"
+                              >
+                                -1
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => updateMedicineStock(item.id, 1)}
+                                className="inline-flex items-center justify-center rounded-2xl bg-slate-100 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-200 transition"
+                              >
+                                +1
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => startEditMedicine(item)}
+                                className="inline-flex items-center justify-center rounded-2xl bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700 transition"
+                              >
+                                Edit
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+                  <div className="flex items-center gap-3 mb-6">
+                    <Package className="text-slate-700" size={24} />
+                    <div>
+                      <h2 className="text-xl font-semibold text-slate-900">Add Medicine</h2>
+                      <p className="text-sm text-slate-500">Create new inventory entries quickly.</p>
+                    </div>
+                  </div>
+                  <form className="space-y-4" onSubmit={addMedicine}>
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700">Medicine Name</label>
+                      <input
+                        name="name"
+                        value={newMedicine.name}
+                        onChange={handleNewMedicineChange}
+                        className="mt-1 block w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-blue-500"
+                        placeholder="e.g. Paracetamol 500mg"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700">Stock</label>
+                      <input
+                        name="stock"
+                        type="number"
+                        min="0"
+                        value={newMedicine.stock}
+                        onChange={handleNewMedicineChange}
+                        className="mt-1 block w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-blue-500"
+                        placeholder="Enter starting stock"
+                        required
+                      />
+                    </div>
+                    <button
+                      type="submit"
+                      className="w-full rounded-2xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white hover:bg-blue-700 transition"
+                    >
+                      Add Medicine
+                    </button>
+                  </form>
+                </div>
+              </div>
+            )}
+
+            {selectedSection === 'orders' && (
+              <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+                <div className="flex items-center justify-between mb-6">
+                  <div className="flex items-center gap-3">
+                    <ShoppingBag className="text-sky-600" size={24} />
+                    <div>
+                      <h2 className="text-xl font-semibold text-slate-900">Orders</h2>
+                      <p className="text-sm text-slate-500">Click any order to view details and tracking status.</p>
+                    </div>
+                  </div>
+                </div>
+                <div className="grid gap-6 lg:grid-cols-[300px_1fr]">
+                  <div className="space-y-3">
+                    {orders.map((order, index) => {
+                      const active = order.id === selectedOrderId;
+                      return (
+                        <button
+                          key={order.id}
+                          type="button"
+                          onClick={() => setSelectedOrderId(order.id)}
+                          className={`w-full rounded-3xl border p-4 text-left transition ${active ? 'border-sky-500 bg-sky-50 shadow-sm' : 'border-slate-200 bg-white hover:border-slate-300'}`}
+                        >
+                          <div className="flex items-center justify-between gap-3">
+                            <div className="flex items-center gap-3">
+                              <span className={`inline-flex h-9 w-9 items-center justify-center rounded-full text-sm font-semibold ${active ? 'bg-sky-500 text-white' : 'bg-slate-100 text-slate-700'}`}>
+                                {index + 1}
+                              </span>
+                              <div>
+                                <p className="font-semibold text-slate-900">Order #{order.id}</p>
+                                <p className="text-sm text-slate-500">{order.customer}</p>
+                              </div>
+                            </div>
+                            <ChevronRight size={20} className={`transition ${active ? 'text-sky-600' : 'text-slate-400'}`} />
+                          </div>
+                          <div className="mt-3 flex items-center justify-between text-sm text-slate-500">
+                            <span>{order.date}</span>
+                            <span className={`rounded-full px-3 py-1 text-xs font-semibold ${order.status === 'Completed' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
+                              {order.status}
+                            </span>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <div className="rounded-3xl border border-slate-200 bg-slate-50 p-6">
+                    {selectedOrder ? (
+                      <>
+                        <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                          <div>
+                            <p className="text-sm font-medium text-slate-500">Order details</p>
+                            <h3 className="text-2xl font-semibold text-slate-900">Order #{selectedOrder.id}</h3>
+                            <p className="text-sm text-slate-500">{selectedOrder.customer} • {selectedOrder.date}</p>
+                          </div>
+                          <span className={`inline-flex rounded-full px-4 py-2 text-sm font-semibold ${selectedOrder.status === 'Completed' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
+                            {selectedOrder.status}
+                          </span>
+                        </div>
+                        <div className="grid gap-4 sm:grid-cols-2">
+                          <div className="rounded-3xl bg-white p-4">
+                            <p className="text-sm font-medium text-slate-500">Shipping address</p>
+                            <p className="mt-3 text-sm text-slate-700">{selectedOrder.address}</p>
+                          </div>
+                          <div className="rounded-3xl bg-white p-4">
+                            <p className="text-sm font-medium text-slate-500">Payment method</p>
+                            <p className="mt-3 text-sm text-slate-700">{selectedOrder.payment}</p>
+                          </div>
+                        </div>
+                        <div className="mt-6 rounded-3xl bg-white p-4">
+                          <p className="text-sm font-medium text-slate-500">Order items</p>
+                          <div className="mt-4 space-y-3">
+                            {selectedOrder.items.map((item) => (
+                              <div key={item.name} className="flex items-center justify-between rounded-2xl border border-slate-200 px-4 py-3">
+                                <div>
+                                  <p className="font-medium text-slate-900">{item.name}</p>
+                                  <p className="text-sm text-slate-500">Qty {item.qty}</p>
+                                </div>
+                                <p className="text-sm font-semibold text-slate-900">{item.price}</p>
+                              </div>
+                            ))}
+                          </div>
+                          <div className="mt-4 flex items-center justify-between border-t border-slate-200 pt-4">
+                            <p className="font-semibold text-slate-900">Order total</p>
+                            <p className="font-semibold text-slate-900">{selectedOrder.total}</p>
+                          </div>
+                        </div>
+                        <div className="mt-6 rounded-3xl bg-white p-4">
+                          <p className="text-sm font-medium text-slate-500">Tracking status</p>
+                          <div className="mt-4 space-y-4">
+                            {selectedOrder.tracking.map((step) => (
+                              <div key={step.step} className="flex items-start gap-4">
+                                <div className="mt-1">
+                                  <span className={`flex h-3 w-3 rounded-full ${step.status === 'complete' ? 'bg-emerald-500' : step.status === 'active' ? 'bg-sky-500' : 'bg-slate-300'}`} />
+                                </div>
+                                <div>
+                                  <p className="font-medium text-slate-900">{step.step}</p>
+                                  <p className="text-sm text-slate-500">{step.date || 'Pending'}</p>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </>
+                    ) : (
+                      <div className="rounded-3xl border border-slate-200 bg-white p-8 text-center text-sm text-slate-500">
+                        Select an order from the left to view details and tracking.
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {selectedSection === 'prescription' && (
+              <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+                <div className="flex items-center justify-between mb-6">
+                  <div className="flex items-center gap-3">
+                    <ClipboardList className="text-yellow-600" size={24} />
+                    <div>
+                      <h2 className="text-xl font-semibold text-slate-900">Prescription Requests</h2>
+                      <p className="text-sm text-slate-500">Review attachments and approve or reject each request.</p>
+                    </div>
+                  </div>
+                </div>
+                <div className="grid gap-6 lg:grid-cols-[280px_1fr]">
+                  <div className="space-y-3">
+                    {prescriptions.map((prescription, index) => {
+                      const active = prescription.id === selectedPrescriptionId;
+                      return (
+                        <button
+                          key={prescription.id}
+                          type="button"
+                          onClick={() => setSelectedPrescriptionId(prescription.id)}
+                          className={`w-full rounded-3xl border p-4 text-left transition ${active ? 'border-yellow-500 bg-yellow-50 shadow-sm' : 'border-slate-200 bg-white hover:border-slate-300'}`}
+                        >
+                          <div className="flex items-center justify-between gap-3">
+                            <div className="flex items-center gap-3">
+                              <span className={`inline-flex h-9 w-9 items-center justify-center rounded-full text-sm font-semibold ${active ? 'bg-yellow-500 text-white' : 'bg-slate-100 text-slate-700'}`}>
+                                {index + 1}
+                              </span>
+                              <div>
+                                <p className="font-semibold text-slate-900">{prescription.patient}</p>
+                                <p className="text-sm text-slate-500">{prescription.medicines}</p>
+                              </div>
+                            </div>
+                            <ChevronRight size={20} className={`transition ${active ? 'text-yellow-600' : 'text-slate-400'}`} />
+                          </div>
+                          <div className="mt-3 flex items-center justify-between text-sm text-slate-500">
+                            <span>{prescription.date}</span>
+                            <span className={`rounded-full px-3 py-1 text-xs font-semibold ${prescription.status === 'Approved' ? 'bg-emerald-100 text-emerald-700' : prescription.status === 'Rejected' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'}`}>
+                              {prescription.status}
+                            </span>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <div className="rounded-3xl border border-slate-200 bg-slate-50 p-6">
+                    {selectedPrescription ? (
+                      <>
+                        <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                          <div>
+                            <p className="text-sm font-medium text-slate-500">Review Prescription</p>
+                            <h3 className="text-2xl font-semibold text-slate-900">{selectedPrescription.patient}</h3>
+                            <p className="text-sm text-slate-500">{selectedPrescription.medicines}</p>
+                          </div>
+                          <span className={`inline-flex rounded-full px-4 py-2 text-sm font-semibold ${selectedPrescription.status === 'Approved' ? 'bg-emerald-100 text-emerald-700' : selectedPrescription.status === 'Rejected' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'}`}>
+                            {selectedPrescription.status}
+                          </span>
+                        </div>
+                        {selectedPrescription.file && (
+                          <div className="rounded-3xl border border-slate-200 bg-white p-5">
+                            <div className="flex items-center justify-between gap-3">
+                              <div>
+                                <p className="text-sm font-medium text-slate-800">Attachment</p>
+                                <p className="text-sm text-slate-500">{selectedPrescription.file.name}</p>
+                              </div>
+                            </div>
+                            <div className="mt-4">
+                              {selectedPrescription.file.type.startsWith('image/') ? (
+                                <img
+                                  src={selectedPrescription.file.url}
+                                  alt={selectedPrescription.file.name}
+                                  className="w-full rounded-3xl border border-slate-200 object-contain"
+                                />
+                              ) : selectedPrescription.file.type === 'application/pdf' ? (
+                                <div className="overflow-hidden rounded-3xl border border-slate-200">
+                                  <object data={selectedPrescription.file.url} type="application/pdf" width="100%" height="320">
+                                    <div className="p-4 text-sm text-slate-500">
+                                      PDF preview not available.{' '}
+                                      <a href={selectedPrescription.file.url} target="_blank" rel="noreferrer" className="text-indigo-600 underline">
+                                        Open document
+                                      </a>
+                                    </div>
+                                  </object>
+                                </div>
+                              ) : (
+                                <a href={selectedPrescription.file.url} target="_blank" rel="noreferrer" className="inline-flex text-sm font-medium text-indigo-600 hover:text-indigo-700">
+                                  View attachment
+                                </a>
+                              )}
+                            </div>
+                          </div>
+                        )}
+                        <div className="mt-6 flex flex-wrap gap-3">
+                          <button
+                            type="button"
+                            onClick={() => updatePrescriptionStatus(selectedPrescription.id, 'Approved')}
+                            className="inline-flex items-center gap-2 rounded-2xl bg-emerald-600 px-5 py-3 text-sm font-semibold text-white hover:bg-emerald-700 transition"
+                          >
+                            <CheckCircle2 size={18} /> Approve
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => updatePrescriptionStatus(selectedPrescription.id, 'Rejected')}
+                            className="inline-flex items-center gap-2 rounded-2xl bg-red-600 px-5 py-3 text-sm font-semibold text-white hover:bg-red-700 transition"
+                          >
+                            <XCircle size={18} /> Reject
+                          </button>
+                        </div>
+                      </>
+                    ) : (
+                      <div className="rounded-3xl border border-slate-200 bg-white p-8 text-center text-sm text-slate-500">
+                        Select a prescription request from the left to review the attachment.
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {selectedSection === 'queries' && (
+              <div className="rounded-3xl border border-slate-200 bg-white shadow-sm">
+                <div className="grid gap-6 lg:grid-cols-[350px_1fr]">
+                  {/* Queries List */}
+                  <div className="border-r border-slate-200 p-6 max-h-[600px] overflow-y-auto">
+                    <p className="mb-4 text-sm font-medium text-slate-500">Patient Queries ({queries.length})</p>
+                    <div className="space-y-2">
+                      {queries.map((q) => {
+                        const active = selectedQueryId === q.id;
+                        return (
+                          <button
+                            key={q.id}
+                            onClick={() => { setSelectedQueryId(q.id); setAnswerText(q.answer || ''); }}
+                            className={`w-full rounded-2xl border p-3.5 text-left transition ${
+                              active
+                                ? 'border-blue-600 bg-blue-50'
+                                : 'border-slate-200 bg-white hover:bg-slate-50'
+                            }`}
+                          >
+                            <div className="flex items-start justify-between gap-2 mb-1.5">
+                              <p className="text-sm font-semibold text-slate-800 truncate">{q.patientName}</p>
+                              <span className={`inline-flex shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${
+                                q.status === 'answered' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
+                              }`}>
+                                {q.status === 'answered' ? 'Answered' : 'Pending'}
+                              </span>
+                            </div>
+                            <p className="text-xs text-slate-500 truncate">{q.subject}</p>
+                            <p className="mt-1 text-xs text-slate-600 line-clamp-2">{q.message}</p>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Query Detail & Answer */}
+                  <div className="p-6">
+                    {selectedQuery ? (
+                      <div>
+                        <div className="mb-6 flex items-start justify-between">
+                          <div>
+                            <h3 className="text-xl font-semibold text-slate-900">{selectedQuery.patientName}</h3>
+                            <p className="text-sm text-slate-500">{selectedQuery.email}</p>
+                            <p className="mt-2 text-xs text-slate-400">Query Date: {selectedQuery.date}</p>
+                          </div>
+                          <span className={`inline-flex rounded-full px-3 py-1 text-sm font-semibold ${
+                            selectedQuery.status === 'answered' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
+                          }`}>
+                            {selectedQuery.status === 'answered' ? 'Answered' : 'Pending'}
+                          </span>
+                        </div>
+
+                        {/* Query Content */}
+                        <div className="mb-6 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                          <p className="text-sm font-semibold text-slate-700 mb-2">{selectedQuery.subject}</p>
+                          <p className="text-sm text-slate-700 leading-relaxed">{selectedQuery.message}</p>
+                        </div>
+
+                        {/* Answer Section */}
+                        {selectedQuery.status === 'answered' && selectedQuery.answer ? (
+                          <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 mb-6">
+                            <p className="text-sm font-semibold text-emerald-900 mb-2">Your Answer</p>
+                            <p className="text-sm text-emerald-800">{selectedQuery.answer}</p>
+                          </div>
+                        ) : (
+                          <div className="mb-6">
+                            <label className="block text-sm font-semibold text-slate-700 mb-2">Write Your Answer <span className="text-red-500">*</span></label>
+                            <textarea
+                              value={answerText}
+                              onChange={(e) => setAnswerText(e.target.value)}
+                              rows={5}
+                              placeholder="Provide a helpful response to the patient's query..."
+                              className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-blue-500 resize-none"
+                            />
+                          </div>
+                        )}
+
+                        {/* Action Buttons */}
+                        {selectedQuery.status !== 'answered' && (
+                          <button
+                            onClick={() => handleSubmitAnswer(selectedQuery.id)}
+                            disabled={!answerText.trim()}
+                            className="inline-flex items-center gap-2 rounded-2xl bg-emerald-600 px-5 py-3 text-sm font-semibold text-white hover:bg-emerald-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            <Send size={18} /> Submit Answer
+                          </button>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="flex items-center justify-center h-64">
+                        <p className="text-sm text-slate-500">Select a query from the left to view and respond.</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {selectedSection === 'reports' && (
+              <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+                <div className="flex items-center gap-3 mb-6">
+                  <BarChart3 className="text-slate-700" size={24} />
+                  <div>
+                    <h2 className="text-xl font-semibold text-slate-900">Reports</h2>
+                    <p className="text-sm text-slate-500">Store revenue and order performance.</p>
+                  </div>
+                </div>
+                <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                  <div className="rounded-3xl bg-slate-50 p-5">
+                    <p className="text-sm text-slate-500">Monthly Revenue</p>
+                    <p className="mt-3 text-3xl font-semibold text-slate-900">{revenueSummary.monthly}</p>
+                  </div>
+                  <div className="rounded-3xl bg-slate-50 p-5">
+                    <p className="text-sm text-slate-500">Weekly Revenue</p>
+                    <p className="mt-3 text-3xl font-semibold text-slate-900">{revenueSummary.weekly}</p>
+                  </div>
+                  <div className="rounded-3xl bg-slate-50 p-5">
+                    <p className="text-sm text-slate-500">Today's Revenue</p>
+                    <p className="mt-3 text-3xl font-semibold text-slate-900">{revenueSummary.revenueToday}</p>
+                  </div>
+                  <div className="rounded-3xl bg-slate-50 p-5">
+                    <p className="text-sm text-slate-500">Growth</p>
+                    <p className="mt-3 text-3xl font-semibold text-slate-900">{revenueSummary.growth}</p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {selectedSection === 'importPatients' && (
+              <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+                <div className="flex items-center gap-3 mb-6">
+                  <FileUp className="text-blue-600" size={24} />
+                  <div>
+                    <h2 className="text-xl font-semibold text-slate-900">Import Patients</h2>
+                    <p className="text-sm text-slate-500">Upload a CSV file to import patient records.</p>
+                  </div>
+                </div>
+
+                <div className="rounded-3xl border border-dashed border-slate-300 bg-slate-50 p-6">
+                  <label className="block text-sm font-medium text-slate-700">Upload Patients CSV</label>
+                  <input
+                    type="file"
+                    accept=".csv,text/csv"
+                    onChange={handlePatientsCsvUpload}
+                    className="mt-3 block w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-blue-500"
+                  />
+                  <p className="mt-3 text-sm text-slate-500">Supported format: `.csv`</p>
+                  {patientsCsvFile && (
+                    <p className="mt-2 text-sm font-medium text-slate-700">Selected file: {patientsCsvFile.name}</p>
+                  )}
+                  {csvUploadMessage && (
+                    <p className="mt-2 text-sm font-medium text-emerald-600">{csvUploadMessage}</p>
+                  )}
+                </div>
+              </div>
+            )}
+          </main>
+        </div>
+
+        <footer className="mt-10 rounded-3xl border border-teal-900/40 bg-gradient-to-r from-slate-950 via-slate-900 to-teal-950 px-6 py-5 shadow-sm">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-sm font-semibold text-white">MedVision Store Dashboard</p>
+              <p className="text-xs text-slate-300">Secure operations for pharmacy teams, inventory, and order fulfillment.</p>
+            </div>
+            <div className="flex items-center gap-4 text-xs text-teal-200">
+              <span>Support: support@medvision.store</span>
+              <span className="hidden sm:inline text-teal-400">|</span>
+              <span>Mon-Sat, 9:00 AM - 7:00 PM</span>
+            </div>
+          </div>
+        </footer>
+      </div>
+    </div>
+  );
+};
+
+export default StoreDashboard;

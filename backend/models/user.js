@@ -1,50 +1,80 @@
 const mongoose = require("mongoose");
 const bcrypt = require("bcrypt");
+
 const userSchema = new mongoose.Schema({
    name: {
       type: String,
       require: true,
       unique: true,
    },
+   salutation: {
+      type: String,
+   },
+   firstName: {
+      type: String,
+   },
+   middleName: {
+      type: String,
+   },
+   lastName: {
+      type: String,
+   },
+   storeName: {
+      type: String,
+   },
+   ownerName: {
+      type: String,
+   },
+   licenceNumber: {
+      type: String,
+   },
+   gstNumber: {
+      type: String,
+   },
    email: {
       type: String,
       require: true,
       unique: true,
    },
+   countryCode: {
+      type: String,
+   },
    address: {
       type: String,
       require: true,
-      unique: true,
+   },
+   city: {
+      type: String,
    },
    mobile: {
-      type: Number,
+      type: String,
       require: true,
-      unique: true,
+   },
+   state: {
+      type: String,
+   },
+   pincode: {
+      type: String,
    },
    weight: {
       type: Number,
       require: true,
-      unique: true,
    },
    dob: {
       type: String,
       require: true,
-      unique: true,
    },
    height: {
       type: Number,
       require: true,
-      unique: true,
    },
    sex: {
       type: String,
       require: true,
-      unique: true,
    },
    bloodgroup: {
       type: String,
       require: true,
-      unique: true,
    },
    password: {
       type: String,

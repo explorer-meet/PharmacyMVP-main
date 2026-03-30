@@ -1,7 +1,6 @@
 
 import { useState } from 'react';
 import toast from 'react-hot-toast';
-import LoginSignup from '../components/LoginSignup';
 import { FaUser } from "react-icons/fa";
 import { FaRegEyeSlash, FaRegEye } from "react-icons/fa";
 import axios from 'axios';
@@ -11,8 +10,8 @@ import { baseURL } from '../main';
 
 const AdminLogin = ()=> {
 
-  const [type, setType] = useState('password'); // check type of input password
-  const [formData, setFormData] = useState({ // form data both for doctor and patient
+  const [type, setType] = useState('password');
+  const [formData, setFormData] = useState({
     email: '',
     password: ''
   });
@@ -33,8 +32,6 @@ const AdminLogin = ()=> {
     setLoading(true);
 
     try {
-      // Update formData with the correct isDoctor value
-      // Sending the formData to the backend
       const response = await axios.post(`${baseURL}/admin`, formData);
       console.log(response);
       if (response.status === 200) {

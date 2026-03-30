@@ -6,17 +6,14 @@ import Layout from './pages/Layout';
 import Home from './pages/Home';
 import Login from './pages/Login';
 import Signup from './pages/Signup';
-import SearchDoctor from './pages/SearchDoctor';
 import OnlinePharmacy from './pages/OnlinePharmacy';
 import Dashboard from './pages/Dashboard';
-import DoctorProfile from './pages/DoctorProfile';
 import AdminLogin from './components/AdminLogin';
 import AdminDashboard from './pages/AdminDashboard';
 import DiseasePrediction from './pages/DiseasePrediction';
-import BookingPage from './pages/BookingPage';
-import ConfirmationPage from './pages/ConfirmationPage';
 import HeartPrediction from './pages/HeartPrediction';
 import PatientProfile from './pages/PatientProfile';
+import StoreDashboard from './pages/StoreDashboard';
 import EmergencyCare from './pages/EmergencyCare';
 import AddMedicine from './pages/AddMedicine';
 import DeleteMedicine from './pages/DeleteMedicine';
@@ -30,6 +27,9 @@ import AdminTracking from './pages/AdminTracking';
 import LungCancer from './pages/LungCancer';
 import KidneyPrediction from './pages/KidneyPrediction';
 import MyVaccination from './pages/MyVaccinations';
+import PrivacyPolicy from './pages/PrivacyPolicy';
+import TermsAndConditions from './pages/TermsAndConditions';
+import ContactUs from './pages/ContactUs';
 
 function App() {
 
@@ -40,16 +40,13 @@ function App() {
           <Route index element={<Home />} />
           <Route path="login" element={<Login />} />
           <Route path="signup" element={<Signup />} />
-          <Route path='searchdoctor' element={<SearchDoctor />} />
           <Route path='disease' element={<DiseasePrediction />} />
           <Route path='dashboard' element={<Dashboard />} />
           <Route path='admindashboard' element={<AdminDashboard />} />
           <Route path='onlinepharmacy' element={<OnlinePharmacy />} />
-          <Route path='doctorProfile' element={<DoctorProfile />} />
           <Route path='patientProfile' element={<PatientProfile />} />
+          <Route path='storeDashboard' element={<StoreDashboard />} />
           <Route path='admin' element={<AdminLogin />} />
-          <Route path="/book/:id" element={<BookingPage />} />
-          <Route path="/confirm/:id" element={<ConfirmationPage />} />
           <Route path="/heart-disease" element={<HeartPrediction />} />
           <Route path="/emergencyguidelines" element={<EmergencyCare />} />
           <Route path="/addmedicine" element={<AddMedicine />} />
@@ -64,6 +61,9 @@ function App() {
           <Route path="/lungcancerprediction" element={<LungCancer />} />
           <Route path="/kidneyprediction" element={<KidneyPrediction />} />
           <Route path="/myvaccinations" element={<MyVaccination />} />
+          <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+          <Route path="/terms-and-conditions" element={<TermsAndConditions />} />
+          <Route path="/contact-us" element={<ContactUs />} />
         </Route>
       </Routes>
     </>

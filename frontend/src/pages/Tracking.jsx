@@ -1,19 +1,24 @@
 import React, {useState, useEffect} from 'react';
 import { useParams } from 'react-router-dom'; // Import useParams
-import { Package, Truck, CheckCircle, Clock, MapPin } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { Package, Truck, CheckCircle, Clock, MapPin, ClipboardList, ShieldCheck, Home } from 'lucide-react';
 import { baseURL } from '../main';
 import axios from 'axios';
+import CheckoutFooter from '../components/CheckoutFooter';
 
 function Tracking() {
   // Retrieve the id from the URL parameters
   const { id } = useParams();
   const [userdata, setUserData] = useState([]);
-  const [status, useStatus] = useState('');
 
   // Example tracking data (replace this with API data based on the id)
   const [trackingStatus, setTrackingStatus] = useState({
     orderNumber: id || "ORD123456789",
-    estimatedDelivery: "January 15, 2025",
+    estimatedDelivery: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toLocaleDateString('en-IN', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+    }),
     currentStatus: "",
     statuses: [
       { id: 1, status: "Booked", completed: false, time: "Pending", text: "Order Placed" },
@@ -24,6 +29,10 @@ function Tracking() {
     ]
   });
   const statusOrder = ['Booked', 'shipped', 'in-transit', 'out-delivery', 'delivered'];
+
+  const completedSteps = trackingStatus.statuses.filter((item) => item.completed).length;
+  const progressPercent = Math.round((completedSteps / trackingStatus.statuses.length) * 100);
+  const currentStatusLabel = trackingStatus.statuses.find((item) => item.status === trackingStatus.currentStatus)?.text || 'Booked';
 
   
   const fetchDataFromApi = async () => {
@@ -37,7 +46,7 @@ function Tracking() {
         const fetchedData = response.data.userData;
         setUserData(fetchedData);
         console.log(fetchedData);
-        const matchedId = fetchedData.order.find(order => order.orderId === id);
+        const matchedId = fetchedData.order?.find(order => order.orderId === id);
 
         if (matchedId) {
           const currentStatus = matchedId.status;
@@ -54,9 +63,9 @@ function Tracking() {
             currentStatus: currentStatus,
             statuses: updatedStatuses
           }));
-        }        
+        }
         // Extract orders from userdata
-        console.log(matchedId.status);
+        console.log(matchedId?.status);
         localStorage.setItem('userData', JSON.stringify(fetchedData));
       } catch (error) {
         console.error('Error fetching data:', error.message);
@@ -68,75 +77,110 @@ function Tracking() {
     }, []);
 
   return (
-    <div className="mt-[12vh] min-h-screen bg-gray-50 py-8 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-3xl mx-auto">
-        <div className="bg-white rounded-lg shadow-lg p-6 md:p-8">
-          {/* Header */}
-          <div className="border-b pb-6">
-            <h1 className="text-2xl font-bold text-gray-900">Order Tracking</h1>
-            <p className="mt-2 text-sm text-gray-600">Order Number: {trackingStatus.orderNumber}</p>
-          </div>
+    <div className="min-h-screen bg-gradient-to-b from-sky-50 via-slate-50 to-white px-4 sm:px-6 lg:px-8 pb-8" style={{ paddingTop: 'calc(var(--app-navbar-offset, 88px) + 2rem)' }}>
+      <div className="max-w-5xl mx-auto">
+        <div className="mb-8 bg-gradient-to-br from-blue-800 via-blue-700 to-cyan-600 rounded-3xl text-white p-6 md:p-8 shadow-xl relative overflow-hidden">
+          <div className="absolute -top-16 -right-10 w-44 h-44 rounded-full bg-white/10 blur-2xl"></div>
+          <div className="absolute -bottom-16 -left-10 w-52 h-52 rounded-full bg-cyan-300/10 blur-2xl"></div>
 
-          {/* Current Status */}
-          <div className="mt-6 bg-blue-50 rounded-lg p-4">
-            <div className="flex items-center">
-              <Package className="h-6 w-6 text-blue-600" />
-              <div className="ml-3">
-                <h2 className="text-sm font-medium text-blue-900">Current Status</h2>
-                <p className="mt-1 text-sm text-blue-700">{trackingStatus.location}</p>
+          <div className="relative z-10 flex items-center justify-between gap-4 flex-wrap">
+            <div>
+              <h1 className="text-3xl md:text-4xl font-bold">Track Your Order</h1>
+              <p className="text-blue-100 mt-2">Stay updated with your shipment progress in real time.</p>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 w-full lg:w-auto">
+              <div className="bg-white/15 backdrop-blur rounded-2xl px-4 py-3 min-w-[150px] border border-white/20">
+                <p className="text-[11px] uppercase tracking-wide text-blue-100">Order ID</p>
+                <p className="text-lg font-semibold flex items-center gap-1.5">
+                  <ClipboardList className="w-4 h-4" />
+                  {trackingStatus.orderNumber}
+                </p>
+              </div>
+              <div className="bg-white/15 backdrop-blur rounded-2xl px-4 py-3 min-w-[150px] border border-white/20">
+                <p className="text-[11px] uppercase tracking-wide text-blue-100">Progress</p>
+                <p className="text-lg font-semibold">{progressPercent}%</p>
               </div>
             </div>
-            {/* <p className="mt-2 text-sm text-blue-700">
-              Estimated Delivery: {trackingStatus.estimatedDelivery}
-            </p> */}
           </div>
 
-          {/* Timeline */}
-          <div className="mt-8">
-            <div className="flow-root">
-              <ul className="-mb-8">
-                {trackingStatus.statuses.map((status, index) => (
-                  <li key={status.id}>
-                    <div className="relative pb-8">
-                      {index !== trackingStatus.statuses.length - 1 && (
-                        <span
-                          className="absolute top-4 left-4 -ml-px h-full w-0.5 bg-gray-200"
-                          aria-hidden="true"
-                        />
-                      )}
-                      <div className="relative flex space-x-3">
-                        <div>
-                          <span className={`h-8 w-8 rounded-full flex items-center justify-center ring-8 ring-white
-                            ${status.completed ? 'bg-green-500' : 'bg-gray-300'}`}>
-                            {status.status === 'Booked' && <Clock className="h-5 w-5 text-white" />}
-                            {status.status === 'shipped' && <Package className="h-5 w-5 text-white" />}
-                            {status.status === 'in-transit' && <Truck className="h-5 w-5 text-white" />}
-                            {status.status === 'out-delivery' && <MapPin className="h-5 w-5 text-white" />}
-                            {status.status === 'delivered' && <CheckCircle className="h-5 w-5 text-white" />}
-                          </span>
-                        </div>
-                        <div className="min-w-0 flex-1 pt-1.5">
-                          <p className="text-sm font-medium text-gray-900">{status.text}</p>
-                          <p className="mt-1 text-sm text-gray-500">{status.time}</p>
-                        </div>
-                      </div>
-                    </div>
-                  </li>
-                ))}
-              </ul>
+          <div className="relative z-10 mt-4 inline-flex items-center gap-2 text-xs bg-emerald-400/20 border border-emerald-200/30 rounded-full px-3 py-1.5 text-emerald-100">
+            <ShieldCheck className="w-3.5 h-3.5" />
+            Shipment updates are synced securely
+          </div>
+        </div>
+
+        <div className="bg-white rounded-2xl shadow-lg p-6 md:p-8 border border-gray-100">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+              <p className="text-xs uppercase tracking-wide text-slate-500">Current Status</p>
+              <p className="text-base font-semibold text-slate-900 mt-1">{currentStatusLabel}</p>
+            </div>
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+              <p className="text-xs uppercase tracking-wide text-slate-500">Estimated Delivery</p>
+              <p className="text-base font-semibold text-slate-900 mt-1">{trackingStatus.estimatedDelivery}</p>
+            </div>
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+              <p className="text-xs uppercase tracking-wide text-slate-500">Customer</p>
+              <p className="text-base font-semibold text-slate-900 mt-1">{userdata?.name || 'N/A'}</p>
             </div>
           </div>
 
-          {/* Additional Info */}
-          <div className="mt-6 bg-gray-50 rounded-lg p-4">
-            <h3 className="text-sm font-medium text-gray-900">Shipping Updates</h3>
+          <div className="w-full h-2 bg-slate-100 rounded-full mb-8 overflow-hidden">
+            <div className="h-full bg-gradient-to-r from-blue-500 to-emerald-500 rounded-full transition-all duration-500" style={{ width: `${progressPercent}%` }}></div>
+          </div>
+
+          <div className="flow-root">
+            <ul className="-mb-8">
+              {trackingStatus.statuses.map((status, index) => (
+                <li key={status.id}>
+                  <div className="relative pb-8">
+                    {index !== trackingStatus.statuses.length - 1 && (
+                      <span
+                        className={`absolute top-4 left-4 -ml-px h-full w-0.5 ${status.completed ? 'bg-emerald-300' : 'bg-gray-200'}`}
+                        aria-hidden="true"
+                      />
+                    )}
+                    <div className="relative flex space-x-3">
+                      <div>
+                        <span className={`h-9 w-9 rounded-full flex items-center justify-center ring-8 ring-white ${status.completed ? 'bg-emerald-500' : 'bg-gray-300'}`}>
+                          {status.status === 'Booked' && <Clock className="h-5 w-5 text-white" />}
+                          {status.status === 'shipped' && <Package className="h-5 w-5 text-white" />}
+                          {status.status === 'in-transit' && <Truck className="h-5 w-5 text-white" />}
+                          {status.status === 'out-delivery' && <MapPin className="h-5 w-5 text-white" />}
+                          {status.status === 'delivered' && <CheckCircle className="h-5 w-5 text-white" />}
+                        </span>
+                      </div>
+                      <div className="min-w-0 flex-1 pt-1.5">
+                        <p className={`text-sm font-semibold ${status.completed ? 'text-gray-900' : 'text-gray-500'}`}>{status.text}</p>
+                        <p className="mt-1 text-xs text-gray-500">{status.time}</p>
+                      </div>
+                    </div>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          <div className="mt-6 bg-slate-50 rounded-xl p-4 border border-slate-200">
+            <h3 className="text-sm font-semibold text-gray-900">Shipping Updates</h3>
             <p className="mt-2 text-sm text-gray-600">
-              You'll receive email updates about your package's status. 
-              For additional assistance, please contact our support team.
+              You will receive email updates about your package status. If you need help, please contact our support team.
             </p>
+          </div>
+
+          <div className="mt-5">
+            <Link
+              to="/orders"
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-blue-200 text-blue-700 hover:bg-blue-50 transition-colors"
+            >
+              <Home className="w-4 h-4" />
+              Back to Orders
+            </Link>
           </div>
         </div>
       </div>
+      <CheckoutFooter />
     </div>
   );
 }
