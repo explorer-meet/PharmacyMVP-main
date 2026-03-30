@@ -1,4 +1,3 @@
-
 const express = require("express");
 require("dotenv").config();
 const app = express();
@@ -9,19 +8,19 @@ const cors = require("cors");
 const multer = require("multer");
 
 const allowedOrigins = [
-  "https://pharmacy-mvp-jade.vercel.app", // Your Vercel frontend
   "http://localhost:3000",
-  "https://pharmacy-8dhdlkq0h-harsh-sharmas-projects-32241233.vercel.app" // For vercel
+  "https://main-frontend-iota.vercel.app" 
 ];
-// const corsOptions = {
-//     origin: 'https://medvision-1.onrender.com', // Frontend URL
-//     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
-//     credentials: true, // Include cookies in requests if needed
-//   };
 
-// Middleware to parse JSON bodiescls
 app.use(cors({
-  origin: true,
+  origin: function (origin, callback) {
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error("Not allowed by CORS"));
+    }
+  },
   credentials: true
 }));
 
