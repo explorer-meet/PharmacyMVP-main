@@ -6,6 +6,11 @@ import { baseURL } from '../main';
 
 const MedicineCard = ({ id, name, manufacturer, dosage, price, stock, type, requiresPrescription, onAddToCart }) => {
 
+  const formatUsd = (value) => {
+    const amount = Number(value) || 0;
+    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
+  };
+
   const storageKey = `prescription_${name}`;
 
   const [showadded, setShowAdded] = useState(false);
@@ -87,6 +92,8 @@ const MedicineCard = ({ id, name, manufacturer, dosage, price, stock, type, requ
   
         // Update localStorage for persistence
         localStorage.setItem('userData', JSON.stringify(updatedUserData));
+        // Notify cart listeners (e.g., floating CartButton) to refresh immediately
+        window.dispatchEvent(new CustomEvent('cart-updated'));
       }
     } catch (error) {
       console.error("Error adding to cart:", error.message);
@@ -142,7 +149,7 @@ const MedicineCard = ({ id, name, manufacturer, dosage, price, stock, type, requ
           )}
         </div> 
         <div className="flex items-center justify-between mt-4">
-          <div className="text-lg font-bold text-cyan-700">Rs {price}/-</div>
+          <div className="text-lg font-bold text-cyan-700">{formatUsd(price)}</div>
           <div className={`text-sm ${stock > 0 ? 'text-green-600' : 'text-red-500'}`}>
             {stock > 0 ? `In Stock (${stock} left)` : 'Out of Stock'}
           </div>

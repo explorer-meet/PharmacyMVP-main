@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { CreditCard, Wallet, Truck, QrCode, ShieldCheck, ChevronLeft, Package, IndianRupee } from 'lucide-react';
+import { CreditCard, Wallet, Truck, QrCode, ShieldCheck, ChevronLeft, Package, DollarSign } from 'lucide-react';
 import { BrowserProvider, parseEther } from 'ethers';
 import toast from 'react-hot-toast';
 import { baseURL } from '../main';
@@ -52,6 +52,10 @@ export function PaymentPage() {
   const cartItems = routeCartItems.length ? routeCartItems : fallbackCartItems;
   const totalItems = cartItems.reduce((sum, item) => sum + item.quantity, 0);
   const payableAmount = 10;
+  const formattedPayableAmount = new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+  }).format(payableAmount);
 
   const fetchDataFromApi = async () => {
     try {
@@ -103,8 +107,8 @@ export function PaymentPage() {
       if (!isConnected) return;
 
       // Placeholder conversion rate for demo/testing.
-      const ETH_TO_INR_RATE = 200000;
-      const amountInEth = payableAmount / ETH_TO_INR_RATE;
+      const ETH_TO_USD_RATE = 2500;
+      const amountInEth = payableAmount / ETH_TO_USD_RATE;
 
       const provider = new BrowserProvider(window.ethereum);
       const signer = await provider.getSigner();
@@ -223,8 +227,8 @@ export function PaymentPage() {
                 <div className="bg-white/15 backdrop-blur rounded-2xl px-4 py-3 min-w-[150px] border border-white/20">
                   <p className="text-[11px] uppercase tracking-wide text-blue-100">Total Amount</p>
                   <p className="text-lg font-semibold flex items-center gap-1.5">
-                    <IndianRupee className="w-4 h-4" />
-                    {payableAmount}
+                    <DollarSign className="w-4 h-4" />
+                    {formattedPayableAmount}
                   </p>
                 </div>
               </div>
@@ -277,7 +281,7 @@ export function PaymentPage() {
                 </div>
                 <div className="border-t pt-3 flex items-center justify-between text-lg font-bold text-gray-900">
                   <span>Total Payable</span>
-                  <span>Rs {payableAmount}/-</span>
+                  <span>{formattedPayableAmount}</span>
                 </div>
               </div>
 

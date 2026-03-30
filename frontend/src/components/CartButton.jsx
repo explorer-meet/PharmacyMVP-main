@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ShoppingCart, X, Trash, Lock, Plus, Minus, BadgeIndianRupee } from 'lucide-react';
+import { ShoppingCart, X, Trash, Lock, Plus, Minus, DollarSign } from 'lucide-react';
 import axios from 'axios';
 import { baseURL } from '../main';
 import { useNavigate } from 'react-router-dom';
@@ -16,6 +16,11 @@ const CartButton = ({ openOnMount = false }) => {
 
   const totalAmount = cartItems.reduce((total, item) => total + item.price * item.quantity, 0);
   const paylock = cartItems.length > 0;
+
+  const formatUsd = (value) => {
+    const amount = Number(value) || 0;
+    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
+  };
 
   const viewCartModal = () => { 
     setIsModalOpen(true);
@@ -50,6 +55,17 @@ const CartButton = ({ openOnMount = false }) => {
   }, []);
 
   useEffect(() => {
+    const handleCartUpdated = () => {
+      fetchDataFromApi();
+    };
+
+    window.addEventListener('cart-updated', handleCartUpdated);
+    return () => {
+      window.removeEventListener('cart-updated', handleCartUpdated);
+    };
+  }, []);
+
+  useEffect(() => {
     if (openOnMount && userData?._id && !hasAutoOpened) {
       setIsModalOpen(true);
       setHasAutoOpened(true);
@@ -68,7 +84,7 @@ const CartButton = ({ openOnMount = false }) => {
     } else {
       setCartItems([]);
     }
-  }, [userData?.orderedmedicines?.length]);
+  }, [userData?.orderedmedicines]);
   
 
 
@@ -86,6 +102,7 @@ const CartButton = ({ openOnMount = false }) => {
           );
           return updatedItems;
         });
+        window.dispatchEvent(new CustomEvent('cart-updated'));
       }
     } catch (error) {
       console.error('Error updating the quantity of medicine:', error.message);
@@ -108,6 +125,7 @@ const CartButton = ({ openOnMount = false }) => {
           );
           return updatedItems;
         });
+        window.dispatchEvent(new CustomEvent('cart-updated'));
       }
     } catch (error) {
       console.error('Error updating the quantity of medicine:', error.message);
@@ -122,6 +140,7 @@ const CartButton = ({ openOnMount = false }) => {
       if (response.status === 200) {
         setCartItems((prevItems) => prevItems.filter((item) => item.name !== name));
         console.log("Medicine Deleted from cart!");
+        window.dispatchEvent(new CustomEvent('cart-updated'));
       }
     } catch (error) {
       console.error('Error deleting the medicine from cart:', error.message);
@@ -212,8 +231,8 @@ const CartButton = ({ openOnMount = false }) => {
                         <div>
                           <h3 className="font-semibold text-slate-900">{item.name}</h3>
                           <p className="text-sm text-slate-500 flex items-center gap-1 mt-0.5">
-                            <BadgeIndianRupee className="w-4 h-4" />
-                            {item.price}
+                            <DollarSign className="w-4 h-4" />
+                            {formatUsd(item.price)}
                           </p>
                         </div>
                         <button
@@ -227,7 +246,7 @@ const CartButton = ({ openOnMount = false }) => {
 
                       <div className="mt-3 flex items-center justify-between">
                         <div className="text-sm text-slate-600">
-                          Subtotal: <span className="font-semibold text-slate-900">Rs {item.price * item.quantity}/-</span>
+                          Subtotal: <span className="font-semibold text-slate-900">{formatUsd(item.price * item.quantity)}</span>
                         </div>
                         <div className="flex items-center gap-2 bg-white border border-slate-200 rounded-lg px-2 py-1">
                         <button
@@ -262,7 +281,7 @@ const CartButton = ({ openOnMount = false }) => {
             <div className="border-t bg-slate-50 px-6 py-4">
               <div className="flex justify-between items-center mb-3">
                 <h3 className="text-base font-medium text-slate-700">Total</h3>
-                <p className="text-xl font-bold text-slate-900">Rs {totalAmount}/-</p>
+                <p className="text-xl font-bold text-slate-900">{formatUsd(totalAmount)}</p>
               </div>
 
               <button

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { baseURL } from '../main';
 import { useNavigate } from 'react-router-dom';
-import { Package, Truck, IndianRupee, ChevronDown, ChevronUp, ClipboardList, CreditCard } from 'lucide-react';
+import { Package, Truck, DollarSign, ChevronDown, ChevronUp, ClipboardList, CreditCard } from 'lucide-react';
 import CheckoutFooter from '../components/CheckoutFooter';
 
 const Orders = () => {
@@ -36,6 +36,11 @@ const Orders = () => {
   }, []);
 
   const [expandedOrder, setExpandedOrder] = useState(null);
+  const formatUSD = (value) =>
+    new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+    }).format(Number(value) || 0);
 
   const toggleDropdown = (orderId) => {
     setExpandedOrder((prev) => (prev === orderId ? null : orderId));
@@ -82,8 +87,8 @@ const Orders = () => {
               <div className="bg-white/15 backdrop-blur rounded-2xl px-4 py-3 min-w-[150px] border border-white/20">
                 <p className="text-[11px] uppercase tracking-wide text-blue-100">Total Spent</p>
                 <p className="text-lg font-semibold flex items-center gap-1.5">
-                  <IndianRupee className="w-4 h-4" />
-                  {totalSpent}
+                  <DollarSign className="w-4 h-4" />
+                  {formatUSD(totalSpent)}
                 </p>
               </div>
             </div>
@@ -123,7 +128,7 @@ const Orders = () => {
                       <p className="text-sm text-gray-700">
                         <span className="font-medium">Items:</span> {itemCount}
                       </p>
-                      <p className="text-lg font-bold text-gray-900">Rs {amount}/-</p>
+                      <p className="text-lg font-bold text-gray-900">{formatUSD(amount)}</p>
                     </div>
 
                     <div className="flex items-center gap-3 flex-wrap">
@@ -158,7 +163,7 @@ const Orders = () => {
                           order.items.map((item, idx) => (
                             <li key={idx} className="flex items-center justify-between bg-white border border-gray-200 rounded-lg px-3 py-2">
                               <span>{item.name || 'Unnamed Item'}</span>
-                              <span className="text-gray-600">Qty {item.quantity || 1} • Rs {item.price || 0}</span>
+                              <span className="text-gray-600">Qty {item.quantity || 1} • {formatUSD(item.price || 0)}</span>
                             </li>
                           ))
                         ) : (

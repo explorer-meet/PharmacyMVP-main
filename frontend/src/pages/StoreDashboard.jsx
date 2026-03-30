@@ -150,6 +150,20 @@ const StoreDashboard = () => {
   ]);
   const [selectedOrderId, setSelectedOrderId] = useState(orders[0]?.id || null);
   const selectedOrder = orders.find((item) => item.id === selectedOrderId);
+  const parseCurrencyAmount = (value) => Number(String(value).replace(/[^\d.]/g, '')) || 0;
+  const formatUSD = (value) =>
+    new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+      maximumFractionDigits: 2,
+    }).format(value);
+  const reportOrdersTotal = orders.length;
+  const reportCompletedOrders = orders.filter((order) => order.status === 'Completed').length;
+  const reportPendingOrders = orders.filter((order) => order.status !== 'Completed').length;
+  const reportTotalRevenue = orders.reduce((sum, order) => sum + parseCurrencyAmount(order.total), 0);
+  const reportAverageOrderValue = reportOrdersTotal ? reportTotalRevenue / reportOrdersTotal : 0;
+  const reportUniqueCustomers = new Set(orders.map((order) => order.customer)).size;
+  const reportCompletionRate = reportOrdersTotal ? Math.round((reportCompletedOrders / reportOrdersTotal) * 100) : 0;
   const [prescriptions, setPrescriptions] = useState([
     {
       id: 'RX-1024',
@@ -192,7 +206,12 @@ const StoreDashboard = () => {
   const selectedPrescription = prescriptions.find((item) => item.id === selectedPrescriptionId);
   const [patientsCsvFile, setPatientsCsvFile] = useState(null);
   const [csvUploadMessage, setCsvUploadMessage] = useState('');
-  const [revenueSummary] = useState({ monthly: '₹6.2L', weekly: '₹1.4L', growth: '14%', orders: 211, revenueToday: '₹38,600' });
+  const [revenueSummary] = useState({
+    monthly: 6200,
+    weekly: 1400,
+    revenueToday: 480,
+    growth: 14,
+  });
   const [queries, setQueries] = useState([
     { id: 1, patientName: 'Meera Singh', email: 'meera@email.com', subject: 'Order & Delivery Issue', message: 'My order was supposed to arrive by March 27. It still hasn\'t arrived. Order ID: 1087', status: 'pending', date: 'Mar 26' },
     { id: 2, patientName: 'Amit Shah', email: 'amit@email.com', subject: 'Medicine Availability Query', message: 'Is Metformin 500mg tablet available in 30-tab packs?', status: 'pending', date: 'Mar 26' },
@@ -1004,13 +1023,13 @@ const StoreDashboard = () => {
                                   <p className="font-medium text-slate-900">{item.name}</p>
                                   <p className="text-sm text-slate-500">Qty {item.qty}</p>
                                 </div>
-                                <p className="text-sm font-semibold text-slate-900">{item.price}</p>
+                                <p className="text-sm font-semibold text-slate-900">{formatUSD(parseCurrencyAmount(item.price))}</p>
                               </div>
                             ))}
                           </div>
                           <div className="mt-4 flex items-center justify-between border-t border-slate-200 pt-4">
                             <p className="font-semibold text-slate-900">Order total</p>
-                            <p className="font-semibold text-slate-900">{selectedOrder.total}</p>
+                            <p className="font-semibold text-slate-900">{formatUSD(parseCurrencyAmount(selectedOrder.total))}</p>
                           </div>
                         </div>
                         <div className="mt-6 rounded-3xl bg-white p-4">
@@ -1268,19 +1287,36 @@ const StoreDashboard = () => {
                 <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
                   <div className="rounded-3xl bg-slate-50 p-5">
                     <p className="text-sm text-slate-500">Monthly Revenue</p>
-                    <p className="mt-3 text-3xl font-semibold text-slate-900">{revenueSummary.monthly}</p>
+                    <p className="mt-3 text-3xl font-semibold text-slate-900">{formatUSD(revenueSummary.monthly)}</p>
                   </div>
                   <div className="rounded-3xl bg-slate-50 p-5">
                     <p className="text-sm text-slate-500">Weekly Revenue</p>
-                    <p className="mt-3 text-3xl font-semibold text-slate-900">{revenueSummary.weekly}</p>
+                    <p className="mt-3 text-3xl font-semibold text-slate-900">{formatUSD(revenueSummary.weekly)}</p>
                   </div>
                   <div className="rounded-3xl bg-slate-50 p-5">
                     <p className="text-sm text-slate-500">Today's Revenue</p>
-                    <p className="mt-3 text-3xl font-semibold text-slate-900">{revenueSummary.revenueToday}</p>
+                    <p className="mt-3 text-3xl font-semibold text-slate-900">{formatUSD(revenueSummary.revenueToday)}</p>
                   </div>
                   <div className="rounded-3xl bg-slate-50 p-5">
                     <p className="text-sm text-slate-500">Growth</p>
-                    <p className="mt-3 text-3xl font-semibold text-slate-900">{revenueSummary.growth}</p>
+                    <p className="mt-3 text-3xl font-semibold text-slate-900">{revenueSummary.growth}%</p>
+                  </div>
+                  <div className="rounded-3xl bg-slate-50 p-5">
+                    <p className="text-sm text-slate-500">Total Order Revenue</p>
+                    <p className="mt-3 text-3xl font-semibold text-slate-900">{formatUSD(reportTotalRevenue)}</p>
+                  </div>
+                  <div className="rounded-3xl bg-slate-50 p-5">
+                    <p className="text-sm text-slate-500">Average Order Value</p>
+                    <p className="mt-3 text-3xl font-semibold text-slate-900">{formatUSD(reportAverageOrderValue)}</p>
+                  </div>
+                  <div className="rounded-3xl bg-slate-50 p-5">
+                    <p className="text-sm text-slate-500">Order Completion Rate</p>
+                    <p className="mt-3 text-3xl font-semibold text-slate-900">{reportCompletionRate}%</p>
+                  </div>
+                  <div className="rounded-3xl bg-slate-50 p-5">
+                    <p className="text-sm text-slate-500">Operational Snapshot</p>
+                    <p className="mt-2 text-lg font-semibold text-slate-900">{reportCompletedOrders}/{reportOrdersTotal} completed</p>
+                    <p className="text-sm text-slate-600">{reportPendingOrders} pending • {reportUniqueCustomers} unique customers</p>
                   </div>
                 </div>
               </div>

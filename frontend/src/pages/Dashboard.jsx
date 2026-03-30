@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import axios from 'axios';
-import { Activity, Calendar, Pill, FileText, Clock, User, Mail, Phone, Menu, X, Home, CircleUser as UserCircle, ShoppingBag, Syringe, Bell, MessageSquare, Mail as MailIcon, Pencil, ClipboardList, IndianRupee, Package, Truck, ChevronDown, ChevronUp, CreditCard, Plus, Minus, Trash2 } from 'lucide-react';
+import { Activity, Calendar, Pill, FileText, Clock, User, Mail, Phone, Menu, X, Home, CircleUser as UserCircle, ShoppingBag, Syringe, Bell, MessageSquare, Mail as MailIcon, Pencil, ClipboardList, DollarSign, Package, Truck, ChevronDown, ChevronUp, CreditCard, Plus, Minus, Trash2 } from 'lucide-react';
 import { baseURL } from '../main';
 import Loader from '../components/Loader';
 import PrescriptionDialog from '../components/PrescriptionDialog';
@@ -19,7 +19,17 @@ const Dashboard = () => {
     const [showProfile, setShowProfile] = useState(false);
     const [expandedDashboardOrder, setExpandedDashboardOrder] = useState(null);
     const [isEditingProfile, setIsEditingProfile] = useState(false);
-    const [profileForm, setProfileForm] = useState({ name: '', email: '', mobile: '' });
+    const [profileForm, setProfileForm] = useState({
+        firstName: '',
+        middleName: '',
+        lastName: '',
+        email: '',
+        mobile: '',
+        address: '',
+        city: '',
+        state: '',
+        pincode: '',
+    });
     const [profileErrors, setProfileErrors] = useState({});
     const [profileImage, setProfileImage] = useState('');
     const [queryForm, setQueryForm] = useState({ subject: '', message: '' });
@@ -103,9 +113,15 @@ const Dashboard = () => {
 
     const handleProfileEdit = () => {
         setProfileForm({
-            name: userData?.name || '',
+            firstName: userData?.firstName || '',
+            middleName: userData?.middleName || '',
+            lastName: userData?.lastName || '',
             email: userData?.email || '',
             mobile: userData?.mobile || '',
+            address: userData?.address || '',
+            city: userData?.city || '',
+            state: userData?.state || '',
+            pincode: userData?.pincode || '',
         });
         setProfileErrors({});
         setIsEditingProfile(true);
@@ -113,9 +129,15 @@ const Dashboard = () => {
 
     const handleProfileCancel = () => {
         setProfileForm({
-            name: userData?.name || '',
+            firstName: userData?.firstName || '',
+            middleName: userData?.middleName || '',
+            lastName: userData?.lastName || '',
             email: userData?.email || '',
             mobile: userData?.mobile || '',
+            address: userData?.address || '',
+            city: userData?.city || '',
+            state: userData?.state || '',
+            pincode: userData?.pincode || '',
         });
         setProfileErrors({});
         setIsEditingProfile(false);
@@ -123,11 +145,20 @@ const Dashboard = () => {
 
     const handleProfileSave = () => {
         const errors = {};
-        const trimmedName = profileForm.name.trim();
+        const trimmedFirstName = profileForm.firstName.trim();
+        const trimmedMiddleName = profileForm.middleName.trim();
+        const trimmedLastName = profileForm.lastName.trim();
         const trimmedEmail = profileForm.email.trim();
         const trimmedMobile = profileForm.mobile.trim();
+        const trimmedAddress = profileForm.address.trim();
+        const trimmedCity = profileForm.city.trim();
+        const trimmedState = profileForm.state.trim();
+        const trimmedPincode = profileForm.pincode.trim();
 
-        if (!trimmedName) errors.name = 'Name is required.';
+        const fullName = [trimmedFirstName, trimmedMiddleName, trimmedLastName].filter(Boolean).join(' ');
+
+        if (!trimmedFirstName) errors.firstName = 'First name is required.';
+        if (!trimmedLastName) errors.lastName = 'Last name is required.';
         if (!trimmedEmail) {
             errors.email = 'Email is required.';
         } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
@@ -135,6 +166,9 @@ const Dashboard = () => {
         }
         if (trimmedMobile && !/^\d{10,15}$/.test(trimmedMobile)) {
             errors.mobile = 'Enter a valid phone number.';
+        }
+        if (trimmedPincode && !/^\d{4,10}$/.test(trimmedPincode)) {
+            errors.pincode = 'Enter a valid pincode.';
         }
 
         if (Object.keys(errors).length > 0) {
@@ -144,9 +178,16 @@ const Dashboard = () => {
 
         setUserData((prev) => ({
             ...prev,
-            name: trimmedName,
+            name: fullName,
+            firstName: trimmedFirstName,
+            middleName: trimmedMiddleName,
+            lastName: trimmedLastName,
             email: trimmedEmail,
             mobile: trimmedMobile,
+            address: trimmedAddress,
+            city: trimmedCity,
+            state: trimmedState,
+            pincode: trimmedPincode,
         }));
         setProfileErrors({});
         setIsEditingProfile(false);
@@ -285,6 +326,7 @@ const Dashboard = () => {
                     dosage: "500mg",
                     frequency: "3 times daily",
                     duration: "7 days",
+                    doctorName: "Dr. Anjali Mehta",
                     prescriber: "Pharmacy Team",
                     date: "2024-03-15",
                     status: "approved",
@@ -299,6 +341,7 @@ const Dashboard = () => {
                     dosage: "200mg",
                     frequency: "As needed",
                     duration: "30 days",
+                    doctorName: "Dr. Rohan Iyer",
                     prescriber: "Pharmacy Team",
                     date: "2024-03-10",
                     status: "pending",
@@ -312,6 +355,7 @@ const Dashboard = () => {
                     dosage: "10mg",
                     frequency: "Once daily",
                     duration: "Ongoing",
+                    doctorName: "Dr. Priya Nair",
                     prescriber: "Pharmacy Team",
                     date: "2024-02-28",
                     status: "rejected",
@@ -339,6 +383,7 @@ const Dashboard = () => {
                         dosage: "500mg",
                         frequency: "3 times daily",
                         duration: "7 days",
+                        doctorName: "Dr. Anjali Mehta",
                         prescriber: "Pharmacy Team",
                         date: "2024-03-15",
                         status: "approved",
@@ -353,6 +398,7 @@ const Dashboard = () => {
                         dosage: "200mg",
                         frequency: "As needed",
                         duration: "30 days",
+                        doctorName: "Dr. Rohan Iyer",
                         prescriber: "Pharmacy Team",
                         date: "2024-03-10",
                         status: "pending",
@@ -366,6 +412,7 @@ const Dashboard = () => {
                         dosage: "10mg",
                         frequency: "Once daily",
                         duration: "Ongoing",
+                        doctorName: "Dr. Priya Nair",
                         prescriber: "Pharmacy Team",
                         date: "2024-02-28",
                         status: "rejected",
@@ -388,9 +435,15 @@ const Dashboard = () => {
         if (!userData) return;
 
         setProfileForm({
-            name: userData.name || '',
+            firstName: userData.firstName || '',
+            middleName: userData.middleName || '',
+            lastName: userData.lastName || '',
             email: userData.email || '',
             mobile: userData.mobile || '',
+            address: userData.address || '',
+            city: userData.city || '',
+            state: userData.state || '',
+            pincode: userData.pincode || '',
         });
     }, [userData]);
 
@@ -426,13 +479,26 @@ const Dashboard = () => {
         return 0;
     };
 
+    const formatDashboardOrderDate = (value) => {
+        const today = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: '2-digit' });
+        if (!value) return today;
+        const parsed = new Date(value);
+        if (Number.isNaN(parsed.getTime())) return today;
+        return parsed.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: '2-digit' });
+    };
+
+    const formatUsd = (value) => {
+        const amount = Number(value) || 0;
+        return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
+    };
+
     const dashboardOrders = (userData?.order || [])
         .filter((order) => order.status === 'Booked')
         .map((order) => ({
             ...order,
             id: order.orderId,
             date: order.date || order.createdAt || 'N/A',
-            total: `Rs ${getDashboardOrderAmount(order)}/-`,
+            totalAmount: getDashboardOrderAmount(order),
             payment: order.payment || 'N/A',
         }));
 
@@ -788,7 +854,7 @@ ${sidebarOpen ? "translate-x-0" : "-translate-x-full"} lg:translate-x-0`}>
                                                             <div className="flex items-center space-x-2">
                                                                 <User className="text-gray-400" size={16} />
                                                                 <span className="text-sm text-gray-600">
-                                                                    {prescription.prescriber || 'Pharmacy Team'}
+                                                                    Doctor: {prescription.doctorName || prescription.prescriber || 'Dr. Not Assigned'}
                                                                 </span>
                                                             </div>
                                                             <div className="flex items-center space-x-2">
@@ -1069,78 +1135,107 @@ ${sidebarOpen ? "translate-x-0" : "-translate-x-full"} lg:translate-x-0`}>
                                 <div className="space-y-6">
                                     {/* Profile Information Grid */}
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                        {/* Full Name */}
                                         <div>
-                                            <label className="block text-sm font-medium text-gray-700 mb-2">Full Name</label>
+                                            <label className="block text-sm font-medium text-gray-700 mb-2">First Name</label>
                                             {isEditingProfile ? (
-                                                <div>
-                                                    <input
-                                                        type="text"
-                                                        name="name"
-                                                        value={profileForm.name}
-                                                        onChange={handleProfileChange}
-                                                        className={`w-full px-4 py-3 rounded-xl border bg-white text-gray-800 focus:outline-none focus:ring-2 focus:ring-green-500 ${profileErrors.name ? 'border-red-400' : 'border-gray-200'}`}
-                                                        placeholder="Enter your full name"
-                                                    />
-                                                    {profileErrors.name && <p className="text-red-500 text-xs mt-1">{profileErrors.name}</p>}
-                                                </div>
+                                                <>
+                                                    <input name="firstName" value={profileForm.firstName} onChange={handleProfileChange} className={`w-full px-4 py-3 rounded-xl border bg-white text-gray-800 focus:outline-none focus:ring-2 focus:ring-green-500 ${profileErrors.firstName ? 'border-red-400' : 'border-gray-200'}`} placeholder="Enter first name" />
+                                                    {profileErrors.firstName && <p className="text-red-500 text-xs mt-1">{profileErrors.firstName}</p>}
+                                                </>
                                             ) : (
-                                                <div className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-gray-50 text-gray-800">
-                                                    {userData?.name || 'Not provided'}
-                                                </div>
+                                                <div className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-gray-50 text-gray-800">{userData?.firstName || 'Not provided'}</div>
                                             )}
                                         </div>
 
-                                        {/* Email */}
                                         <div>
-                                            <label className="block text-sm font-medium text-gray-700 mb-2">Email Address</label>
+                                            <label className="block text-sm font-medium text-gray-700 mb-2">Middle Name</label>
                                             {isEditingProfile ? (
-                                                <div>
-                                                    <input
-                                                        type="email"
-                                                        name="email"
-                                                        value={profileForm.email}
-                                                        onChange={handleProfileChange}
-                                                        className={`w-full px-4 py-3 rounded-xl border bg-white text-gray-800 focus:outline-none focus:ring-2 focus:ring-green-500 ${profileErrors.email ? 'border-red-400' : 'border-gray-200'}`}
-                                                        placeholder="Enter your email address"
-                                                    />
+                                                <input name="middleName" value={profileForm.middleName} onChange={handleProfileChange} className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-white text-gray-800 focus:outline-none focus:ring-2 focus:ring-green-500" placeholder="Enter middle name (optional)" />
+                                            ) : (
+                                                <div className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-gray-50 text-gray-800">{userData?.middleName || 'Not provided'}</div>
+                                            )}
+                                        </div>
+
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-2">Last Name</label>
+                                            {isEditingProfile ? (
+                                                <>
+                                                    <input name="lastName" value={profileForm.lastName} onChange={handleProfileChange} className={`w-full px-4 py-3 rounded-xl border bg-white text-gray-800 focus:outline-none focus:ring-2 focus:ring-green-500 ${profileErrors.lastName ? 'border-red-400' : 'border-gray-200'}`} placeholder="Enter last name" />
+                                                    {profileErrors.lastName && <p className="text-red-500 text-xs mt-1">{profileErrors.lastName}</p>}
+                                                </>
+                                            ) : (
+                                                <div className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-gray-50 text-gray-800">{userData?.lastName || 'Not provided'}</div>
+                                            )}
+                                        </div>
+
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-2">Email ID</label>
+                                            {isEditingProfile ? (
+                                                <>
+                                                    <input type="email" name="email" value={profileForm.email} onChange={handleProfileChange} className={`w-full px-4 py-3 rounded-xl border bg-white text-gray-800 focus:outline-none focus:ring-2 focus:ring-green-500 ${profileErrors.email ? 'border-red-400' : 'border-gray-200'}`} placeholder="Enter email address" />
                                                     {profileErrors.email && <p className="text-red-500 text-xs mt-1">{profileErrors.email}</p>}
-                                                </div>
+                                                </>
                                             ) : (
-                                                <div className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-gray-50 text-gray-800">
-                                                    {userData?.email || 'Not provided'}
-                                                </div>
+                                                <div className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-gray-50 text-gray-800">{userData?.email || 'Not provided'}</div>
                                             )}
                                         </div>
 
-                                        {/* Phone */}
                                         <div>
-                                            <label className="block text-sm font-medium text-gray-700 mb-2">Phone Number</label>
+                                            <label className="block text-sm font-medium text-gray-700 mb-2">Mobile Number</label>
                                             {isEditingProfile ? (
-                                                <div>
-                                                    <input
-                                                        type="text"
-                                                        name="mobile"
-                                                        value={profileForm.mobile}
-                                                        onChange={handleProfileChange}
-                                                        className={`w-full px-4 py-3 rounded-xl border bg-white text-gray-800 focus:outline-none focus:ring-2 focus:ring-green-500 ${profileErrors.mobile ? 'border-red-400' : 'border-gray-200'}`}
-                                                        placeholder="Enter your phone number"
-                                                    />
+                                                <>
+                                                    <input name="mobile" value={profileForm.mobile} onChange={handleProfileChange} className={`w-full px-4 py-3 rounded-xl border bg-white text-gray-800 focus:outline-none focus:ring-2 focus:ring-green-500 ${profileErrors.mobile ? 'border-red-400' : 'border-gray-200'}`} placeholder="Enter mobile number" />
                                                     {profileErrors.mobile && <p className="text-red-500 text-xs mt-1">{profileErrors.mobile}</p>}
-                                                </div>
+                                                </>
                                             ) : (
-                                                <div className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-gray-50 text-gray-800">
-                                                    {userData?.mobile || 'Not provided'}
-                                                </div>
+                                                <div className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-gray-50 text-gray-800">{userData?.mobile || 'Not provided'}</div>
                                             )}
                                         </div>
 
-                                        {/* Member Since */}
                                         <div>
                                             <label className="block text-sm font-medium text-gray-700 mb-2">Member Since</label>
                                             <div className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-gray-50 text-gray-800">
                                                 {new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}
                                             </div>
+                                        </div>
+
+                                        <div className="md:col-span-2">
+                                            <label className="block text-sm font-medium text-gray-700 mb-2">Shipping Address</label>
+                                            {isEditingProfile ? (
+                                                <textarea name="address" value={profileForm.address} onChange={handleProfileChange} rows={3} className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-white text-gray-800 focus:outline-none focus:ring-2 focus:ring-green-500" placeholder="Enter shipping address" />
+                                            ) : (
+                                                <div className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-gray-50 text-gray-800">{userData?.address || 'Not provided'}</div>
+                                            )}
+                                        </div>
+
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-2">City</label>
+                                            {isEditingProfile ? (
+                                                <input name="city" value={profileForm.city} onChange={handleProfileChange} className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-white text-gray-800 focus:outline-none focus:ring-2 focus:ring-green-500" placeholder="Enter city" />
+                                            ) : (
+                                                <div className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-gray-50 text-gray-800">{userData?.city || 'Not provided'}</div>
+                                            )}
+                                        </div>
+
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-2">State</label>
+                                            {isEditingProfile ? (
+                                                <input name="state" value={profileForm.state} onChange={handleProfileChange} className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-white text-gray-800 focus:outline-none focus:ring-2 focus:ring-green-500" placeholder="Enter state" />
+                                            ) : (
+                                                <div className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-gray-50 text-gray-800">{userData?.state || 'Not provided'}</div>
+                                            )}
+                                        </div>
+
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-2">Pincode</label>
+                                            {isEditingProfile ? (
+                                                <>
+                                                    <input name="pincode" value={profileForm.pincode} onChange={handleProfileChange} className={`w-full px-4 py-3 rounded-xl border bg-white text-gray-800 focus:outline-none focus:ring-2 focus:ring-green-500 ${profileErrors.pincode ? 'border-red-400' : 'border-gray-200'}`} placeholder="Enter pincode" />
+                                                    {profileErrors.pincode && <p className="text-red-500 text-xs mt-1">{profileErrors.pincode}</p>}
+                                                </>
+                                            ) : (
+                                                <div className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-gray-50 text-gray-800">{userData?.pincode || 'Not provided'}</div>
+                                            )}
                                         </div>
                                     </div>
 
@@ -1223,8 +1318,8 @@ ${sidebarOpen ? "translate-x-0" : "-translate-x-full"} lg:translate-x-0`}>
                                             <div className="bg-white/15 backdrop-blur rounded-2xl px-4 py-3 min-w-[150px] border border-white/20">
                                                 <p className="text-[11px] uppercase tracking-wide text-blue-100">Total Spent</p>
                                                 <p className="text-lg font-semibold flex items-center gap-1.5">
-                                                    <IndianRupee className="w-4 h-4" />
-                                                    {dashboardOrders.reduce((sum, order) => sum + getDashboardOrderAmount(order), 0)}
+                                                    <DollarSign className="w-4 h-4" />
+                                                    {formatUsd(dashboardOrders.reduce((sum, order) => sum + (order.totalAmount || 0), 0))}
                                                 </p>
                                             </div>
                                         </div>
@@ -1262,13 +1357,13 @@ ${sidebarOpen ? "translate-x-0" : "-translate-x-full"} lg:translate-x-0`}>
                                                         </div>
 
                                                         <p className="text-sm text-gray-700">
-                                                            <span className="font-medium">Date:</span> {order.date ? new Date(order.date).toLocaleDateString('en-IN') : 'N/A'}
+                                                            <span className="font-medium">Date:</span> {formatDashboardOrderDate(order.date)}
                                                         </p>
                                                         <p className="text-sm text-gray-700 inline-flex items-center gap-1.5">
                                                             <CreditCard className="w-4 h-4 text-gray-500" />
                                                             <span><span className="font-medium">Payment:</span> {order.payment || 'N/A'}</span>
                                                         </p>
-                                                        <p className="text-lg font-bold text-gray-900">{order.total || 'Rs 0/-'}</p>
+                                                        <p className="text-lg font-bold text-gray-900">{formatUsd(order.totalAmount)}</p>
                                                     </div>
 
                                                     <div className="flex items-center gap-3 flex-wrap">
@@ -1303,7 +1398,7 @@ ${sidebarOpen ? "translate-x-0" : "-translate-x-full"} lg:translate-x-0`}>
                                                                 order.items.map((item, idx) => (
                                                                     <li key={idx} className="flex items-center justify-between bg-white border border-gray-200 rounded-lg px-3 py-2">
                                                                                 <span>{item.name || 'Unnamed Item'}</span>
-                                                                                <span className="text-gray-600">Qty {item.quantity || 1} • Rs {item.price || 0}</span>
+                                                                                <span className="text-gray-600">Qty {item.quantity || 1} • {formatUsd(item.price || 0)}</span>
                                                                     </li>
                                                                 ))
                                                             ) : (
