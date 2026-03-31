@@ -6,6 +6,8 @@ const Pharmacy = require("../models/pharmacy");
 const StoreApprovalRequest = require("../models/storeApprovalRequest");
 const Store = require("../models/store");
 const UserNotification = require("../models/userNotification");
+const VaccinationMaster = require("../models/vaccinationMaster");
+const UserVaccination = require("../models/userVaccination");
 const jwt = require("jsonwebtoken");
 const bcrypt = require('bcrypt');
 
@@ -1390,7 +1392,92 @@ const addStore = async (req, res) => {
     }   
 }
 
+// ─── Predefined vaccination list for seeding ───────────────────────────────
+const PREDEFINED_VACCINES = [
+  { name: 'COVID-19', category: 'Respiratory', recommendedFor: 'All Ages', description: 'Protection against Coronavirus disease 2019' },
+  { name: 'Influenza (Flu)', category: 'Respiratory', recommendedFor: 'All Ages', description: 'Annual influenza (flu) shot' },
+  { name: 'Measles, Mumps, Rubella (MMR)', category: 'Childhood', recommendedFor: 'Children & Adults', description: 'Combined MMR live attenuated vaccine' },
+  { name: 'Tetanus, Diphtheria, Pertussis (Tdap)', category: 'Bacterial', recommendedFor: 'All Ages', description: 'Booster recommended every 10 years' },
+  { name: 'Hepatitis A', category: 'Liver', recommendedFor: 'All Ages', description: 'Protection against Hepatitis A virus' },
+  { name: 'Hepatitis B', category: 'Liver', recommendedFor: 'All Ages', description: 'Protection against Hepatitis B virus' },
+  { name: 'Polio (IPV)', category: 'Childhood', recommendedFor: 'Children', description: 'Inactivated poliovirus vaccine' },
+  { name: 'Varicella (Chickenpox)', category: 'Childhood', recommendedFor: 'Children & Adults', description: 'Chickenpox prevention vaccine' },
+  { name: 'Pneumococcal', category: 'Respiratory', recommendedFor: 'Elderly & High-Risk', description: 'Pneumonia and related disease prevention' },
+  { name: 'Meningococcal', category: 'Bacterial', recommendedFor: 'Adolescents & Adults', description: 'Bacterial meningitis prevention' },
+  { name: 'HPV (Human Papillomavirus)', category: 'Cancer Prevention', recommendedFor: 'Adolescents & Adults', description: 'HPV-related cancer prevention' },
+  { name: 'Rotavirus', category: 'Childhood', recommendedFor: 'Infants', description: 'Rotavirus gastroenteritis prevention' },
+  { name: 'Haemophilus influenzae type b (Hib)', category: 'Childhood', recommendedFor: 'Infants & Children', description: 'Hib disease and meningitis prevention' },
+];
+
+const seedVaccinationMasterIfEmpty = async () => {
+  try {
+    const count = await VaccinationMaster.countDocuments();
+    if (count === 0) {
+      await VaccinationMaster.insertMany(PREDEFINED_VACCINES);
+      console.log('Vaccination master data seeded.');
+    }
+  } catch (err) {
+    console.error('Error seeding vaccination master:', err);
+  }
+};
+
+const getVaccinationMaster = async (req, res) => {
+  try {
+    await seedVaccinationMasterIfEmpty();
+    const vaccines = await VaccinationMaster.find().sort({ category: 1, name: 1 });
+    return res.status(StatusCodes.OK).json({ vaccines });
+  } catch (error) {
+    console.error('getVaccinationMaster error:', error);
+    return res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({ message: 'Failed to fetch vaccination master' });
+  }
+};
+
+const getUserVaccinations = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const records = await UserVaccination.find({ userId }).populate('vaccinationId');
+    return res.status(StatusCodes.OK).json({ records });
+  } catch (error) {
+    console.error('getUserVaccinations error:', error);
+    return res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({ message: 'Failed to fetch user vaccinations' });
+  }
+};
+
+const upsertUserVaccination = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const { vaccinationId } = req.params;
+    const { status, vaccinationDate } = req.body;
+
+    if (!['vaccinated', 'not_vaccinated'].includes(status)) {
+      return res.status(StatusCodes.BAD_REQUEST).json({ message: 'Invalid status value' });
+    }
+
+    const master = await VaccinationMaster.findById(vaccinationId);
+    if (!master) {
+      return res.status(StatusCodes.NOT_FOUND).json({ message: 'Vaccination not found in master list' });
+    }
+
+    const update = {
+      status,
+      vaccinationDate: status === 'vaccinated' && vaccinationDate ? new Date(vaccinationDate) : null,
+    };
+
+    const record = await UserVaccination.findOneAndUpdate(
+      { userId, vaccinationId },
+      { $set: update },
+      { new: true, upsert: true, setDefaultsOnInsert: true }
+    );
+
+    return res.status(StatusCodes.OK).json({ record });
+  } catch (error) {
+    console.error('upsertUserVaccination error:', error);
+    return res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({ message: 'Failed to update vaccination' });
+  }
+};
+
 module.exports = {
     signUp, signIn, fetchData, UpdateDoctorProfile, adminsignIn, AdminfetchData, doctorListAssigned, updatedoctorstatus
-    , fetchupdateddoctors, updateavailability, fetchavailableslots, confirmslot, getnames, linkgiven, uploadpres, confirmstatus, UpdatePatientProfile, fetchDoctors, fetchpharmacymedicines, updateorderedmedicines, updatecartquantity, addmedicinetodb, decreaseupdatecartquantity, deletemedicine, finalitems, finaladdress, finalpayment, deletecartItems, doctorchatbotfetchdata, uploadPrescriptionFile, createStoreApprovalRequest, getStoreApprovalRequests, reviewStoreApprovalRequest, getAllStores, updateStoreStatus, addStore, getUserNotificationPreferences, updateUserNotificationPreferences
+    , fetchupdateddoctors, updateavailability, fetchavailableslots, confirmslot, getnames, linkgiven, uploadpres, confirmstatus, UpdatePatientProfile, fetchDoctors, fetchpharmacymedicines, updateorderedmedicines, updatecartquantity, addmedicinetodb, decreaseupdatecartquantity, deletemedicine, finalitems, finaladdress, finalpayment, deletecartItems, doctorchatbotfetchdata, uploadPrescriptionFile, createStoreApprovalRequest, getStoreApprovalRequests, reviewStoreApprovalRequest, getAllStores, updateStoreStatus, addStore, getUserNotificationPreferences, updateUserNotificationPreferences,
+    getVaccinationMaster, getUserVaccinations, upsertUserVaccination
 };

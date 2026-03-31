@@ -1,7 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const multer = require("multer");
-const { signUp, signIn, fetchData, AdminfetchData, UpdateDoctorProfile, adminsignIn, doctorListAssigned, updatedoctorstatus,fetchupdateddoctors, updateavailability, fetchavailableslots, confirmslot, getnames, linkgiven, uploadpres, confirmstatus, UpdatePatientProfile, fetchDoctors, fetchpharmacymedicines, updateorderedmedicines, updatecartquantity, addmedicinetodb, decreaseupdatecartquantity, deletemedicine, finalitems, finaladdress, finalpayment, deletecartItems, doctorchatbotfetchdata, uploadPrescriptionFile, createStoreApprovalRequest, getStoreApprovalRequests, reviewStoreApprovalRequest, getAllStores, updateStoreStatus,addStore, getUserNotificationPreferences, updateUserNotificationPreferences } = require("../controllers/auth");
+const { signUp, signIn, fetchData, AdminfetchData, UpdateDoctorProfile, adminsignIn, doctorListAssigned, updatedoctorstatus,fetchupdateddoctors, updateavailability, fetchavailableslots, confirmslot, getnames, linkgiven, uploadpres, confirmstatus, UpdatePatientProfile, fetchDoctors, fetchpharmacymedicines, updateorderedmedicines, updatecartquantity, addmedicinetodb, decreaseupdatecartquantity, deletemedicine, finalitems, finaladdress, finalpayment, deletecartItems, doctorchatbotfetchdata, uploadPrescriptionFile, createStoreApprovalRequest, getStoreApprovalRequests, reviewStoreApprovalRequest, getAllStores, updateStoreStatus,addStore, getUserNotificationPreferences, updateUserNotificationPreferences, getVaccinationMaster, getUserVaccinations, upsertUserVaccination } = require("../controllers/auth");
 const verifyToken  = require("../middleware/authMiddleware");  
 
 // Configure multer for prescription uploads
@@ -89,4 +89,10 @@ router.patch("/store-requests/:id/review", verifyToken(["admin"]), reviewStoreAp
 router.patch("/stores/:id/status", verifyToken(["admin"]), updateStoreStatus);
 router.get("/allstores", verifyToken(["admin"]), getAllStores);
 router.post("/stores", verifyToken(["admin"]), addStore);
+
+// Vaccination routes
+router.get("/vaccination-master", verifyToken(["User"]), getVaccinationMaster);
+router.get("/user-vaccinations", verifyToken(["User"]), getUserVaccinations);
+router.put("/user-vaccinations/:vaccinationId", verifyToken(["User"]), upsertUserVaccination);
+
 module.exports = router;

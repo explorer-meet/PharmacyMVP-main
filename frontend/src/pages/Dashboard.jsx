@@ -16,6 +16,10 @@ const Dashboard = () => {
     const [showRaiseQuery, setShowRaiseQuery] = useState(false);
     const [showMyOrders, setShowMyOrders] = useState(false);
     const [showMyVaccinations, setShowMyVaccinations] = useState(false);
+    const [vaccinationMaster, setVaccinationMaster] = useState([]);
+    const [userVaccinationMap, setUserVaccinationMap] = useState({});
+    const [vacSaving, setVacSaving] = useState({});
+    const [vacLoading, setVacLoading] = useState(false);
     const [showProfile, setShowProfile] = useState(false);
     const [expandedDashboardOrder, setExpandedDashboardOrder] = useState(null);
     const [isEditingProfile, setIsEditingProfile] = useState(false);
@@ -60,29 +64,56 @@ const Dashboard = () => {
         'Other',
     ];
 
-    const dummyVaccinations = [
-        {
-            id: 1,
-            name: 'COVID-19 (Pfizer)',
-            date: '2024-02-15',
-            status: 'Completed',
-            dose: 'Dose 3'
-        },
-        {
-            id: 2,
-            name: 'Tetanus Toxoid',
-            date: '2024-01-10',
-            status: 'Completed',
-            dose: 'Single Dose'
-        },
-        {
-            id: 3,
-            name: 'Influenza (Flu)',
-            date: '2024-03-20',
-            status: 'Completed',
-            dose: 'Single Dose'
+    // ── Vaccination helpers ──────────────────────────────────────────────────
+    const getVacStatus = (id) => userVaccinationMap[id]?.status ?? 'not_vaccinated';
+    const getVacDate   = (id) => userVaccinationMap[id]?.vaccinationDate ?? '';
+    const vaccinatedCount = vaccinationMaster.filter(v => getVacStatus(v._id) === 'vaccinated').length;
+
+    const loadVaccinations = async () => {
+        const token = localStorage.getItem('medVisionToken');
+        if (!token) return;
+        setVacLoading(true);
+        try {
+            const [masterRes, userRes] = await Promise.all([
+                axios.get(`${baseURL}/vaccination-master`, { headers: { Authorization: `Bearer ${token}` } }),
+                axios.get(`${baseURL}/user-vaccinations`, { headers: { Authorization: `Bearer ${token}` } }),
+            ]);
+            setVaccinationMaster(masterRes.data.vaccines || []);
+            const map = {};
+            (userRes.data.records || []).forEach(r => {
+                map[r.vaccinationId._id] = {
+                    status: r.status,
+                    vaccinationDate: r.vaccinationDate ? r.vaccinationDate.substring(0, 10) : '',
+                };
+            });
+            setUserVaccinationMap(map);
+        } catch { /* silent */ } finally {
+            setVacLoading(false);
         }
-    ];
+    };
+
+    const handleVacStatusChange = async (vaccinationId, newStatus) => {
+        const date = newStatus === 'vaccinated' ? getVacDate(vaccinationId) : '';
+        setUserVaccinationMap(prev => ({ ...prev, [vaccinationId]: { status: newStatus, vaccinationDate: date } }));
+        setVacSaving(prev => ({ ...prev, [vaccinationId]: true }));
+        try {
+            const token = localStorage.getItem('medVisionToken');
+            await axios.put(`${baseURL}/user-vaccinations/${vaccinationId}`, { status: newStatus, vaccinationDate: date || null }, { headers: { Authorization: `Bearer ${token}` } });
+        } catch { loadVaccinations(); } finally {
+            setVacSaving(prev => ({ ...prev, [vaccinationId]: false }));
+        }
+    };
+
+    const handleVacDateChange = async (vaccinationId, newDate) => {
+        setUserVaccinationMap(prev => ({ ...prev, [vaccinationId]: { ...prev[vaccinationId], vaccinationDate: newDate } }));
+        setVacSaving(prev => ({ ...prev, [vaccinationId]: true }));
+        try {
+            const token = localStorage.getItem('medVisionToken');
+            await axios.put(`${baseURL}/user-vaccinations/${vaccinationId}`, { status: 'vaccinated', vaccinationDate: newDate }, { headers: { Authorization: `Bearer ${token}` } });
+        } catch { loadVaccinations(); } finally {
+            setVacSaving(prev => ({ ...prev, [vaccinationId]: false }));
+        }
+    };
 
     const handleQueryChange = (e) => {
         setQueryForm({ ...queryForm, [e.target.name]: e.target.value });
@@ -593,7 +624,7 @@ const Dashboard = () => {
         { icon: Home,         text: "Dashboard",      onClick: () => { resetDashboardPanels(); setSidebarOpen(false); },                                                                     color: "text-cyan-600"   },
         { icon: Pill,         text: "My Prescriptions",onClick: () => { const n = !showPrescriptions;  resetDashboardPanels(); setShowPrescriptions(n);  setSidebarOpen(false); },           color: "text-sky-600" },
         { icon: ShoppingBag,  text: "My Orders",       onClick: () => { const n = !showMyOrders;        resetDashboardPanels(); setShowMyOrders(n);        setSidebarOpen(false); },           color: "text-emerald-600" },
-        { icon: Syringe,      text: "My Vaccinations", onClick: () => { const n = !showMyVaccinations;  resetDashboardPanels(); setShowMyVaccinations(n);  setSidebarOpen(false); },           color: "text-teal-600"   },
+        { icon: Syringe,      text: "My Vaccinations", onClick: () => { const n = !showMyVaccinations;  resetDashboardPanels(); setShowMyVaccinations(n); if (!n) {} else { loadVaccinations(); } setSidebarOpen(false); },           color: "text-teal-600"   },
         { icon: UserCircle,   text: "Profile",         onClick: () => { const n = !showProfile;         resetDashboardPanels(); setShowProfile(n);         setSidebarOpen(false); },           color: "text-slate-600"},
         { icon: Bell,         text: "Notifications",   onClick: () => { const n = !showNotifications;   resetDashboardPanels(); setShowNotifications(n);   setSidebarOpen(false); },           color: "text-amber-500" },
         { icon: MessageSquare,text: "Raise a Query",   onClick: () => { const n = !showRaiseQuery;      resetDashboardPanels(); setShowRaiseQuery(n);      setSidebarOpen(false); },           color: "text-cyan-600"   },
@@ -619,10 +650,10 @@ const Dashboard = () => {
         {
             icon: Syringe,
             label: "Vaccinations",
-            value: dummyVaccinations.length,
+            value: vaccinatedCount,
             change: "Review your immunization history",
             color: "bg-gradient-to-br from-emerald-400 to-teal-500",
-            onClick: () => { resetDashboardPanels(); setShowMyVaccinations(true); }
+            onClick: () => { resetDashboardPanels(); setShowMyVaccinations(true); loadVaccinations(); }
         },
     ];
 
@@ -872,7 +903,7 @@ ${sidebarOpen ? "translate-x-0" : "-translate-x-full"} lg:translate-x-0`}>
                                                     <p className="text-sm font-semibold text-emerald-900">Vaccination records</p>
                                                     <p className="text-xs text-emerald-700">Immunization entries available</p>
                                                 </div>
-                                                <span className="text-2xl font-bold text-emerald-900">{dummyVaccinations.length}</span>
+                                                <span className="text-2xl font-bold text-emerald-900">{vaccinatedCount} / {vaccinationMaster.length}</span>
                                             </div>
                                         </div>
                                     </div>
@@ -1349,7 +1380,7 @@ ${sidebarOpen ? "translate-x-0" : "-translate-x-full"} lg:translate-x-0`}>
                                                 <p className="text-sm text-green-700">Total Orders</p>
                                             </div>
                                             <div className="text-center">
-                                                <p className="text-2xl font-bold text-green-600">{dummyVaccinations.length}</p>
+                                                <p className="text-2xl font-bold text-green-600">{vaccinatedCount} / {vaccinationMaster.length}</p>
                                                 <p className="text-sm text-green-700">Vaccinations</p>
                                             </div>
                                         </div>
@@ -1525,15 +1556,17 @@ ${sidebarOpen ? "translate-x-0" : "-translate-x-full"} lg:translate-x-0`}>
 
                         {/* My Vaccinations Panel */}
                         {showMyVaccinations && (
-                            <div className="bg-white rounded-2xl shadow-lg p-8">
+                            <div className="bg-white rounded-2xl shadow-lg p-6">
                                 <div className="flex items-center justify-between mb-6">
                                     <div className="flex items-center gap-3">
-                                        <div className="w-10 h-10 rounded-xl bg-orange-100 flex items-center justify-center">
-                                            <Syringe className="text-orange-600" size={20} />
+                                        <div className="w-10 h-10 rounded-xl bg-teal-100 flex items-center justify-center">
+                                            <Syringe className="text-teal-600" size={20} />
                                         </div>
                                         <div>
                                             <h2 className="text-xl font-bold text-gray-800">My Vaccinations</h2>
-                                            <p className="text-sm text-gray-500">View your vaccination records</p>
+                                            <p className="text-sm text-gray-500">
+                                                {vacLoading ? 'Loading…' : `${vaccinatedCount} of ${vaccinationMaster.length} vaccines recorded`}
+                                            </p>
                                         </div>
                                     </div>
                                     <button onClick={() => setShowMyVaccinations(false)} className="text-gray-400 hover:text-gray-600 transition">
@@ -1541,45 +1574,78 @@ ${sidebarOpen ? "translate-x-0" : "-translate-x-full"} lg:translate-x-0`}>
                                     </button>
                                 </div>
 
-                                {dummyVaccinations && dummyVaccinations.length > 0 ? (
-                                    <div className="space-y-4">
-                                        {dummyVaccinations.map((vaccination) => (
-                                            <div
-                                                key={vaccination.id}
-                                                className="border border-gray-200 rounded-xl p-4 hover:shadow-md transition-shadow duration-300"
-                                            >
-                                                <div className="flex items-start justify-between">
-                                                    <div className="flex items-start gap-3 flex-1">
-                                                        <div className="w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center mt-1">
-                                                            <Syringe className="text-orange-600" size={18} />
-                                                        </div>
-                                                        <div>
-                                                            <h3 className="font-semibold text-gray-800">{vaccination.name}</h3>
-                                                            <div className="flex items-center gap-2 mt-2">
-                                                                <span className="text-xs bg-orange-100 text-orange-700 px-2 py-1 rounded-full font-medium">{vaccination.dose}</span>
-                                                                <span className="text-xs text-gray-500">{vaccination.date}</span>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-
-                                                    <span className={`px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap ml-2 ${
-                                                        vaccination.status === 'Completed'
-                                                            ? 'bg-green-100 text-green-700'
-                                                            : vaccination.status === 'Pending'
-                                                            ? 'bg-yellow-100 text-yellow-700'
-                                                            : 'bg-gray-100 text-gray-700'
-                                                    }`}>
-                                                        {vaccination.status}
-                                                    </span>
-                                                </div>
-                                            </div>
-                                        ))}
+                                {vacLoading ? (
+                                    <div className="flex justify-center py-12">
+                                        <svg className="animate-spin h-7 w-7 text-teal-400" viewBox="0 0 24 24" fill="none">
+                                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
+                                        </svg>
+                                    </div>
+                                ) : vaccinationMaster.length === 0 ? (
+                                    <div className="text-center py-12">
+                                        <Syringe className="text-gray-300 mx-auto mb-3" size={40} />
+                                        <p className="text-gray-500 text-sm">No vaccination data available.</p>
                                     </div>
                                 ) : (
-                                    <div className="text-center py-12">
-                                        <Syringe className="text-gray-300 mx-auto mb-4" size={48} />
-                                        <h3 className="text-lg font-medium text-gray-600 mb-2">No Vaccinations Recorded</h3>
-                                        <p className="text-gray-500">Your vaccination records will appear here</p>
+                                    <div className="overflow-x-auto">
+                                        <table className="w-full text-sm">
+                                            <thead className="bg-gray-50 border-b">
+                                                <tr className="text-gray-500 text-xs uppercase tracking-wider">
+                                                    <th className="p-3 text-left">Vaccine</th>
+                                                    <th className="p-3 text-left">Status</th>
+                                                    <th className="p-3 text-left">Date</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {vaccinationMaster.map((vaccine, idx) => {
+                                                    const status = getVacStatus(vaccine._id);
+                                                    const date   = getVacDate(vaccine._id);
+                                                    const isSaving = !!vacSaving[vaccine._id];
+                                                    const isVaccinated = status === 'vaccinated';
+                                                    return (
+                                                        <tr key={vaccine._id} className={`border-b last:border-none ${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/40'} hover:bg-teal-50/20`}>
+                                                            <td className="p-3">
+                                                                <p className="font-medium text-gray-800">{vaccine.name}</p>
+                                                                <p className="text-xs text-gray-400">{vaccine.category}</p>
+                                                            </td>
+                                                            <td className="p-3">
+                                                                <div className="flex items-center gap-1.5">
+                                                                    <select
+                                                                        disabled={isSaving}
+                                                                        value={status}
+                                                                        onChange={e => handleVacStatusChange(vaccine._id, e.target.value)}
+                                                                        className={`appearance-none pl-2 pr-6 py-1 rounded-full text-xs font-semibold border focus:outline-none cursor-pointer disabled:opacity-50 transition-colors
+                                                                            ${isVaccinated ? 'bg-green-100 text-green-700 border-green-300' : 'bg-red-100 text-red-700 border-red-300'}`}
+                                                                    >
+                                                                        <option value="not_vaccinated">Not Vaccinated</option>
+                                                                        <option value="vaccinated">Vaccinated</option>
+                                                                    </select>
+                                                                    {isSaving && <svg className="animate-spin h-3.5 w-3.5 text-gray-400 shrink-0" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg>}
+                                                                </div>
+                                                            </td>
+                                                            <td className="p-3">
+                                                                {isVaccinated ? (
+                                                                    <div className="flex items-center gap-1.5 bg-gray-50 border px-2 py-1 rounded-lg w-fit">
+                                                                        <Calendar size={13} className="text-gray-400 shrink-0" />
+                                                                        <input
+                                                                            type="date"
+                                                                            disabled={isSaving}
+                                                                            value={date}
+                                                                            max={new Date().toISOString().substring(0, 10)}
+                                                                            onChange={e => handleVacDateChange(vaccine._id, e.target.value)}
+                                                                            className="bg-transparent outline-none text-xs text-gray-700 disabled:opacity-50"
+                                                                        />
+                                                                    </div>
+                                                                ) : (
+                                                                    <span className="text-teal-500 text-xs">Stay protected — get vaccinated!</span>
+                                                                )}
+                                                            </td>
+                                                        </tr>
+                                                    );
+                                                })}
+                                            </tbody>
+                                        </table>
+                                        <p className="mt-4 text-xs text-gray-400">* Changes are saved automatically.</p>
                                     </div>
                                 )}
                             </div>
