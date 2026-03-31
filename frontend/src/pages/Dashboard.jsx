@@ -330,7 +330,7 @@ const Dashboard = () => {
                 },
             });
         } catch (error) {
-            console.error('Error creating prescription order:', error.message);
+            console.error('Error while creating prescription order:', error.message);
             alert('Could not start checkout right now. Please try again.');
         } finally {
             setPlacingPrescriptionOrder(false);
