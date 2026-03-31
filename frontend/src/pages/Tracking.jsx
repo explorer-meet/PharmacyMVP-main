@@ -38,15 +38,21 @@ function Tracking() {
   const fetchDataFromApi = async () => {
       try {
         const token = localStorage.getItem('medVisionToken');
-        const response = await axios.get(`${baseURL}/fetchdata`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        });
-        const fetchedData = response.data.userData;
+        const [userResponse, orderResponse] = await Promise.all([
+          axios.get(`${baseURL}/fetchdata`, {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          }),
+          axios.get(`${baseURL}/orders/${id}`, {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          }),
+        ]);
+        const fetchedData = userResponse.data.userData;
+        const matchedId = orderResponse.data.order;
         setUserData(fetchedData);
-        console.log(fetchedData);
-        const matchedId = fetchedData.order?.find(order => order.orderId === id);
 
         if (matchedId) {
           const currentStatus = matchedId.status;
@@ -64,8 +70,6 @@ function Tracking() {
             statuses: updatedStatuses
           }));
         }
-        // Extract orders from userdata
-        console.log(matchedId?.status);
         localStorage.setItem('userData', JSON.stringify(fetchedData));
       } catch (error) {
         console.error('Error fetching data:', error.message);

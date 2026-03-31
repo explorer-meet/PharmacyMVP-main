@@ -15,7 +15,7 @@ const MedicineCard = ({ id, name, manufacturer, dosage, price, stock, type, requ
 
   const [showadded, setShowAdded] = useState(false);
   const [addcart, setAddCart] = useState(false);
-  const [userData, setUserData] = useState([]);
+  const [userData, setUserData] = useState(null);
   const [showPrescriptionModal, setShowPrescriptionModal] = useState(false);
   const [prescriptionFile, setPrescriptionFile] = useState(null);
   // null | 'pending' | 'approved'
@@ -69,41 +69,56 @@ const MedicineCard = ({ id, name, manufacturer, dosage, price, stock, type, requ
 
   const handleaddtocart = async () => {
     try {
+      let userId = userData?._id;
+
+      // If no userData, try localStorage
+      if (!userId) {
+        const storedUserData = localStorage.getItem('userData');
+        if (storedUserData) {
+          try {
+            const parsed = JSON.parse(storedUserData);
+            userId = parsed?._id;
+          } catch (e) {
+            console.error("Failed to parse userData from localStorage:", e);
+          }
+        }
+      }
+
+      if (!userId) {
+        console.error("User not logged in or userData not available");
+        alert("Please log in to add items to cart");
+        return;
+      }
+
+      console.log("Adding to cart:", { name, price, medicineId: id, userId });
+      
       const response = await axios.post(`${baseURL}/updateorderedmedicines`, {
         name,
         price,
-        id: userData?._id,
+        medicineId: id,
+        id: userId,
       });
-      console.log(response);
+      
+      console.log("Add to cart response:", response);
   
       if (response.status === 200) {
-        console.log(`${name} added to cart with ${id} quantity price is ${price}`);
+        console.log(`${name} added to cart successfully`);
         setShowAdded(true);
 
         setTimeout(() => {
           setShowAdded(false);
         }, 1000);
   
-        // Fetch updated userData
-        const token = localStorage.getItem('medVisionToken');
-        const updatedResponse = await axios.get(`${baseURL}/fetchdata`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        });
-  
-        const updatedUserData = updatedResponse.data.userData;
-  
-        // Update state to trigger re-render
-        setUserData(updatedUserData);
-  
-        // Update localStorage for persistence
-        localStorage.setItem('userData', JSON.stringify(updatedUserData));
-        // Notify cart listeners (e.g., floating CartButton) to refresh immediately
+        // Notify cart listeners to refresh immediately
         window.dispatchEvent(new CustomEvent('cart-updated'));
       }
     } catch (error) {
-      console.error("Error adding to cart:", error.message);
+      console.error("Error adding to cart:", error);
+      if (error.response?.status === 404) {
+        alert("User session expired. Please log in again.");
+      } else {
+        alert(`Failed to add ${name} to cart. Please try again.`);
+      }
     }
   };
   
@@ -111,17 +126,40 @@ const MedicineCard = ({ id, name, manufacturer, dosage, price, stock, type, requ
   const fetchDataFromApi = async () => {
     try {
       const token = localStorage.getItem('medVisionToken');
+      
+      // Try localStorage first as immediate fallback
+      const storedUserData = localStorage.getItem('userData');
+      if (storedUserData) {
+        try {
+          const parsed = JSON.parse(storedUserData);
+          if (parsed?._id) {
+            setUserData(parsed);
+            return; // Success from localStorage
+          }
+        } catch (e) {
+          console.error("Failed to parse userData from localStorage:", e);
+        }
+      }
+
+      if (!token) {
+        console.warn("No token found in localStorage");
+        return;
+      }
+
       const response = await axios.get(`${baseURL}/fetchdata`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
       });
-      const fetchedData = response.data.userData;
-      setUserData(fetchedData);
 
-      localStorage.setItem('userData', JSON.stringify(fetchedData));
+      const fetchedData = response.data.userData;
+      if (fetchedData?._id) {
+        setUserData(fetchedData);
+        localStorage.setItem('userData', JSON.stringify(fetchedData));
+      }
     } catch (error) {
-      console.error("Error fetching data:", error.message);
+      console.error("Error fetching user data:", error.message);
+      // Fallback already attempted above from localStorage
     }
   };
 

@@ -1,13 +1,24 @@
 const express = require("express");
 const router = express.Router();
 const multer = require("multer");
-const { signUp, signIn, fetchData, AdminfetchData, UpdateDoctorProfile, adminsignIn, doctorListAssigned, updatedoctorstatus,fetchupdateddoctors, updateavailability, fetchavailableslots, confirmslot, getnames, linkgiven, uploadpres, confirmstatus, UpdatePatientProfile, fetchDoctors, fetchpharmacymedicines, updateorderedmedicines, updatecartquantity, addmedicinetodb, decreaseupdatecartquantity, deletemedicine, finalitems, finaladdress, finalpayment, deletecartItems, doctorchatbotfetchdata, uploadPrescriptionFile, createStoreApprovalRequest, getStoreApprovalRequests, reviewStoreApprovalRequest, getAllStores, updateStoreStatus,addStore, getUserNotificationPreferences, updateUserNotificationPreferences, getVaccinationMaster, getUserVaccinations, upsertUserVaccination, uploadPrescriptionRequest, getMyPrescriptionRequests, getStorePrescriptionRequests, reviewPrescriptionRequest } = require("../controllers/auth");
+const fs = require("fs");
+const os = require("os");
+const path = require("path");
+const { signUp, signIn, fetchData, AdminfetchData, adminsignIn, uploadpres, UpdatePatientProfile, fetchpharmacymedicines, updateorderedmedicines, updatecartquantity, addmedicinetodb, decreaseupdatecartquantity, deletemedicine, finalitems, finaladdress, finalpayment, deletecartItems, uploadPrescriptionFile, createStoreApprovalRequest, getStoreApprovalRequests, reviewStoreApprovalRequest, getAllStores, updateStoreStatus, addStore, getUserNotificationPreferences, updateUserNotificationPreferences, uploadPrescriptionRequest, getMyPrescriptionRequests, getStorePrescriptionRequests, reviewPrescriptionRequest, getStoreOrders, getMyOrders, getOrderById, getStoreStaffMembers, createStoreStaffMember, updateStoreStaffMember, updateStoreStaffStatus, deleteStoreStaffMember, getCart, seedVaccinationMasterIfEmpty, upsertUserVaccination, getUserVaccinations } = require("../controllers/auth");
 const verifyToken  = require("../middleware/authMiddleware");  
+
+const uploadsDir = process.env.UPLOADS_DIR || path.join(os.tmpdir(), "medvision-uploads");
+const ensureUploadsDir = () => {
+  if (!fs.existsSync(uploadsDir)) {
+    fs.mkdirSync(uploadsDir, { recursive: true });
+  }
+};
 
 // Configure multer for prescription uploads
 const prescriptionStorage = multer.diskStorage({
   destination: function (req, file, cb) {
-    cb(null, 'uploads/');
+    ensureUploadsDir();
+    cb(null, uploadsDir);
   },
   filename: function (req, file, cb) {
     cb(null, Date.now() + '-' + file.originalname);
@@ -17,20 +28,31 @@ const prescriptionStorage = multer.diskStorage({
 const prescriptionUpload = multer({ 
   storage: prescriptionStorage,
   fileFilter: function (req, file, cb) {
-    if (file.mimetype.startsWith('image/') || file.mimetype === 'application/pdf') {
+    const isPdf = file.mimetype === 'application/pdf' || (file.mimetype === 'application/octet-stream' && String(file.originalname || '').toLowerCase().endsWith('.pdf'));
+    if (file.mimetype.startsWith('image/') || isPdf) {
       cb(null, true);
     } else {
       cb(new Error('Only images and PDF files are allowed!'), false);
     }
   },
   limits: {
-    fileSize: 5 * 1024 * 1024 // 5MB limit
+    fileSize: 10 * 1024 * 1024 // 10MB limit
   }
 });
 
+const prescriptionUploadSingle = (req, res, next) => {
+  prescriptionUpload.single('prescription')(req, res, (err) => {
+    if (err) {
+      return res.status(400).json({ message: err.message || 'Invalid prescription file upload' });
+    }
+    next();
+  });
+};
+
 const storeRequestStorage = multer.diskStorage({
   destination: function (req, file, cb) {
-    cb(null, 'uploads/');
+    ensureUploadsDir();
+    cb(null, uploadsDir);
   },
   filename: function (req, file, cb) {
     cb(null, Date.now() + '-store-' + file.originalname);
@@ -47,35 +69,23 @@ const storeRequestUpload = multer({
     }
   },
   limits: {
-    fileSize: 5 * 1024 * 1024,
+    fileSize: 10 * 1024 * 1024,
   },
 });
 
 // Define routes for authentication
 router.post("/login", signIn);
 router.post("/signup", signUp);
-router.post("/profile", UpdateDoctorProfile);
 router.post("/patientprofile", UpdatePatientProfile);
-router.post("/updateslots", updateavailability);
-// router.post("/admin", adminsignIn);
-router.get("/fetchdata", verifyToken(["User", "Store", "Doctor"]), fetchData);
+router.get("/fetchdata", verifyToken(["User", "Store"]), fetchData);
 router.get("/user-notifications", verifyToken(["User"]), getUserNotificationPreferences);
 router.put("/user-notifications", verifyToken(["User"]), updateUserNotificationPreferences);
-router.post("/fetchslots", fetchavailableslots);
-// router.get("/doctors", doctorListAssigned)
-// router.get("/alldoctors", fetchupdateddoctors);
 router.get("/adminfetchdata", verifyToken(["admin"]), AdminfetchData);
-// router.put("/acceptdoctor", updatedoctorstatus);
-// router.post("/confirmslots", confirmslot);
-router.post("/getnames", getnames);
-router.post("/linkgiven", linkgiven);
-router.post("/confirmstatus", confirmstatus);
 router.post("/uploadpres", prescriptionUpload.single('prescription'), uploadpres);
-router.post("/prescriptions/upload", verifyToken(["User"]), prescriptionUpload.single('prescription'), uploadPrescriptionRequest);
+router.post("/prescriptions/upload", verifyToken(["User"]), prescriptionUploadSingle, uploadPrescriptionRequest);
 router.get("/prescriptions/me", verifyToken(["User"]), getMyPrescriptionRequests);
 router.get("/prescriptions/store", verifyToken(["Store"]), getStorePrescriptionRequests);
 router.patch("/prescriptions/:id/review", verifyToken(["Store"]), reviewPrescriptionRequest);
-// router.post("/fetchdoctors", fetchDoctors);
 router.post("/updateorderedmedicines", updateorderedmedicines);
 router.post("/updatecartquantity", updatecartquantity);
 router.post("/addmedicine", addmedicinetodb);
@@ -85,18 +95,25 @@ router.get("/allmedicines", fetchpharmacymedicines);
 router.post("/additemstocart", finalitems);
 router.post("/addaddress", finaladdress);
 router.post("/addpayment", finalpayment);
+router.get("/cart", verifyToken(["User", "Store"]), getCart);
+router.get("/orders/me", verifyToken(["User"]), getMyOrders);
+router.get("/orders/:orderId", verifyToken(["User", "Store"]), getOrderById);
 router.post("/deletefullcart", deletecartItems)
-// router.post("/doctorchatbotfetchdata", doctorchatbotfetchdata)
 router.post("/store-requests", storeRequestUpload.single('storeLicenceFile'), createStoreApprovalRequest);
 router.get("/store-requests", verifyToken(["admin"]), getStoreApprovalRequests);
 router.patch("/store-requests/:id/review", verifyToken(["admin"]), reviewStoreApprovalRequest);
 router.patch("/stores/:id/status", verifyToken(["admin"]), updateStoreStatus);
 router.get("/allstores", verifyToken(["admin"]), getAllStores);
 router.post("/stores", verifyToken(["admin"]), addStore);
+router.get("/store-orders", verifyToken(["Store"]), getStoreOrders);
+router.get("/store-staff", verifyToken(["Store"]), getStoreStaffMembers);
+router.post("/store-staff", verifyToken(["Store"]), createStoreStaffMember);
+router.put("/store-staff/:id", verifyToken(["Store"]), updateStoreStaffMember);
+router.patch("/store-staff/:id/status", verifyToken(["Store"]), updateStoreStaffStatus);
+router.delete("/store-staff/:id", verifyToken(["Store"]), deleteStoreStaffMember);
 
 // Vaccination routes
-router.get("/vaccination-master", verifyToken(["User"]), getVaccinationMaster);
-router.get("/user-vaccinations", verifyToken(["User"]), getUserVaccinations);
-router.put("/user-vaccinations/:vaccinationId", verifyToken(["User"]), upsertUserVaccination);
+router.post("/vaccinations", verifyToken(["User"]), upsertUserVaccination);
+router.get("/vaccinations", verifyToken(["User"]), getUserVaccinations);
 
 module.exports = router;

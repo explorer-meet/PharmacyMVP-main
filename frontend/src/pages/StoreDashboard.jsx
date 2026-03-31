@@ -22,30 +22,8 @@ import {
 const StoreDashboard = () => {
   const navigate = useNavigate();
   const [selectedSection, setSelectedSection] = useState('staff');
-  const [staffMembers, setStaffMembers] = useState([
-    {
-      id: 1,
-      firstName: 'Asha',
-      middleName: '',
-      lastName: 'Patel',
-      role: 'Pharmacist',
-      email: 'asha@store.com',
-      contact: '+91 98765 43210',
-      address: '21 Tulip Street, Mumbai',
-      idProof: 'Aadhar',
-    },
-    {
-      id: 2,
-      firstName: 'Rohit',
-      middleName: '',
-      lastName: 'Kumar',
-      role: 'Store Assistant',
-      email: 'rohit@store.com',
-      contact: '+91 91234 56789',
-      address: '9 Lotus Avenue, Pune',
-      idProof: 'PAN Card',
-    },
-  ]);
+  const [staffMembers, setStaffMembers] = useState([]);
+  const [staffLoading, setStaffLoading] = useState(false);
   const [newStaff, setNewStaff] = useState({
     firstName: '',
     middleName: '',
@@ -53,8 +31,6 @@ const StoreDashboard = () => {
     contact: '',
     email: '',
     address: '',
-    idProof: '',
-    idProofFile: null,
     role: 'Pharmacist',
   });
   const [editingStaffId, setEditingStaffId] = useState(null);
@@ -73,84 +49,9 @@ const StoreDashboard = () => {
   const [newMedicine, setNewMedicine] = useState({ name: '', stock: '', status: 'In Stock' });
   const [editingMedicineId, setEditingMedicineId] = useState(null);
   const [editMedicine, setEditMedicine] = useState({ name: '', stock: '' });
-  const [orders] = useState([
-    {
-      id: 1087,
-      customer: 'Meera Singh',
-      total: '₹1,245',
-      status: 'Completed',
-      date: 'Mar 26',
-      address: '12 Magnolia Lane, Mumbai',
-      payment: 'Credit Card',
-      items: [
-        { name: 'Paracetamol 500mg', qty: 2, price: '₹180' },
-        { name: 'Cough Syrup', qty: 1, price: '₹320' },
-        { name: 'Vitamin D Capsules', qty: 1, price: '₹745' },
-      ],
-      tracking: [
-        { step: 'Order placed', date: 'Mar 24', status: 'complete' },
-        { step: 'Dispatched', date: 'Mar 25', status: 'complete' },
-        { step: 'Delivered', date: 'Mar 26', status: 'complete' },
-      ],
-    },
-    {
-      id: 1085,
-      customer: 'Amit Shah',
-      total: '₹860',
-      status: 'Pending',
-      date: 'Mar 26',
-      address: '77 Pearl Street, Pune',
-      payment: 'UPI',
-      items: [
-        { name: 'Metformin 500mg', qty: 1, price: '₹250' },
-        { name: 'Saline Nasal Spray', qty: 2, price: '₹220' },
-        { name: 'Multivitamin Tablets', qty: 1, price: '₹390' },
-      ],
-      tracking: [
-        { step: 'Order placed', date: 'Mar 26', status: 'complete' },
-        { step: 'Packed', date: 'Mar 26', status: 'active' },
-        { step: 'Out for delivery', date: '', status: 'upcoming' },
-      ],
-    },
-    {
-      id: 1083,
-      customer: 'Sneha Patel',
-      total: '₹2,050',
-      status: 'Completed',
-      date: 'Mar 25',
-      address: '45 Garden Avenue, Delhi',
-      payment: 'Debit Card',
-      items: [
-        { name: 'Aspirin 75mg', qty: 1, price: '₹150' },
-        { name: 'Antacid Tablets', qty: 2, price: '₹400' },
-        { name: 'Protein Powder', qty: 1, price: '₹1,500' },
-      ],
-      tracking: [
-        { step: 'Order placed', date: 'Mar 23', status: 'complete' },
-        { step: 'Dispatched', date: 'Mar 24', status: 'complete' },
-        { step: 'Delivered', date: 'Mar 25', status: 'complete' },
-      ],
-    },
-    {
-      id: 1081,
-      customer: 'Rajeev Nair',
-      total: '₹1,360',
-      status: 'Pending',
-      date: 'Mar 24',
-      address: '18 Lotus Road, Chennai',
-      payment: 'Cash on Delivery',
-      items: [
-        { name: 'Blood Pressure Monitor', qty: 1, price: '₹1,000' },
-        { name: 'Hand Sanitizer', qty: 2, price: '₹180' },
-      ],
-      tracking: [
-        { step: 'Order placed', date: 'Mar 24', status: 'complete' },
-        { step: 'Packed', date: 'Mar 24', status: 'active' },
-        { step: 'Out for delivery', date: '', status: 'upcoming' },
-      ],
-    },
-  ]);
-  const [selectedOrderId, setSelectedOrderId] = useState(orders[0]?.id || null);
+  const [orders, setOrders] = useState([]);
+  const [ordersLoading, setOrdersLoading] = useState(false);
+  const [selectedOrderId, setSelectedOrderId] = useState(null);
   const selectedOrder = orders.find((item) => item.id === selectedOrderId);
   const parseCurrencyAmount = (value) => Number(String(value).replace(/[^\d.]/g, '')) || 0;
   const formatUSD = (value) =>
@@ -158,10 +59,15 @@ const StoreDashboard = () => {
       style: 'currency',
       currency: 'USD',
       maximumFractionDigits: 2,
-    }).format(value);
+    }).format(Number(value) || 0);
+  const isCompletedOrder = (status) => ['completed', 'delivered'].includes(String(status || '').toLowerCase());
+  const getOrderStatusBadgeClass = (status) =>
+    isCompletedOrder(status)
+      ? 'bg-emerald-100 text-emerald-700'
+      : 'bg-amber-100 text-amber-700';
   const reportOrdersTotal = orders.length;
-  const reportCompletedOrders = orders.filter((order) => order.status === 'Completed').length;
-  const reportPendingOrders = orders.filter((order) => order.status !== 'Completed').length;
+  const reportCompletedOrders = orders.filter((order) => isCompletedOrder(order.status)).length;
+  const reportPendingOrders = orders.filter((order) => !isCompletedOrder(order.status)).length;
   const reportTotalRevenue = orders.reduce((sum, order) => sum + parseCurrencyAmount(order.total), 0);
   const reportAverageOrderValue = reportOrdersTotal ? reportTotalRevenue / reportOrdersTotal : 0;
   const reportUniqueCustomers = new Set(orders.map((order) => order.customer)).size;
@@ -194,6 +100,27 @@ const StoreDashboard = () => {
     return parsed.toLocaleDateString('en-US', { month: 'short', day: '2-digit' });
   };
 
+  const loadStoreOrders = async () => {
+    const token = localStorage.getItem('medVisionToken');
+    if (!token) return;
+
+    try {
+      setOrdersLoading(true);
+      const response = await axios.get(`${baseURL}/store-orders`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const rows = response.data.orders || [];
+      setOrders(rows);
+      setSelectedOrderId((prev) => (rows.some((order) => order.id === prev) ? prev : rows[0]?.id || null));
+    } catch (error) {
+      console.error('Failed to load store orders:', error.message);
+      setOrders([]);
+      setSelectedOrderId(null);
+    } finally {
+      setOrdersLoading(false);
+    }
+  };
+
   const loadStorePrescriptions = async () => {
     const token = localStorage.getItem('medVisionToken');
     if (!token) return;
@@ -212,6 +139,24 @@ const StoreDashboard = () => {
       setSelectedPrescriptionId(null);
     } finally {
       setPrescriptionsLoading(false);
+    }
+  };
+
+  const loadStoreStaffMembers = async () => {
+    const token = localStorage.getItem('medVisionToken');
+    if (!token) return;
+
+    try {
+      setStaffLoading(true);
+      const response = await axios.get(`${baseURL}/store-staff`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setStaffMembers(response.data.staffMembers || []);
+    } catch (error) {
+      console.error('Failed to load staff members:', error.message);
+      setStaffMembers([]);
+    } finally {
+      setStaffLoading(false);
     }
   };
 
@@ -246,11 +191,6 @@ const StoreDashboard = () => {
     setNewStaff((prev) => ({ ...prev, [name]: value }));
   };
 
-  const handleStaffFileChange = (e) => {
-    const file = e.target.files?.[0] || null;
-    setNewStaff((prev) => ({ ...prev, idProofFile: file, idProof: file?.name || '' }));
-  };
-
   const openStaffForm = () => {
     setEditingStaffId(null);
     setShowStaffForm(true);
@@ -261,68 +201,57 @@ const StoreDashboard = () => {
       contact: '',
       email: '',
       address: '',
-      idProof: '',
-      idProofFile: null,
       role: 'Pharmacist',
     });
   };
 
-  const addStaffMember = (e) => {
+  const addStaffMember = async (e) => {
     e.preventDefault();
     if (!newStaff.firstName || !newStaff.lastName || !newStaff.email || !newStaff.contact) return;
 
-    if (editingStaffId) {
-      setStaffMembers((prev) =>
-        prev.map((member) =>
-          member.id === editingStaffId
-            ? {
-                ...member,
-                firstName: newStaff.firstName,
-                middleName: newStaff.middleName,
-                lastName: newStaff.lastName,
-                role: newStaff.role,
-                email: newStaff.email,
-                contact: newStaff.contact,
-                address: newStaff.address,
-                idProof: newStaff.idProof || newStaff.idProofFile?.name || member.idProof,
-              }
-            : member,
-        ),
-      );
-      setEditingStaffId(null);
-    } else {
-      setStaffMembers((prev) => [
-        ...prev,
-        {
-          id: prev.length + 1,
-          firstName: newStaff.firstName,
-          middleName: newStaff.middleName,
-          lastName: newStaff.lastName,
-          role: newStaff.role,
-          email: newStaff.email,
-          contact: newStaff.contact,
-          address: newStaff.address,
-          idProof: newStaff.idProof || newStaff.idProofFile?.name || '',
-        },
-      ]);
-    }
+    const token = localStorage.getItem('medVisionToken');
+    if (!token) return;
 
-    setNewStaff({
-      firstName: '',
-      middleName: '',
-      lastName: '',
-      contact: '',
-      email: '',
-      address: '',
-      idProof: '',
-      idProofFile: null,
-      role: 'Pharmacist',
-    });
-    setShowStaffForm(false);
+    const payload = {
+      firstName: newStaff.firstName,
+      middleName: newStaff.middleName,
+      lastName: newStaff.lastName,
+      role: newStaff.role,
+      email: newStaff.email,
+      contact: newStaff.contact,
+      address: newStaff.address,
+    };
+
+    try {
+      if (editingStaffId) {
+        await axios.put(`${baseURL}/store-staff/${editingStaffId}`, payload, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+      } else {
+        await axios.post(`${baseURL}/store-staff`, payload, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+      }
+
+      await loadStoreStaffMembers();
+      setEditingStaffId(null);
+      setNewStaff({
+        firstName: '',
+        middleName: '',
+        lastName: '',
+        contact: '',
+        email: '',
+        address: '',
+        role: 'Pharmacist',
+      });
+      setShowStaffForm(false);
+    } catch (error) {
+      console.error('Failed to save staff member:', error.message);
+    }
   };
 
   const handleEditStaff = (staff) => {
-    setEditingStaffId(staff.id);
+    setEditingStaffId(staff._id);
     setShowStaffForm(true);
     setNewStaff({
       firstName: staff.firstName,
@@ -331,8 +260,6 @@ const StoreDashboard = () => {
       contact: staff.contact,
       email: staff.email,
       address: staff.address,
-      idProof: staff.idProof,
-      idProofFile: null,
       role: staff.role,
     });
   };
@@ -347,14 +274,39 @@ const StoreDashboard = () => {
       contact: '',
       email: '',
       address: '',
-      idProof: '',
-      idProofFile: null,
       role: 'Pharmacist',
     });
   };
 
   const removeStaffMember = (id) => {
-    setStaffMembers((prev) => prev.filter((member) => member.id !== id));
+    const token = localStorage.getItem('medVisionToken');
+    if (!token) return;
+
+    axios
+      .delete(`${baseURL}/store-staff/${id}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      .then(() => setStaffMembers((prev) => prev.filter((member) => member._id !== id)))
+      .catch((error) => console.error('Failed to remove staff member:', error.message));
+  };
+
+  const toggleStaffStatus = async (member) => {
+    const token = localStorage.getItem('medVisionToken');
+    if (!token) return;
+
+    const nextStatus = member.status === 'Active' ? 'Inactive' : 'Active';
+    try {
+      const response = await axios.patch(
+        `${baseURL}/store-staff/${member._id}/status`,
+        { status: nextStatus },
+        { headers: { Authorization: `Bearer ${token}` } },
+      );
+
+      const updatedStaffMember = response.data.staffMember;
+      setStaffMembers((prev) => prev.map((row) => (row._id === updatedStaffMember._id ? updatedStaffMember : row)));
+    } catch (error) {
+      console.error('Failed to update staff status:', error.message);
+    }
   };
 
   const handleNewMedicineChange = (e) => {
@@ -426,6 +378,12 @@ const StoreDashboard = () => {
   };
 
   useEffect(() => {
+    if (selectedSection === 'staff') {
+      loadStoreStaffMembers();
+    }
+    if (selectedSection === 'orders' || selectedSection === 'reports') {
+      loadStoreOrders();
+    }
     if (selectedSection === 'prescription') {
       loadStorePrescriptions();
     }
@@ -457,10 +415,10 @@ const StoreDashboard = () => {
     const contactQuery = staffSearchContact.trim().toLowerCase();
     const emailQuery = staffSearchEmail.trim().toLowerCase();
 
-    const firstNameMatch = firstNameQuery ? member.firstName.toLowerCase().includes(firstNameQuery) : true;
-    const lastNameMatch = lastNameQuery ? member.lastName.toLowerCase().includes(lastNameQuery) : true;
-    const contactMatch = contactQuery ? member.contact.toLowerCase().includes(contactQuery) : true;
-    const emailMatch = emailQuery ? member.email.toLowerCase().includes(emailQuery) : true;
+    const firstNameMatch = firstNameQuery ? String(member.firstName || '').toLowerCase().includes(firstNameQuery) : true;
+    const lastNameMatch = lastNameQuery ? String(member.lastName || '').toLowerCase().includes(lastNameQuery) : true;
+    const contactMatch = contactQuery ? String(member.contact || '').toLowerCase().includes(contactQuery) : true;
+    const emailMatch = emailQuery ? String(member.email || '').toLowerCase().includes(emailQuery) : true;
 
     return firstNameMatch && lastNameMatch && contactMatch && emailMatch;
   });
@@ -591,8 +549,6 @@ const StoreDashboard = () => {
                             contact: '',
                             email: '',
                             address: '',
-                            idProof: '',
-                            idProofFile: null,
                             role: 'Pharmacist',
                           });
                         }}
@@ -654,26 +610,43 @@ const StoreDashboard = () => {
                       </div>
                     )}
                     <div className="space-y-4">
-                      {filteredStaffMembers.length ? (
+                      {staffLoading ? (
+                        <div className="rounded-3xl border border-slate-200 bg-slate-50 p-8 text-center text-sm text-slate-500">
+                          Loading staff members...
+                        </div>
+                      ) : filteredStaffMembers.length ? (
                         filteredStaffMembers.map((member) => (
-                          <div key={member.id} className="flex flex-col gap-3 rounded-3xl border border-slate-200 p-4 sm:flex-row sm:items-center sm:justify-between">
+                          <div key={member._id} className="flex flex-col gap-3 rounded-3xl border border-slate-200 p-4 sm:flex-row sm:items-center sm:justify-between">
                             <div>
-                              <p className="font-semibold text-slate-900">{`${member.firstName} ${member.middleName ? `${member.middleName} ` : ''}${member.lastName}`}</p>
-                              <p className="text-sm text-slate-500">{member.role}</p>
-                              <p className="text-sm text-slate-500">{member.contact}</p>
-                              <p className="text-sm text-slate-500">{member.email}</p>
-                              <p className="text-sm text-slate-500">{member.address}</p>
-                              <p className="text-sm text-slate-500">ID: {member.idProof}</p>
+                              <p className="text-sm text-slate-700">
+                                <span className="font-semibold text-slate-900">Name:</span>{' '}
+                                {`${member.firstName} ${member.middleName ? `${member.middleName} ` : ''}${member.lastName}`}
+                              </p>
+                              <p className="text-sm text-slate-700">
+                                <span className="font-semibold text-slate-900">Role:</span> {member.role}
+                              </p>
+                              <p className="text-sm text-slate-700">
+                                <span className="font-semibold text-slate-900">Contact Number:</span> {member.contact}
+                              </p>
+                              <p className="text-sm text-slate-700">
+                                <span className="font-semibold text-slate-900">Email ID:</span> {member.email}
+                              </p>
                             </div>
                             <div className="flex flex-wrap gap-2">
                               <button
                                 onClick={() => handleEditStaff(member)}
                                 className="inline-flex items-center gap-2 rounded-2xl bg-sky-600 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-700 transition"
                               >
-                                Update
+                                Edit
                               </button>
                               <button
-                                onClick={() => removeStaffMember(member.id)}
+                                onClick={() => toggleStaffStatus(member)}
+                                className={`inline-flex items-center gap-2 rounded-2xl px-4 py-2 text-sm font-semibold transition ${member.status === 'Active' ? 'bg-amber-50 text-amber-700 hover:bg-amber-100' : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'}`}
+                              >
+                                {member.status === 'Active' ? 'Deactivate' : 'Activate'}
+                              </button>
+                              <button
+                                onClick={() => removeStaffMember(member._id)}
                                 className="inline-flex items-center gap-2 rounded-2xl bg-red-50 px-4 py-2 text-sm font-semibold text-red-600 hover:bg-red-100 transition"
                               >
                                 <Trash2 size={16} /> Remove
@@ -765,18 +738,6 @@ const StoreDashboard = () => {
                           />
                         </div>
                         <div>
-                          <label className="block text-sm font-medium text-slate-700">Upload ID Proof</label>
-                          <input
-                            type="file"
-                            accept="image/*,.pdf"
-                            onChange={handleStaffFileChange}
-                            className="mt-1 block w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-blue-500"
-                          />
-                          {newStaff.idProofFile && (
-                            <p className="mt-2 text-sm text-slate-500">Selected file: {newStaff.idProofFile.name}</p>
-                          )}
-                        </div>
-                        <div>
                           <label className="block text-sm font-medium text-slate-700">Role</label>
                           <select
                             name="role"
@@ -808,8 +769,6 @@ const StoreDashboard = () => {
                             contact: '',
                             email: '',
                             address: '',
-                            idProof: '',
-                            idProofFile: null,
                             role: 'Pharmacist',
                           });
                         }}
@@ -972,7 +931,15 @@ const StoreDashboard = () => {
                 </div>
                 <div className="grid gap-6 lg:grid-cols-[300px_1fr]">
                   <div className="space-y-3">
-                    {orders.map((order, index) => {
+                    {ordersLoading ? (
+                      <div className="rounded-3xl border border-slate-200 bg-slate-50 p-8 text-center text-sm text-slate-500">
+                        Loading orders...
+                      </div>
+                    ) : orders.length === 0 ? (
+                      <div className="rounded-3xl border border-slate-200 bg-slate-50 p-8 text-center text-sm text-slate-500">
+                        No orders available yet.
+                      </div>
+                    ) : orders.map((order, index) => {
                       const active = order.id === selectedOrderId;
                       return (
                         <button
@@ -995,7 +962,7 @@ const StoreDashboard = () => {
                           </div>
                           <div className="mt-3 flex items-center justify-between text-sm text-slate-500">
                             <span>{order.date}</span>
-                            <span className={`rounded-full px-3 py-1 text-xs font-semibold ${order.status === 'Completed' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
+                            <span className={`rounded-full px-3 py-1 text-xs font-semibold ${getOrderStatusBadgeClass(order.status)}`}>
                               {order.status}
                             </span>
                           </div>
@@ -1004,7 +971,11 @@ const StoreDashboard = () => {
                     })}
                   </div>
                   <div className="rounded-3xl border border-slate-200 bg-slate-50 p-6">
-                    {selectedOrder ? (
+                    {ordersLoading ? (
+                      <div className="rounded-3xl border border-slate-200 bg-white p-8 text-center text-sm text-slate-500">
+                        Loading order details...
+                      </div>
+                    ) : selectedOrder ? (
                       <>
                         <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                           <div>
@@ -1012,7 +983,7 @@ const StoreDashboard = () => {
                             <h3 className="text-2xl font-semibold text-slate-900">Order #{selectedOrder.id}</h3>
                             <p className="text-sm text-slate-500">{selectedOrder.customer} • {selectedOrder.date}</p>
                           </div>
-                          <span className={`inline-flex rounded-full px-4 py-2 text-sm font-semibold ${selectedOrder.status === 'Completed' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
+                          <span className={`inline-flex rounded-full px-4 py-2 text-sm font-semibold ${getOrderStatusBadgeClass(selectedOrder.status)}`}>
                             {selectedOrder.status}
                           </span>
                         </div>
@@ -1029,8 +1000,8 @@ const StoreDashboard = () => {
                         <div className="mt-6 rounded-3xl bg-white p-4">
                           <p className="text-sm font-medium text-slate-500">Order items</p>
                           <div className="mt-4 space-y-3">
-                            {selectedOrder.items.map((item) => (
-                              <div key={item.name} className="flex items-center justify-between rounded-2xl border border-slate-200 px-4 py-3">
+                            {selectedOrder.items.map((item, index) => (
+                              <div key={item.id || `${item.name}-${index}`} className="flex items-center justify-between rounded-2xl border border-slate-200 px-4 py-3">
                                 <div>
                                   <p className="font-medium text-slate-900">{item.name}</p>
                                   <p className="text-sm text-slate-500">Qty {item.qty}</p>

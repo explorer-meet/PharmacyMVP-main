@@ -7,7 +7,9 @@ import Loader from '../components/Loader';
 import PrescriptionDialog from '../components/PrescriptionDialog';
 
 const Dashboard = () => {
+    const latestOrderStorageKey = 'medVisionLatestOrderId';
     const [userData, setUserData] = useState(null);
+    const [userOrders, setUserOrders] = useState([]);
     const [sidebarOpen, setSidebarOpen] = useState(false);
     const [loading, setLoading] = useState(true);
     const [isPrescriptionDialogOpen, setIsPrescriptionDialogOpen] = useState(false);
@@ -341,15 +343,21 @@ const Dashboard = () => {
         try {
             setPlacingPrescriptionOrder(true);
 
-            await axios.post(`${baseURL}/additemstocart`, {
+            const response = await axios.post(`${baseURL}/additemstocart`, {
                 id: userData._id,
                 items: selectedItems,
             });
+
+            const currentOrderId = response.data.orderId || response.data.order?.orderId;
+            if (currentOrderId) {
+                localStorage.setItem(latestOrderStorageKey, currentOrderId);
+            }
 
             setIsRefillModalOpen(false);
             navigate('/addresspage', {
                 state: {
                     cartItems: selectedItems,
+                    orderId: currentOrderId,
                 },
             });
         } catch (error) {
@@ -466,8 +474,24 @@ const Dashboard = () => {
         }
     };
 
+    const fetchMyOrders = async () => {
+        try {
+            const token = localStorage.getItem('medVisionToken');
+            const response = await axios.get(`${baseURL}/orders/me`, {
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                },
+            });
+            setUserOrders(response.data.orders || []);
+        } catch (error) {
+            console.error('Error fetching orders:', error.message);
+            setUserOrders([]);
+        }
+    };
+
     useEffect(() => {
         fetchDataFromApi();
+        fetchMyOrders();
         fetchNotificationPreferences();
         fetchMyPrescriptionRequests();
     }, []);
@@ -534,7 +558,7 @@ const Dashboard = () => {
         return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
     };
 
-    const dashboardOrders = (userData?.order || [])
+    const dashboardOrders = (userOrders || [])
         .filter((order) => order.status === 'Booked')
         .map((order) => ({
             ...order,

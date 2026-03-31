@@ -1,28 +1,38 @@
 const mongoose = require("mongoose");
 
-const userVaccinationSchema = new mongoose.Schema(
-  {
-    userId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
-      required: true,
-    },
-    vaccinationId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "VaccinationMaster",
-      required: true,
-    },
-    status: {
-      type: String,
-      enum: ["vaccinated", "not_vaccinated"],
-      default: "not_vaccinated",
-    },
-    vaccinationDate: { type: Date, default: null },
+const userVaccinationSchema = new mongoose.Schema({
+  userId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "User",
+    required: true,
   },
-  { timestamps: true }
-);
-
-// One record per user per vaccine
-userVaccinationSchema.index({ userId: 1, vaccinationId: 1 }, { unique: true });
+  vaccineId: {
+    type: String,
+    required: true,
+  },
+  vaccineName: {
+    type: String,
+    required: true,
+  },
+  vaccinationDate: {
+    type: Date,
+    required: true,
+  },
+  nextDueDate: {
+    type: Date,
+  },
+  certificateUrl: {
+    type: String,
+  },
+  status: {
+    type: String,
+    enum: ["Completed", "Pending", "Overdue"],
+    default: "Pending",
+  },
+  createdAt: {
+    type: Date,
+    default: Date.now,
+  },
+});
 
 module.exports = mongoose.model("UserVaccination", userVaccinationSchema);

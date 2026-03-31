@@ -1,13 +1,16 @@
 import React, { useEffect, useState } from 'react';
 import { CheckCircle, Package, ArrowLeft, Truck, ShieldCheck, ClipboardList, Home } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { useLocation } from 'react-router-dom';
 import { baseURL } from '../main';
 import axios from 'axios';
 import CheckoutFooter from '../components/CheckoutFooter';
 
 export function OrderConfirmationPage() {
+  const latestOrderStorageKey = 'medVisionLatestOrderId';
+  const location = useLocation();
   const [userdata, setUserData] = useState([]);
-  const latestOrder = userdata?.order?.[userdata.order.length - 1];
+  const [latestOrder, setLatestOrder] = useState(null);
   const estimatedDelivery = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toLocaleDateString('en-IN', {
     day: '2-digit',
     month: 'short',
@@ -17,13 +20,34 @@ export function OrderConfirmationPage() {
   const fetchDataFromApi = async () => {
     try {
       const token = localStorage.getItem('medVisionToken');
-      const response = await axios.get(`${baseURL}/fetchdata`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-      const fetchedData = response.data.userData;
+      const orderId = location.state?.orderId || localStorage.getItem(latestOrderStorageKey);
+      const [userResponse, ordersResponse] = await Promise.all([
+        axios.get(`${baseURL}/fetchdata`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }),
+        orderId
+          ? axios.get(`${baseURL}/orders/${orderId}`, {
+              headers: {
+                Authorization: `Bearer ${token}`,
+              },
+            })
+          : axios.get(`${baseURL}/orders/me`, {
+              headers: {
+                Authorization: `Bearer ${token}`,
+              },
+            }),
+      ]);
+      const fetchedData = userResponse.data.userData;
       setUserData(fetchedData);
+      const resolvedOrder = orderId
+        ? ordersResponse.data.order
+        : (ordersResponse.data.orders || []).find((order) => order.status === 'Booked') || ordersResponse.data.orders?.[0] || null;
+      setLatestOrder(resolvedOrder);
+      if (resolvedOrder?.orderId) {
+        localStorage.setItem(latestOrderStorageKey, resolvedOrder.orderId);
+      }
       localStorage.setItem('userData', JSON.stringify(fetchedData));
     } catch (error) {
       console.error('Error fetching data:', error.message);

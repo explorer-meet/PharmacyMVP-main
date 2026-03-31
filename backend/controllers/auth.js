@@ -1,14 +1,15 @@
 const { StatusCodes } = require("http-status-codes");
 const User = require("../models/user");
-const Doctor = require("../models/doctor");
 const Admin = require("../models/admin")
 const Pharmacy = require("../models/pharmacy");
 const StoreApprovalRequest = require("../models/storeApprovalRequest");
 const Store = require("../models/store");
+const StoreStaff = require("../models/storeStaff");
+const Order = require("../models/order");
 const UserNotification = require("../models/userNotification");
-const VaccinationMaster = require("../models/vaccinationMaster");
-const UserVaccination = require("../models/userVaccination");
 const PrescriptionRequest = require("../models/prescriptionRequest");
+const Prescription = require("../models/prescription");
+const Cart = require("../models/cart");
 const jwt = require("jsonwebtoken");
 const bcrypt = require('bcrypt');
 
@@ -45,6 +46,129 @@ const verifyAdminRequest = (req) => {
             message: "Invalid or expired token",
         };
     }
+};
+
+const generateOrderId = () => `ORD${Date.now().toString(36).toUpperCase()}${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
+
+const getCustomerName = (user) => {
+    if (!user) return 'Unknown Customer';
+    if (user.name) return user.name;
+
+    const fullName = [user.firstName, user.middleName, user.lastName]
+        .filter(Boolean)
+        .join(' ')
+        .trim();
+
+    return fullName || 'Unknown Customer';
+};
+
+const formatOrderDateLabel = (value) => {
+    if (!value) return 'N/A';
+
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) return 'N/A';
+
+    return parsed.toLocaleDateString('en-US', {
+        month: 'short',
+        day: '2-digit',
+    });
+};
+
+const buildOrderTracking = (status, dateLabel) => {
+    const normalizedStatus = String(status || 'Pending').toLowerCase();
+
+    if (normalizedStatus === 'delivered' || normalizedStatus === 'completed') {
+        return [
+            { step: 'Order placed', date: dateLabel, status: 'complete' },
+            { step: 'Dispatched', date: dateLabel, status: 'complete' },
+            { step: 'Delivered', date: dateLabel, status: 'complete' },
+        ];
+    }
+
+    if (normalizedStatus === 'out-delivery' || normalizedStatus === 'out for delivery') {
+        return [
+            { step: 'Order placed', date: dateLabel, status: 'complete' },
+            { step: 'Dispatched', date: dateLabel, status: 'complete' },
+            { step: 'Out for delivery', date: dateLabel, status: 'active' },
+        ];
+    }
+
+    if (normalizedStatus === 'in-transit' || normalizedStatus === 'shipped' || normalizedStatus === 'dispatched') {
+        return [
+            { step: 'Order placed', date: dateLabel, status: 'complete' },
+            { step: 'Dispatched', date: dateLabel, status: 'active' },
+            { step: 'Delivered', date: '', status: 'upcoming' },
+        ];
+    }
+
+    return [
+        { step: 'Order placed', date: dateLabel, status: 'complete' },
+        { step: 'Packed', date: dateLabel, status: 'active' },
+        { step: 'Out for delivery', date: '', status: 'upcoming' },
+    ];
+};
+
+const mapPatientOrder = (order) => ({
+    _id: order._id,
+    orderId: order.orderId,
+    userId: order.userId,
+    storeId: order.storeId,
+    items: (order.items || []).map((item) => ({
+        id: item.id,
+        name: item.name,
+        quantity: Number(item.quantity) || 0,
+        price: Number(item.price) || 0,
+    })),
+    totalPrice: Number(order.totalPrice) || 0,
+    payment: order.payment || 'Pending',
+    address: order.address || 'TBD',
+    status: order.status || 'Pending',
+    createdAt: order.createdAt,
+    updatedAt: order.updatedAt,
+});
+
+const mapStoreOrder = (order) => {
+    const user = order.userId || {};
+    const dateLabel = formatOrderDateLabel(order.createdAt);
+
+    return {
+        id: order.orderId,
+        orderId: order.orderId,
+        userId: user._id || null,
+        storeId: order.storeId,
+        customer: getCustomerName(user),
+        customerEmail: user.email || 'N/A',
+        customerContact: user.mobile || 'N/A',
+        total: Number(order.totalPrice) || 0,
+        status: order.status || 'Pending',
+        date: dateLabel,
+        address: order.address || 'N/A',
+        payment: order.payment || 'Pending',
+        items: (order.items || []).map((item) => ({
+            id: item.id,
+            name: item.name,
+            qty: Number(item.quantity) || 0,
+            price: Number(item.price) || 0,
+        })),
+        tracking: buildOrderTracking(order.status, dateLabel),
+    };
+};
+
+const resolveOrderStoreId = async (preferredStoreId) => {
+    if (preferredStoreId) {
+        const matchedStore = await Store.findById(preferredStoreId).select('_id').lean();
+        if (matchedStore?._id) {
+            return matchedStore._id;
+        }
+    }
+
+    const activeStore = await Store.findOne({ status: 'Active' }).sort({ createdAt: 1 }).select('_id').lean();
+    if (activeStore?._id) {
+        return activeStore._id;
+    }
+
+    const fallbackStore = await Store.findOne({}).sort({ createdAt: 1 }).select('_id').lean();
+    return fallbackStore?._id || null;
 };
 
 const signUp = async (req, res) => {
@@ -118,26 +242,7 @@ const signUp = async (req, res) => {
             res.status(StatusCodes.CREATED).json({ message: "User created successfully" });
         }
 
-        else {
-            const existingUser = await Doctor.findOne({ email });
-            if (existingUser) {
-                return res.status(StatusCodes.BAD_REQUEST).json({
-                    message: "User already registered",
-                });
-            }
 
-            // Create new user data
-            const doctorData = {
-                regNo,
-                name,
-                email,
-                hash_password,
-            };
-
-            // Save the new user
-            const newUser = await Doctor.create(doctorData);
-            res.status(StatusCodes.CREATED).json({ message: "Doctor added successfully" });
-        }
 
     } catch (error) {
         // Catch any other errors
@@ -148,7 +253,7 @@ const signUp = async (req, res) => {
 
 const signIn = async (req, res) => {
     try {
-        const { isDoctor = false, userType = 'patient', email, password } = req.body;
+        const { userType = 'patient', email, password } = req.body;
 
         if (!email || !password) {
             return res.status(400).json({
@@ -211,36 +316,11 @@ const signIn = async (req, res) => {
 };
 
 
-const UpdateDoctorProfile = async (req, res) => {
-    try {
-        const { regNo, address, fees, hospital, specialist, experience, location, assign, status } = req.body;
-
-        // Find and update the doctor's profile based on the registration number
-        const updatedDoctor = await Doctor.findOneAndUpdate(
-            { regNo },
-            { address, fees, hospital, specialist, experience, location, assign, status },
-            { new: true, runValidators: true } // Options: return the updated document and run validation
-        );
-
-        if (!updatedDoctor) {
-            return res.status(404).json({ message: 'Doctor not found' });
-        }
-
-        res.status(200).json({
-            message: 'Doctor profile updated successfully',
-            doctor: updatedDoctor,
-        });
-    } catch (error) {
-        res.status(500).json({ message: 'Error updating doctor profile', error });
-    }
-};
-
-
 const fetchData = async (req, res) => {
     try {
         const decoded = req.user;
 
-        const userModel = decoded.role === 'Doctor' ? Doctor : User;
+        const userModel = decoded.role === 'Store' ? Store : User;
 
         const userData = await userModel
             .findById(decoded._id)
@@ -427,254 +507,6 @@ const AdminfetchData = async (req, res) => {
     }
 };
 
-const doctorListAssigned = async (req, res) => {
-    try {
-        // Query to find all doctors with assign value as "assign"
-        const assignedDoctors = await Doctor.find({ assign: 'true' });
-        res.status(200).json({ success: true, doctors: assignedDoctors });
-    } catch (error) {
-        console.error(error.message);
-        res.status(500).json({ success: false, message: 'Server error' });
-    }
-};
-
-const fetchupdateddoctors = async (req, res) => {
-    try {
-        // Query to find all doctors with assign value as "assign"
-        const acceptedDoctors = await Doctor.find({ assign: 'false' });
-        res.status(200).json({ success: true, doctors: acceptedDoctors });
-    } catch (error) {
-        console.error(error.message);
-        res.status(500).json({ success: false, message: 'Server error' });
-    }
-};
-
-const updatedoctorstatus = async (req, res) => {
-    try {
-        const { regno, assign, status } = req.body; // Extract data from request body
-
-        const updatedDoctor = await Doctor.findOneAndUpdate(
-            { regNo: regno }, // Match doctor by regno
-            { assign, status }, // Update these fields
-            { new: true } // Return the updated document
-        );
-
-        if (!updatedDoctor) {
-            return res.status(404).json({ message: "Doctor not found" });
-        }
-
-        res.status(200).json({
-            message: "Doctor accepted successfully",
-            doctor: updatedDoctor
-        });
-    } catch (error) {
-        console.error("Error updating doctor:", error);
-        res.status(500).json({ message: "Internal server error" });
-    }
-};
-
-const updateavailability = async (req, res) => {
-    try {
-        const { regno, slots } = req.body;
-
-        // Find doctor by regno and update the available field
-        const updatedDoctor = await Doctor.findOneAndUpdate(
-            { regNo: regno }, // Match the regno
-            { $set: { available: slots } }, // Update the available field
-            { new: true } // Return the updated document
-        );
-
-        if (!updatedDoctor) {
-            return res.status(404).json({ success: false, message: 'Doctor not found' });
-        }
-
-        res.status(200).json({ success: true, doctor: updatedDoctor });
-    } catch (error) {
-        console.error(error.message);
-        res.status(500).json({ success: false, message: 'Server error' });
-    }
-};
-
-const fetchavailableslots = async (req, res) => {
-    try {
-        const { regno } = req.body;
-
-        // Find doctor by regno
-        const doctor = await Doctor.findOne({ regNo: regno });
-
-        if (!doctor) {
-            return res.status(404).json({ success: false, message: 'Doctor not found' });
-        }
-
-        // Return the available array
-        res.status(200).json({
-            success: true,
-            available: doctor.available, // Include the available array
-        });
-    } catch (error) {
-        console.error("Error fetching available slots:", error.message);
-        res.status(500).json({
-            success: false,
-            message: 'Server error',
-        });
-    }
-};
-
-const confirmslot = async (req, res) => {
-    const { regNo, name, slot } = req.body;
-
-    try {
-        const doctor = await Doctor.findOne({ regNo });
-        const user = await User.findOne({ name });
-
-
-        if (!doctor) return res.status(404).json({ success: false, message: "Doctor not found" });
-        if (!user) return res.status(404).json({ success: false, message: "User not found" });
-
-
-        const slotIndex = doctor.available.indexOf(slot);
-        if (slotIndex === -1) {
-            return res.status(400).json({ success: false, message: "Slot not available" });
-        }
-
-        // Remove the slot from the available slots
-        doctor.available.splice(slotIndex, 1);
-
-        doctor.appointments.push({ patientName: name, slot });
-        user.appointments.push({ regNo, slot });
-
-        await doctor.save();
-        await user.save();
-
-        res.status(200).json({ success: true, message: "Slot confirmed successfully" });
-    } catch (error) {
-        console.error("Error:", error.message);
-        res.status(500).json({ success: false, message: "Server error" });
-    }
-};
-
-const getnames = async (req, res) => {
-    const regNos = req.body.regNos;
-    try {
-        // Fetch names based on regNo from the database
-        console.log(regNos); // Logs regNos to check what is being received
-        const doctors = await Doctor.find({ regNo: { $in: regNos } }, 'regNo name');
-
-        // Send the response back to the client
-        res.status(200).json(doctors);  // Use res.json to send the data as JSON
-    } catch (error) {
-        console.error("Error:", error.message);
-        res.status(500).json({ success: false, message: "Server error" });
-    }
-};
-
-const linkgiven = async (req, res) => {
-    const { regNo, videoLink, patientName } = req.body;
-
-    // Check if the required fields are provided
-    if (!videoLink || !patientName || !regNo) {
-        return res.status(400).json({ success: false, message: 'Missing required fields' });
-    }
-
-    try {
-        // Find the patient by name
-        const user = await User.findOne({ name: patientName });
-
-        // Check if the user exists
-        if (!user) {
-            return res.status(404).json({ success: false, message: 'Patient not found' });
-        }
-
-        // Check if the regNo and link are not null/undefined
-        if (typeof regNo !== 'number' || typeof videoLink !== 'string') {
-            return res.status(400).json({ success: false, message: 'Invalid data type for regNo or videoLink' });
-        }
-
-        // Update the `link` field by appending the new video link and regNo
-        user.link.push({ link: videoLink, regNo: regNo });
-
-        // Save the updated user
-        await user.save();
-
-        // Send a success response
-        return res.status(200).json({ success: true, message: 'Video link updated successfully' });
-    } catch (error) {
-        console.error('Error updating video link:', error);
-        return res.status(500).json({ success: false, message: 'Server error' });
-    }
-};
-
-
-const uploadpres = async (req, res) => {
-    const { medicines, regNo, patientName } = req.body;
-
-    // Check if required fields are present
-    if (!medicines || !patientName || !regNo) {
-        return res.status(400).json({ success: false, message: 'Missing required fields' });
-    }
-
-    try {
-        // Search for the patient in the User Schema
-        const user = await User.findOne({ name: patientName });
-
-        if (!user) {
-            return res.status(404).json({ success: false, message: 'Patient not found' });
-        }
-
-        // Iterate over the medicines array and add regNo to each medicine entry
-        const medicinesWithRegNo = medicines.map(medicine => ({
-            ...medicine,
-            regNo: regNo  // Add regNo to each medicine object
-        }));
-
-        // Push the medicines array (with regNo included) to the user.medicines field
-        user.medicines.push(...medicinesWithRegNo);
-
-        // Save the updated user
-        await user.save();
-
-        return res.status(200).json({
-            success: true,
-            message: 'Prescription uploaded successfully',
-            user
-        });
-    } catch (error) {
-        console.error('Error uploading prescription:', error);
-        return res.status(500).json({ success: false, message: 'Server error' });
-    }
-};
-
-const confirmstatus = async (req, res) => {
-    const { regNo, patientName } = req.body;
-
-    // Check if the required fields are provided
-    try {
-        // Find the patient by name
-        const user = await User.findOne({ name: patientName });
-        const doctor = await Doctor.findOne({ regNo: regNo });
-
-        // Check if the user exists
-        if (!user || !doctor) {
-            return res.status(404).json({ success: false, message: 'Patient not found' });
-        }
-
-
-        // Update the `link` field by appending the new video link and regNo
-        user.confirm.push({ confirm: true, regNo: regNo });
-        doctor.confirm.push({ confirm: true, name: patientName });
-
-        // Save the updated user
-        await user.save();
-        await doctor.save();
-
-        // Send a success response
-        return res.status(200).json({ success: true, message: 'confirm status  updated successfully' });
-    } catch (error) {
-        console.error('Error updating confirm status:', error);
-        return res.status(500).json({ success: false, message: 'Server error' });
-    }
-};
-
 const UpdatePatientProfile = async (req, res) => {
     try {
         const { name, address, mobile, weight, dob, height, sex, bloodgroup } = req.body;
@@ -699,25 +531,6 @@ const UpdatePatientProfile = async (req, res) => {
     }
 };
 
-const fetchDoctors = async (req, res) => {
-    const { name, location } = req.body;
-
-    try {
-        // Query to find a doctor with the given name and location
-        console.log(name, location);
-        const doctorExists = await Doctor.findOne({ name, address: location });
-
-        if (doctorExists) {
-            res.status(200).json({ success: true, message: 'Doctor found', doctor: doctorExists });
-        } else {
-            res.status(404).json({ success: false, message: 'No doctor found with the given name and location' });
-        }
-    } catch (error) {
-        console.error(error.message);
-        res.status(500).json({ success: false, message: 'Server error' });
-    }
-};
-
 const fetchpharmacymedicines = async (req, res) => {
     try {
         // Query to find all medicines 
@@ -731,7 +544,7 @@ const fetchpharmacymedicines = async (req, res) => {
 
 const updateorderedmedicines = async (req, res) => {
     try {
-        const { name, price, id } = req.body;
+        const { name, price, id, medicineId } = req.body;
 
         if (!name || !price || !id) {
             return res.status(400).json({ error: 'Name, Price, and User ID are required' });
@@ -743,32 +556,44 @@ const updateorderedmedicines = async (req, res) => {
             return res.status(404).json({ error: 'User not found' });
         }
 
-        // Check if the medicine already exists in the user's orderedmedicines array
-        const existingMedicine = user.orderedmedicines.find(medicine => medicine.medicine === name);
+        // Find or create cart for this user
+        let cart = await Cart.findOne({ userId: id });
+        if (!cart) {
+            cart = new Cart({ userId: id, items: [] });
+        }
+
+        // Use medicineId as the unique key if available, otherwise use name
+        const uniqueKey = medicineId || name;
+
+        // Check if the medicine already exists in the cart items array
+        const existingMedicine = cart.items.find(item => 
+            (medicineId && item.medicineId === medicineId) || 
+            (!medicineId && item.medicine === name)
+        );
 
         if (existingMedicine) {
             // Increment the quantity if the medicine exists
             existingMedicine.quantity += 1;
         } else {
             // Add a new medicine entry if it doesn't exist
-            user.orderedmedicines.push({
+            cart.items.push({
+                medicineId: medicineId || undefined,
                 medicine: name,
-                quantity: 1, // Default quantity
+                quantity: 1,
                 price: price,
             });
         }
 
-        // Save the user document
-        await user.save();
+        // Save the cart document
+        await cart.save();
 
-        // console.log(`Updated orderedmedicines for user ${id}`);
         res.status(200).json({
-            message: 'Medicine updated successfully',
-            orderedmedicines: user.orderedmedicines
+            message: 'Medicine added to cart successfully',
+            cart: cart.items
         });
     } catch (error) {
-        console.error('Error updating orderedmedicines:', error.message);
-        res.status(500).json({ error: 'Internal server error' });
+        console.error('Error adding to cart:', error.message);
+        res.status(500).json({ error: 'Internal server error', details: error.message });
     }
 };
 
@@ -780,20 +605,28 @@ const updatecartquantity = async (req, res) => {
     }
 
     try {
-        // Find the user and increment the quantity of the specific medicine
-        const updatedUser = await User.findOneAndUpdate(
-            { _id: id, "orderedmedicines.medicine": name }, // Match user and medicine
-            { $inc: { "orderedmedicines.$.quantity": 1 } }, // Increment quantity by 1
-            { new: true } // Return the updated document
-        );
+        // Find the cart for this user
+        const cart = await Cart.findOne({ userId: id });
 
-        if (!updatedUser) {
+        if (!cart) {
+            return res.status(404).json({ error: 'Cart not found for this user' });
+        }
+
+        // Find the medicine in the cart items
+        const medicine = cart.items.find(item => item.medicine === name);
+
+        if (!medicine) {
             return res.status(404).json({ error: 'Medicine not found in the cart' });
         }
 
+        // Increment quantity by 1
+        medicine.quantity += 1;
+
+        await cart.save();
+
         return res.status(200).json({
             message: 'Medicine quantity updated successfully',
-            orderedmedicines: updatedUser.orderedmedicines
+            cart: cart.items
         });
     } catch (error) {
         console.error('Error updating cart quantity:', error);
@@ -804,21 +637,20 @@ const updatecartquantity = async (req, res) => {
 const decreaseupdatecartquantity = async (req, res) => {
     const { name, id } = req.body; // Destructure name from request body
 
-
     if (!name) {
         return res.status(400).json({ error: 'Medicine name is required for updating the quantity' });
     }
 
     try {
-        // Find the user and decrease the quantity of the specific medicine
-        const user = await User.findOne({ _id: id });
+        // Find the cart for this user
+        const cart = await Cart.findOne({ userId: id });
 
-        if (!user) {
-            return res.status(404).json({ error: 'User not found' });
+        if (!cart) {
+            return res.status(404).json({ error: 'Cart not found for this user' });
         }
 
-        // Find the medicine in the array
-        const medicine = user.orderedmedicines.find(item => item.medicine === name);
+        // Find the medicine in the cart items
+        const medicine = cart.items.find(item => item.medicine === name);
 
         if (!medicine) {
             return res.status(404).json({ error: 'Medicine not found in the cart' });
@@ -830,15 +662,13 @@ const decreaseupdatecartquantity = async (req, res) => {
         }
 
         // Decrease the quantity
-        const updatedUser = await User.findOneAndUpdate(
-            { _id: id, "orderedmedicines.medicine": name }, // Match user and medicine
-            { $inc: { "orderedmedicines.$.quantity": -1 } }, // Decrement quantity by 1
-            { new: true } // Return the updated document
-        );
+        medicine.quantity -= 1;
+
+        await cart.save();
 
         return res.status(200).json({
             message: 'Medicine quantity decreased successfully',
-            orderedmedicines: updatedUser.orderedmedicines
+            cart: cart.items
         });
     } catch (error) {
         console.error('Error updating cart quantity:', error);
@@ -853,22 +683,21 @@ const deletemedicine = async (req, res) => {
             return res.status(400).json({ message: 'Name and userID are required' });
         }
 
-        // Find the user by ID and update the orderedmedicines array
-        const updatedUser = await User.findByIdAndUpdate(
-            id, // Find the user by their ID
-            { $pull: { orderedmedicines: { medicine: name } } }, // Remove the medicine object where 'medicine' matches the 'name'
-            { new: true } // Return the updated document
-        );
+        // Find the cart and remove the medicine
+        const cart = await Cart.findOne({ userId: id });
 
-        if (!updatedUser) {
-            return res.status(404).json({ message: 'User not found or medicine not found in order' });
+        if (!cart) {
+            return res.status(404).json({ message: 'Cart not found for this user' });
         }
 
-        await updatedUser.save();
+        // Remove the medicine from cart items
+        cart.items = cart.items.filter(item => item.medicine !== name);
+
+        await cart.save();
 
         res.status(200).json({
-            message: `Medicine '${name}' successfully deleted from user's orders`,
-            updatedOrders: updatedUser.orderedmedicines,
+            message: `Medicine '${name}' successfully deleted from cart`,
+            cart: cart.items,
         });
     } catch (error) {
         console.error('Error deleting medicine:', error);
@@ -906,7 +735,7 @@ const addmedicinetodb = async (req, res) => {
 };
 
 const finalitems = async (req, res) => {
-    const { id, items } = req.body;
+    const { id, items, storeId } = req.body;
 
     // Validate the request
     if (!id) {
@@ -924,42 +753,53 @@ const finalitems = async (req, res) => {
             return res.status(404).json({ error: 'User not found' });
         }
 
-        // Validate existing orders
-        if (user.order && user.order.length > 0) {
-            const incompleteOrder = user.order.some(order =>
-                !order.orderId ||
-                !order.items || order.items.length === 0 ||
-                !order.totalPrice ||
-                order.payment === 'Pending' ||
-                !order.address
-            );
+        const incompleteOrder = await Order.findOne({
+            userId: id,
+            $or: [
+                { payment: 'Pending' },
+                { address: 'TBD' },
+                { status: 'Pending' },
+            ],
+        }).sort({ createdAt: -1 });
 
-            if (incompleteOrder) {
-                return res.status(201).json({
-                    message: 'Kindly proceed with the payment',
-                });
-            }
+        if (incompleteOrder) {
+            return res.status(201).json({
+                message: 'Kindly proceed with the payment',
+                order: mapPatientOrder(incompleteOrder),
+                orderId: incompleteOrder.orderId,
+            });
         }
 
-        // Generate a unique order ID
-        const orderId = Math.random().toString(36).substr(2, 9).toUpperCase();
+        const resolvedStoreId = await resolveOrderStoreId(storeId);
 
-        // Push items into the `order` array
-        const newOrder = {
+        if (!resolvedStoreId) {
+            return res.status(400).json({ error: 'No store available to process this order' });
+        }
+
+        const orderId = generateOrderId();
+
+        const normalizedItems = items.map((item, index) => ({
+            id: String(item.id || index + 1),
+            name: item.name,
+            quantity: Number(item.quantity) || 1,
+            price: Number(item.price) || 0,
+        }));
+
+        const newOrder = await Order.create({
             orderId,
-            items, // Add the items from the request
-            totalPrice: items.reduce((total, item) => total + item.price * item.quantity, 0), // Calculate total price
-            payment: 'Pending', // Placeholder for payment method
-            address: 'TBD', // Placeholder for address
-            status: 'Pending'
-        };
-
-        user.order.push(newOrder); // Push the new order into the user's `order` array
-        await user.save(); // Save the updated user document
+            userId: user._id,
+            storeId: resolvedStoreId,
+            items: normalizedItems,
+            totalPrice: normalizedItems.reduce((total, item) => total + item.price * item.quantity, 0),
+            payment: 'Pending',
+            address: 'TBD',
+            status: 'Pending',
+        });
 
         return res.status(200).json({
             message: 'Medicine added successfully to orders',
-            order: newOrder,
+            order: mapPatientOrder(newOrder),
+            orderId: newOrder.orderId,
         });
     } catch (error) {
         console.error('Error adding items to order:', error.message);
@@ -976,29 +816,19 @@ const finaladdress = async (req, res) => {
     }
 
     try {
-        // Find the user by ID
-        const user = await User.findById(id);
+        const updatedOrder = await Order.findOneAndUpdate(
+            { orderId: orderid, userId: id },
+            { address },
+            { new: true },
+        );
 
-        if (!user) {
-            return res.status(404).json({ error: 'User not found' });
-        }
-
-        // Find the order by orderid in the user's order array
-        const orderIndex = user.order.findIndex(order => order.orderId === orderid);
-
-        if (orderIndex === -1) {
+        if (!updatedOrder) {
             return res.status(404).json({ error: 'Order not found' });
         }
 
-        // Update the address field
-        user.order[orderIndex].address = address;
-
-        // Save the updated user document
-        await user.save();
-
         return res.status(200).json({
             message: 'Address added successfully',
-            updatedOrder: user.order[orderIndex],
+            updatedOrder: mapPatientOrder(updatedOrder),
         });
     } catch (error) {
         console.error('Error updating address:', error.message);
@@ -1015,30 +845,22 @@ const finalpayment = async (req, res) => {
     }
 
     try {
-        // Find the user by ID
-        const user = await User.findById(id);
+        const updatedOrder = await Order.findOneAndUpdate(
+            { orderId: orderid, userId: id },
+            {
+                payment,
+                status: 'Booked',
+            },
+            { new: true },
+        );
 
-        if (!user) {
-            return res.status(404).json({ error: 'User not found' });
-        }
-
-        // Find the order by orderid in the user's order array
-        const orderIndex = user.order.findIndex(order => order.orderId === orderid);
-
-        if (orderIndex === -1) {
+        if (!updatedOrder) {
             return res.status(404).json({ error: 'Order not found' });
         }
 
-        // Update the address field
-        user.order[orderIndex].payment = payment;
-        user.order[orderIndex].status = "Booked";
-
-        // Save the updated user document
-        await user.save();
-
         return res.status(200).json({
             message: 'Payment successfull!',
-            updatedOrder: user.order[orderIndex],
+            updatedOrder: mapPatientOrder(updatedOrder),
         });
     } catch (error) {
         console.error('Error updating address:', error.message);
@@ -1056,37 +878,17 @@ const deletecartItems = async (req, res) => {
     }
 
     try {
-        // Find the user by ID
-        const user = await User.findById(id);
+        // Find and delete the cart for this user
+        const result = await Cart.findOneAndDelete({ userId: id });
 
-        if (!user) {
-            return res.status(404).json({ error: 'User not found' });
+        if (!result) {
+            return res.status(404).json({ error: 'Cart not found for this user' });
         }
 
-        // Clear the `orderedmedicines` array
-        user.orderedmedicines = []; // Set the array to an empty array
-
-        // Save the updated user document
-        await user.save();
-
-        return res.status(200).json({ message: 'Ordered medicines have been cleared successfully.' });
+        return res.status(200).json({ message: 'Cart items have been cleared successfully.' });
     } catch (error) {
-        console.error('Error clearing ordered medicines:', error.message);
+        console.error('Error clearing cart:', error.message);
         return res.status(500).json({ error: 'Internal server error' });
-    }
-};
-
-const doctorchatbotfetchdata = async (req, res) => {
-    const { doctorspecialist } = req.body;
-    console.log("Specialist:", doctorspecialist);
-
-    try {
-        const doctors = await Doctor.find({ specialist: doctorspecialist });
-
-        return res.status(200).json({ doctors }); // ✅ send to frontend
-    } catch (error) {
-        console.error("Error fetching doctors:", error.message);
-        return res.status(500).json({ error: "Internal server error" });
     }
 };
 
@@ -1108,22 +910,22 @@ const uploadPrescriptionFile = async (req, res) => {
         // For now, we'll simulate approval/rejection randomly
         const isApproved = Math.random() > 0.5; // 50% chance of approval
 
-        // You could save the file path to the user's record
+        // Verify the user exists
         const user = await User.findById(userId);
         if (!user) {
             return res.status(404).json({ message: 'User not found' });
         }
 
-        // Add prescription record to user
-        user.prescriptions = user.prescriptions || [];
-        user.prescriptions.push({
+        // Create prescription record in dedicated collection
+        const prescription = new Prescription({
+            userId: userId,
             fileName: req.file.originalname,
             filePath: req.file.path, // In real implementation, this would be the uploaded file URL
             uploadedAt: new Date(),
             status: isApproved ? 'approved' : 'rejected'
         });
 
-        await user.save();
+        await prescription.save();
 
         return res.status(200).json({
             message: isApproved ? 'Prescription approved' : 'Prescription rejected',
@@ -1393,90 +1195,6 @@ const addStore = async (req, res) => {
     }   
 }
 
-// ─── Predefined vaccination list for seeding ───────────────────────────────
-const PREDEFINED_VACCINES = [
-  { name: 'COVID-19', category: 'Respiratory', recommendedFor: 'All Ages', description: 'Protection against Coronavirus disease 2019' },
-  { name: 'Influenza (Flu)', category: 'Respiratory', recommendedFor: 'All Ages', description: 'Annual influenza (flu) shot' },
-  { name: 'Measles, Mumps, Rubella (MMR)', category: 'Childhood', recommendedFor: 'Children & Adults', description: 'Combined MMR live attenuated vaccine' },
-  { name: 'Tetanus, Diphtheria, Pertussis (Tdap)', category: 'Bacterial', recommendedFor: 'All Ages', description: 'Booster recommended every 10 years' },
-  { name: 'Hepatitis A', category: 'Liver', recommendedFor: 'All Ages', description: 'Protection against Hepatitis A virus' },
-  { name: 'Hepatitis B', category: 'Liver', recommendedFor: 'All Ages', description: 'Protection against Hepatitis B virus' },
-  { name: 'Polio (IPV)', category: 'Childhood', recommendedFor: 'Children', description: 'Inactivated poliovirus vaccine' },
-  { name: 'Varicella (Chickenpox)', category: 'Childhood', recommendedFor: 'Children & Adults', description: 'Chickenpox prevention vaccine' },
-  { name: 'Pneumococcal', category: 'Respiratory', recommendedFor: 'Elderly & High-Risk', description: 'Pneumonia and related disease prevention' },
-  { name: 'Meningococcal', category: 'Bacterial', recommendedFor: 'Adolescents & Adults', description: 'Bacterial meningitis prevention' },
-  { name: 'HPV (Human Papillomavirus)', category: 'Cancer Prevention', recommendedFor: 'Adolescents & Adults', description: 'HPV-related cancer prevention' },
-  { name: 'Rotavirus', category: 'Childhood', recommendedFor: 'Infants', description: 'Rotavirus gastroenteritis prevention' },
-  { name: 'Haemophilus influenzae type b (Hib)', category: 'Childhood', recommendedFor: 'Infants & Children', description: 'Hib disease and meningitis prevention' },
-];
-
-const seedVaccinationMasterIfEmpty = async () => {
-  try {
-    const count = await VaccinationMaster.countDocuments();
-    if (count === 0) {
-      await VaccinationMaster.insertMany(PREDEFINED_VACCINES);
-      console.log('Vaccination master data seeded.');
-    }
-  } catch (err) {
-    console.error('Error seeding vaccination master:', err);
-  }
-};
-
-const getVaccinationMaster = async (req, res) => {
-  try {
-    await seedVaccinationMasterIfEmpty();
-    const vaccines = await VaccinationMaster.find().sort({ category: 1, name: 1 });
-    return res.status(StatusCodes.OK).json({ vaccines });
-  } catch (error) {
-    console.error('getVaccinationMaster error:', error);
-    return res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({ message: 'Failed to fetch vaccination master' });
-  }
-};
-
-const getUserVaccinations = async (req, res) => {
-  try {
-    const userId = req.user._id;
-    const records = await UserVaccination.find({ userId }).populate('vaccinationId');
-    return res.status(StatusCodes.OK).json({ records });
-  } catch (error) {
-    console.error('getUserVaccinations error:', error);
-    return res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({ message: 'Failed to fetch user vaccinations' });
-  }
-};
-
-const upsertUserVaccination = async (req, res) => {
-  try {
-    const userId = req.user._id;
-    const { vaccinationId } = req.params;
-    const { status, vaccinationDate } = req.body;
-
-    if (!['vaccinated', 'not_vaccinated'].includes(status)) {
-      return res.status(StatusCodes.BAD_REQUEST).json({ message: 'Invalid status value' });
-    }
-
-    const master = await VaccinationMaster.findById(vaccinationId);
-    if (!master) {
-      return res.status(StatusCodes.NOT_FOUND).json({ message: 'Vaccination not found in master list' });
-    }
-
-    const update = {
-      status,
-      vaccinationDate: status === 'vaccinated' && vaccinationDate ? new Date(vaccinationDate) : null,
-    };
-
-    const record = await UserVaccination.findOneAndUpdate(
-      { userId, vaccinationId },
-      { $set: update },
-      { new: true, upsert: true, setDefaultsOnInsert: true }
-    );
-
-    return res.status(StatusCodes.OK).json({ record });
-  } catch (error) {
-    console.error('upsertUserVaccination error:', error);
-    return res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({ message: 'Failed to update vaccination' });
-  }
-};
-
 const uploadPrescriptionRequest = async (req, res) => {
     try {
         const userId = req.user?._id;
@@ -1502,7 +1220,9 @@ const uploadPrescriptionRequest = async (req, res) => {
         });
     } catch (error) {
         console.error('uploadPrescriptionRequest error:', error);
-        return res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({ message: 'Failed to upload prescription' });
+        return res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({
+            message: error?.message || 'Failed to upload prescription',
+        });
     }
 };
 
@@ -1569,9 +1289,361 @@ const reviewPrescriptionRequest = async (req, res) => {
     }
 };
 
+const getStoreStaffMembers = async (req, res) => {
+    try {
+        const storeId = req.user?._id;
+        const staffMembers = await StoreStaff.find({ storeId }).sort({ createdAt: -1 });
+        return res.status(StatusCodes.OK).json({ staffMembers });
+    } catch (error) {
+        console.error('getStoreStaffMembers error:', error);
+        return res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({ message: 'Failed to fetch staff members' });
+    }
+};
+
+const getStoreOrders = async (req, res) => {
+    try {
+        const storeId = req.user?._id;
+        const orders = await Order.find({ storeId })
+            .populate('userId', 'name firstName middleName lastName email mobile')
+            .sort({ createdAt: -1 });
+
+        return res.status(StatusCodes.OK).json({ orders: orders.map(mapStoreOrder) });
+    } catch (error) {
+        console.error('getStoreOrders error:', error);
+        return res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({ message: 'Failed to fetch store orders' });
+    }
+};
+
+const getMyOrders = async (req, res) => {
+    try {
+        const userId = req.user?._id;
+        const orders = await Order.find({ userId }).sort({ createdAt: -1 }).lean();
+
+        return res.status(StatusCodes.OK).json({ orders: orders.map(mapPatientOrder) });
+    } catch (error) {
+        console.error('getMyOrders error:', error);
+        return res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({ message: 'Failed to fetch user orders' });
+    }
+};
+
+const getOrderById = async (req, res) => {
+    try {
+        const { orderId } = req.params;
+        const query = { orderId };
+
+        if (req.user?.role === 'User') {
+            query.userId = req.user?._id;
+        }
+
+        if (req.user?.role === 'Store') {
+            query.storeId = req.user?._id;
+        }
+
+        const order = await Order.findOne(query).lean();
+
+        if (!order) {
+            return res.status(StatusCodes.NOT_FOUND).json({ message: 'Order not found' });
+        }
+
+        return res.status(StatusCodes.OK).json({ order: mapPatientOrder(order) });
+    } catch (error) {
+        console.error('getOrderById error:', error);
+        return res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({ message: 'Failed to fetch order' });
+    }
+};
+
+const createStoreStaffMember = async (req, res) => {
+    try {
+        const storeId = req.user?._id;
+        const {
+            firstName,
+            middleName = '',
+            lastName,
+            role = 'Pharmacist',
+            email,
+            contact,
+            address = '',
+        } = req.body;
+
+        if (!firstName || !lastName || !email || !contact) {
+            return res.status(StatusCodes.BAD_REQUEST).json({ message: 'Please provide first name, last name, email, and contact' });
+        }
+
+        const staffMember = await StoreStaff.create({
+            storeId,
+            firstName,
+            middleName,
+            lastName,
+            role,
+            email,
+            contact,
+            address,
+            status: 'Active',
+        });
+
+        return res.status(StatusCodes.CREATED).json({
+            message: 'Staff member added successfully',
+            staffMember,
+        });
+    } catch (error) {
+        if (error?.code === 11000) {
+            return res.status(StatusCodes.BAD_REQUEST).json({ message: 'A staff member with this email already exists' });
+        }
+        console.error('createStoreStaffMember error:', error);
+        return res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({ message: 'Failed to add staff member' });
+    }
+};
+
+const updateStoreStaffMember = async (req, res) => {
+    try {
+        const storeId = req.user?._id;
+        const { id } = req.params;
+        const {
+            firstName,
+            middleName = '',
+            lastName,
+            role,
+            email,
+            contact,
+            address = '',
+        } = req.body;
+
+        if (!firstName || !lastName || !email || !contact) {
+            return res.status(StatusCodes.BAD_REQUEST).json({ message: 'Please provide first name, last name, email, and contact' });
+        }
+
+        const staffMember = await StoreStaff.findOneAndUpdate(
+            { _id: id, storeId },
+            {
+                $set: {
+                    firstName,
+                    middleName,
+                    lastName,
+                    role,
+                    email,
+                    contact,
+                    address,
+                },
+            },
+            { new: true, runValidators: true },
+        );
+
+        if (!staffMember) {
+            return res.status(StatusCodes.NOT_FOUND).json({ message: 'Staff member not found' });
+        }
+
+        return res.status(StatusCodes.OK).json({
+            message: 'Staff member updated successfully',
+            staffMember,
+        });
+    } catch (error) {
+        if (error?.code === 11000) {
+            return res.status(StatusCodes.BAD_REQUEST).json({ message: 'A staff member with this email already exists' });
+        }
+        console.error('updateStoreStaffMember error:', error);
+        return res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({ message: 'Failed to update staff member' });
+    }
+};
+
+const updateStoreStaffStatus = async (req, res) => {
+    try {
+        const storeId = req.user?._id;
+        const { id } = req.params;
+        const { status } = req.body;
+
+        if (!['Active', 'Inactive'].includes(status)) {
+            return res.status(StatusCodes.BAD_REQUEST).json({ message: 'Invalid status value' });
+        }
+
+        const staffMember = await StoreStaff.findOneAndUpdate(
+            { _id: id, storeId },
+            { $set: { status } },
+            { new: true },
+        );
+
+        if (!staffMember) {
+            return res.status(StatusCodes.NOT_FOUND).json({ message: 'Staff member not found' });
+        }
+
+        return res.status(StatusCodes.OK).json({
+            message: `Staff member ${status.toLowerCase()} successfully`,
+            staffMember,
+        });
+    } catch (error) {
+        console.error('updateStoreStaffStatus error:', error);
+        return res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({ message: 'Failed to update staff member status' });
+    }
+};
+
+const deleteStoreStaffMember = async (req, res) => {
+    try {
+        const storeId = req.user?._id;
+        const { id } = req.params;
+        const deletedStaff = await StoreStaff.findOneAndDelete({ _id: id, storeId });
+
+        if (!deletedStaff) {
+            return res.status(StatusCodes.NOT_FOUND).json({ message: 'Staff member not found' });
+        }
+
+        return res.status(StatusCodes.OK).json({
+            message: 'Staff member removed successfully',
+        });
+    } catch (error) {
+        console.error('deleteStoreStaffMember error:', error);
+        return res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({ message: 'Failed to remove staff member' });
+    }
+};
+
+const getCart = async (req, res) => {
+    try {
+        const userId = req.user.userId;
+
+        let cart = await Cart.findOne({ userId });
+        
+        if (!cart) {
+            // Return empty cart if user doesn't have one yet
+            return res.status(StatusCodes.OK).json({
+                items: [],
+                message: 'Cart is empty'
+            });
+        }
+
+        return res.status(StatusCodes.OK).json({
+            items: cart.items,
+            message: 'Cart retrieved successfully'
+        });
+    } catch (error) {
+        console.error('getCart error:', error);
+        return res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({ message: 'Failed to retrieve cart' });
+    }
+};
+
+// Vaccination functions
+const seedVaccinationMasterIfEmpty = async () => {
+  try {
+    const VaccinationMaster = require("../models/vaccinationMaster");
+    const count = await VaccinationMaster.countDocuments();
+    if (count === 0) {
+      const vaccinations = [
+        {
+          vaccineId: "BCG",
+          name: "BCG",
+          description: "Bacille Calmette-Guérin",
+          ageGroup: "At Birth",
+          doseSchedule: "Single Dose",
+        },
+        {
+          vaccineId: "OPV",
+          name: "OPV",
+          description: "Oral Polio Vaccine",
+          ageGroup: "6 weeks, 10 weeks, 14 weeks, 16-24 months",
+          doseSchedule: "4 Doses",
+        },
+        {
+          vaccineId: "IPV",
+          name: "IPV",
+          description: "Inactivated Polio Vaccine",
+          ageGroup: "6 weeks, 10 weeks, 14 weeks",
+          doseSchedule: "3 Doses",
+        },
+        {
+          vaccineId: "DPT",
+          name: "DPT",
+          description: "Diphtheria, Pertussis, Tetanus",
+          ageGroup: "6 weeks, 10 weeks, 14 weeks, 18-24 months",
+          doseSchedule: "4 Doses",
+        },
+        {
+          vaccineId: "Hepatitis B",
+          name: "Hepatitis B",
+          description: "Hepatitis B Vaccine",
+          ageGroup: "At Birth, 6 weeks, 10 weeks, 14 weeks",
+          doseSchedule: "4 Doses",
+        },
+        {
+          vaccineId: "Measles",
+          name: "Measles",
+          description: "Measles, Mumps, Rubella",
+          ageGroup: "9-12 months, 16-24 months",
+          doseSchedule: "2 Doses",
+        },
+        {
+          vaccineId: "Typhoid",
+          name: "Typhoid",
+          description: "Typhoid Vaccine",
+          ageGroup: "2+ years",
+          doseSchedule: "1 Dose (Booster every 3 years)",
+        },
+        {
+          vaccineId: "Varicella",
+          name: "Varicella",
+          description: "Chickenpox Vaccine",
+          ageGroup: "12-15 months",
+          doseSchedule: "2 Doses",
+        },
+      ];
+      await VaccinationMaster.insertMany(vaccinations);
+    }
+  } catch (error) {
+    console.log("Vaccination Master seeding error:", error.message);
+  }
+};
+
+const upsertUserVaccination = async (req, res) => {
+  try {
+    const { vaccineId, vaccineName, vaccinationDate, nextDueDate, certificateUrl } = req.body;
+    const userId = req.user.userId;
+
+    const UserVaccination = require("../models/userVaccination");
+    
+    const vaccination = await UserVaccination.findOneAndUpdate(
+      { userId, vaccineId },
+      {
+        userId,
+        vaccineId,
+        vaccineName,
+        vaccinationDate,
+        nextDueDate,
+        certificateUrl,
+        status: vaccinationDate ? "Completed" : "Pending",
+      },
+      { upsert: true, new: true }
+    );
+
+    res.status(StatusCodes.OK).json({
+      status: "success",
+      message: "Vaccination record updated",
+      data: vaccination,
+    });
+  } catch (error) {
+    res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({
+      status: "error",
+      message: error.message,
+    });
+  }
+};
+
+const getUserVaccinations = async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const UserVaccination = require("../models/userVaccination");
+
+    const vaccinations = await UserVaccination.find({ userId });
+
+    res.status(StatusCodes.OK).json({
+      status: "success",
+      data: vaccinations,
+    });
+  } catch (error) {
+    res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({
+      status: "error",
+      message: error.message,
+    });
+  }
+};
+
 module.exports = {
-    signUp, signIn, fetchData, UpdateDoctorProfile, adminsignIn, AdminfetchData, doctorListAssigned, updatedoctorstatus
-    , fetchupdateddoctors, updateavailability, fetchavailableslots, confirmslot, getnames, linkgiven, uploadpres, confirmstatus, UpdatePatientProfile, fetchDoctors, fetchpharmacymedicines, updateorderedmedicines, updatecartquantity, addmedicinetodb, decreaseupdatecartquantity, deletemedicine, finalitems, finaladdress, finalpayment, deletecartItems, doctorchatbotfetchdata, uploadPrescriptionFile, createStoreApprovalRequest, getStoreApprovalRequests, reviewStoreApprovalRequest, getAllStores, updateStoreStatus, addStore, getUserNotificationPreferences, updateUserNotificationPreferences,
-    getVaccinationMaster, getUserVaccinations, upsertUserVaccination,
-    uploadPrescriptionRequest, getMyPrescriptionRequests, getStorePrescriptionRequests, reviewPrescriptionRequest
+    signUp, signIn, fetchData, adminsignIn, AdminfetchData, uploadpres, UpdatePatientProfile, fetchpharmacymedicines, updateorderedmedicines, updatecartquantity, addmedicinetodb, decreaseupdatecartquantity, deletemedicine, finalitems, finaladdress, finalpayment, deletecartItems, uploadPrescriptionFile, createStoreApprovalRequest, getStoreApprovalRequests, reviewStoreApprovalRequest, getAllStores, updateStoreStatus, addStore, getUserNotificationPreferences, updateUserNotificationPreferences,
+    uploadPrescriptionRequest, getMyPrescriptionRequests, getStorePrescriptionRequests, reviewPrescriptionRequest,
+    getStoreOrders, getMyOrders, getOrderById, getStoreStaffMembers, createStoreStaffMember, updateStoreStaffMember, updateStoreStaffStatus, deleteStoreStaffMember, getCart, seedVaccinationMasterIfEmpty, upsertUserVaccination, getUserVaccinations
 };

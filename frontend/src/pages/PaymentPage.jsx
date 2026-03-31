@@ -36,12 +36,14 @@ const paymentMethods = [
 ];
 
 export function PaymentPage() {
+  const latestOrderStorageKey = 'medVisionLatestOrderId';
   const navigate = useNavigate();
   const [selectedMethod, setSelectedMethod] = useState('card');
   const [loading, setLoading] = useState(false);
   const [userdata, setUserData] = useState([]);
   const [account, setAccount] = useState('');
   const location = useLocation();
+  const currentOrderId = location.state?.orderId || localStorage.getItem(latestOrderStorageKey);
   const routeCartItems = location.state?.cartItems || [];
   const fallbackCartItems = (userdata?.orderedmedicines || []).map((medicine, index) => ({
     id: index,
@@ -164,18 +166,23 @@ export function PaymentPage() {
 
     setLoading(true);
     try {
+      if (!currentOrderId) {
+        throw new Error('Order ID not found');
+      }
+
       const response = await axios.post(`${baseURL}/addpayment`, {
         id: userdata?._id,
-        orderid: userdata?.order?.[userdata.order.length - 1]?.orderId,
+        orderid: currentOrderId,
         payment: selectedMethod
       });
 
       if (response.status === 200) {
+        localStorage.setItem(latestOrderStorageKey, currentOrderId);
         setTimeout(() => {
           deletecartitems();
           setLoading(false);
           toast.success(response.data.message);
-          navigate('/orderconfirmation');
+          navigate('/orderconfirmation', { state: { orderId: currentOrderId } });
           console.log(cartItems);
 
         }, 1000);

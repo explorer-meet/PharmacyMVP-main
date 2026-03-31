@@ -8,6 +8,7 @@ import toast from 'react-hot-toast';
 // const ethereum = window.ethereum;
 
 const CartButton = ({ openOnMount = false }) => {
+  const latestOrderStorageKey = 'medVisionLatestOrderId';
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [cartItems, setCartItems] = useState([]);
   const [userData, setUserData] = useState([]);
@@ -30,33 +31,54 @@ const CartButton = ({ openOnMount = false }) => {
     setIsModalOpen(false);
   };
 
-  const fetchDataFromApi = async () => {
+  const fetchCartData = async () => {
     try {
       const token = localStorage.getItem('medVisionToken');
-      const response = await axios.get(`${baseURL}/fetchdata`, {
+      
+      // Fetch user data
+      const userResponse = await axios.get(`${baseURL}/fetchdata`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
       });
-      const fetchedData = response.data.userData;
-  
+      const fetchedData = userResponse.data.userData;
       if (fetchedData) {
-        setUserData(fetchedData); // State update
+        setUserData(fetchedData);
         localStorage.setItem('userData', JSON.stringify(fetchedData));
+      }
+
+      // Fetch cart data
+      const cartResponse = await axios.get(`${baseURL}/cart`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      
+      if (cartResponse.data.items && cartResponse.data.items.length > 0) {
+        const cartItems = cartResponse.data.items.map((item, index) => ({
+          id: index,
+          name: item.medicine,
+          price: item.price,
+          quantity: item.quantity || 1,
+        }));
+        setCartItems(cartItems);
+      } else {
+        setCartItems([]);
       }
     } catch (error) {
       console.error('Error fetching data:', error.message);
+      setCartItems([]);
     }
   };
   
 
   useEffect(() => {
-    fetchDataFromApi();
+    fetchCartData();
   }, []);
 
   useEffect(() => {
     const handleCartUpdated = () => {
-      fetchDataFromApi();
+      fetchCartData();
     };
 
     window.addEventListener('cart-updated', handleCartUpdated);
@@ -71,20 +93,6 @@ const CartButton = ({ openOnMount = false }) => {
       setHasAutoOpened(true);
     }
   }, [openOnMount, userData?._id, hasAutoOpened]);
-
-  useEffect(() => {
-    if (userData?.orderedmedicines?.length > 0) {
-      const updatedCartItems = userData.orderedmedicines.map((medicine, index) => ({
-        id: index,
-        name: medicine.medicine,
-        price: medicine.price,
-        quantity: medicine.quantity || 1,
-      }));
-      setCartItems(updatedCartItems);
-    } else {
-      setCartItems([]);
-    }
-  }, [userData?.orderedmedicines]);
   
 
 
@@ -157,16 +165,21 @@ const CartButton = ({ openOnMount = false }) => {
       });
   
       console.log(response);
+      const currentOrderId = response.data.orderId || response.data.order?.orderId;
+      if (currentOrderId) {
+        localStorage.setItem(latestOrderStorageKey, currentOrderId);
+      }
   
       if (response.status === 200) {
         navigate('/addresspage', {
           state: {
             cartItems: cartItems,
+            orderId: currentOrderId,
           },
         });
       }
       else if(response.status === 201){
-        navigate('/addresspage');
+        navigate('/addresspage', { state: { orderId: currentOrderId } });
         toast.success(response.data.message);
       }
     } catch (error) {

@@ -1,13 +1,28 @@
 const mongoose = require("mongoose");
 
-const vaccinationMasterSchema = new mongoose.Schema(
-  {
-    name: { type: String, required: true, unique: true },
-    description: { type: String, default: "" },
-    category: { type: String, default: "General" },
-    recommendedFor: { type: String, default: "All Ages" },
+const vaccinationMasterSchema = new mongoose.Schema({
+  vaccineId: {
+    type: String,
+    unique: true,
+    required: true,
   },
-  { timestamps: true }
-);
+  name: {
+    type: String,
+    required: true,
+  },
+  description: {
+    type: String,
+  },
+  ageGroup: {
+    type: String,
+  },
+  doseSchedule: {
+    type: String,
+  },
+  createdAt: {
+    type: Date,
+    default: Date.now,
+  },
+});
 
 module.exports = mongoose.model("VaccinationMaster", vaccinationMasterSchema);

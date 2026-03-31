@@ -53,7 +53,6 @@ const Login = () => {
   try {
     let loginPayload = {
       ...formData,
-      isDoctor: false,
       userType,
     };
 
@@ -69,6 +68,8 @@ const Login = () => {
     // Store REAL JWT from backend
     localStorage.setItem("medVisionToken", response.data.token);
     localStorage.setItem("medVisionUserType", loginPayload.userType);
+    // Store user data with consistent key name for all components to use
+    localStorage.setItem("userData", JSON.stringify(response.data.user));
     localStorage.setItem("user", JSON.stringify(response.data.user));
 
     if (loginPayload.userType === 'admin') {

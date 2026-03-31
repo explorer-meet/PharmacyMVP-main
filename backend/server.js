@@ -3,6 +3,8 @@ require("dotenv").config();
 const app = express();
 const connectDB = require("./config/config"); //connecting to the database
 const authRouter = require("./routes/auth");
+const path = require("path");
+const os = require("os");
 
 const cors = require("cors");
 const multer = require("multer");
@@ -50,7 +52,8 @@ const upload = multer({
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-app.use('/uploads', express.static('uploads'));
+const uploadsDir = process.env.UPLOADS_DIR || path.join(os.tmpdir(), 'medvision-uploads');
+app.use('/uploads', express.static(uploadsDir));
 
 // app.use(cors(corsOptions));
 app.use("/api", authRouter);
@@ -61,6 +64,9 @@ const start = async () => {
     const dbconnectstatus = await connectDB(process.env.MONGO_URL);
     if (dbconnectstatus) {
       console.log("Database Connected");
+      // Seed vaccination master data
+      const { seedVaccinationMasterIfEmpty } = require("./controllers/auth");
+      await seedVaccinationMasterIfEmpty();
     }
     else {
       console.log("Error connecting to database");

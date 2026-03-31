@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { baseURL } from '../main';
 import { useNavigate } from 'react-router-dom';
@@ -13,21 +13,26 @@ const Orders = () => {
   const fetchDataFromApi = async () => {
     try {
       const token = localStorage.getItem('medVisionToken');
-      const response = await axios.get(`${baseURL}/fetchdata`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-      const fetchedData = response.data.userData;
+      const [userResponse, ordersResponse] = await Promise.all([
+        axios.get(`${baseURL}/fetchdata`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }),
+        axios.get(`${baseURL}/orders/me`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }),
+      ]);
+      const fetchedData = userResponse.data.userData;
       setUserData(fetchedData);
-
-      // Extract orders from userdata
-      const ordersArray = fetchedData.order || [];
-      setOrders(ordersArray);
+      setOrders(ordersResponse.data.orders || []);
 
       localStorage.setItem('userData', JSON.stringify(fetchedData));
     } catch (error) {
       console.error('Error fetching data:', error.message);
+      setOrders([]);
     }
   };
 

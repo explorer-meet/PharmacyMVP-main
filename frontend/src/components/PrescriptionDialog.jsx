@@ -59,7 +59,7 @@ const PrescriptionDialog = ({ isOpen, onClose, onUploaded }) => {
       onClose();
     } catch (error) {
       console.error('Prescription upload failed:', error.message);
-      toast.error('Failed to upload prescription. Please try again.');
+      toast.error(error?.response?.data?.message || 'Failed to upload prescription. Please try again.');
     } finally {
       setLoading(false);
     }

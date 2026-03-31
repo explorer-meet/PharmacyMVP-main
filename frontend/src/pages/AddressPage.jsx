@@ -8,6 +8,7 @@ import { useLocation } from 'react-router-dom';
 import CheckoutFooter from '../components/CheckoutFooter';
 
 export function AddressPage() {
+  const latestOrderStorageKey = 'medVisionLatestOrderId';
   const navigate = useNavigate();
   const [userdata, setUserData] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -21,6 +22,7 @@ export function AddressPage() {
     zipCode: ''
   });
   const location = useLocation();
+  const currentOrderId = location.state?.orderId || localStorage.getItem(latestOrderStorageKey);
   const cartItems = location.state?.cartItems || [];
   const totalAmount = cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
   const totalItems = cartItems.reduce((sum, item) => sum + item.quantity, 0);
@@ -65,9 +67,13 @@ export function AddressPage() {
     setLoading(true);
 
     try {
+      if (!currentOrderId) {
+        throw new Error('Order ID not found');
+      }
+
       const response = await axios.post(`${baseURL}/addaddress`, {
         id: userdata?._id,
-        orderid: userdata?.order?.[userdata.order.length - 1]?.orderId,
+        orderid: currentOrderId,
         address: formData.address
       });
 
@@ -77,7 +83,8 @@ export function AddressPage() {
           toast.success(response.data.message);
           navigate('/payments', {
             state: {
-              cartItems: cartItems
+              cartItems: cartItems,
+              orderId: currentOrderId,
             }
           })
         }, 1000)
