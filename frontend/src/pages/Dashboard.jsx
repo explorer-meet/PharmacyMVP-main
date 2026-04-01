@@ -44,14 +44,16 @@ const Dashboard = () => {
     const [profileImage, setProfileImage] = useState('');
     const [queryForm, setQueryForm] = useState({ subject: '', message: '' });
     const [queryErrors, setQueryErrors] = useState({});
-    const [querySubmitted, setQuerySubmitted] = useState(false);
+    const [showQueryForm, setShowQueryForm] = useState(false);
+    const [querySubmitting, setQuerySubmitting] = useState(false);
+    const [userQueries, setUserQueries] = useState([]);
+    const [queriesLoading, setQueriesLoading] = useState(false);
     const [notifications, setNotifications] = useState({
         sms: true,
         email: true,
     });
     const [notificationSettingsLoading, setNotificationSettingsLoading] = useState(true);
     const [notificationSettingsSaving, setNotificationSettingsSaving] = useState(false);
-    const [notificationSettingsMessage, setNotificationSettingsMessage] = useState(null);
     const [pendingNotificationChange, setPendingNotificationChange] = useState(null);
     const [notificationToggleSuccess, setNotificationToggleSuccess] = useState(false);
     const [isRefillModalOpen, setIsRefillModalOpen] = useState(false);
@@ -89,7 +91,9 @@ const Dashboard = () => {
             setVaccinationMaster(masterRes.data.vaccines || []);
             const map = {};
             (userRes.data.records || []).forEach(r => {
-                map[r.vaccinationId._id] = {
+                const vaccinationMasterId = r?.vaccinationId?._id || r?.vaccinationMasterId?._id || r?.vaccinationMasterId;
+                if (!vaccinationMasterId) return;
+                map[vaccinationMasterId] = {
                     status: r.status,
                     vaccinationDate: r.vaccinationDate ? r.vaccinationDate.substring(0, 10) : '',
                 };
@@ -128,14 +132,63 @@ const Dashboard = () => {
         setQueryErrors({ ...queryErrors, [e.target.name]: undefined });
     };
 
-    const handleQuerySubmit = (e) => {
+    const fetchMyQueries = async () => {
+        const token = localStorage.getItem('medVisionToken');
+        if (!token) return;
+
+        try {
+            setQueriesLoading(true);
+            const response = await axios.get(`${baseURL}/queries`, {
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                },
+            });
+            setUserQueries(response.data.queries || []);
+        } catch (error) {
+            console.error('Error fetching user queries:', error.message);
+            setUserQueries([]);
+        } finally {
+            setQueriesLoading(false);
+        }
+    };
+
+    const handleQuerySubmit = async (e) => {
         e.preventDefault();
         const errs = {};
         if (!queryForm.subject) errs.subject = 'Please select a subject.';
         if (queryForm.message.trim().length < 20) errs.message = 'Minimum 20 characters required.';
         if (Object.keys(errs).length > 0) { setQueryErrors(errs); return; }
-        setQuerySubmitted(true);
-        setQueryForm({ subject: '', message: '' });
+
+        const token = localStorage.getItem('medVisionToken');
+        if (!token) {
+            alert('Please login again to submit your query.');
+            return;
+        }
+
+        try {
+            setQuerySubmitting(true);
+            const response = await axios.post(`${baseURL}/queries`, {
+                subject: queryForm.subject,
+                message: queryForm.message.trim(),
+            }, {
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                },
+            });
+
+            const savedQuery = response.data?.query;
+            if (savedQuery) {
+                setUserQueries((prev) => [savedQuery, ...prev]);
+            }
+            await fetchMyQueries();
+            setShowQueryForm(false);
+            setQueryForm({ subject: '', message: '' });
+        } catch (error) {
+            console.error('Error submitting query:', error.message);
+            alert(error.response?.data?.message || 'Could not submit query right now. Please try again.');
+        } finally {
+            setQuerySubmitting(false);
+        }
     };
 
     const handleProfileChange = (e) => {
@@ -431,21 +484,11 @@ const Dashboard = () => {
                 sms: preferences?.isSmsNotificationOn ?? true,
                 email: preferences?.isEmailNotificationOn ?? true,
             });
-            setNotificationSettingsMessage(null);
         } catch (error) {
             console.error('Error fetching notification settings:', error.message);
-            setNotificationSettingsMessage({
-                type: 'error',
-                text: 'Could not load notification settings right now.',
-            });
         } finally {
             setNotificationSettingsLoading(false);
         }
-    };
-
-    const handleNotificationToggle = (key, value) => {
-        setNotifications((prev) => ({ ...prev, [key]: value }));
-        setNotificationSettingsMessage(null);
     };
 
     const openNotificationToggleDialog = (key, value) => {
@@ -463,37 +506,23 @@ const Dashboard = () => {
         setPendingNotificationChange(null);
     };
 
-    const confirmNotificationToggle = () => {
+    const confirmNotificationToggle = async () => {
         if (!pendingNotificationChange) return;
 
         const { key, value, label } = pendingNotificationChange;
-        handleNotificationToggle(key, value);
-        setNotificationSettingsMessage({
-            type: 'success',
-            text: `${label} notifications ${value ? 'enabled' : 'disabled'}. Click "Save Preferences" to apply changes.`,
-        });
-        setNotificationToggleSuccess(true);
-        window.setTimeout(() => {
-            closeNotificationToggleDialog();
-        }, 850);
-    };
-
-    const handleNotificationSave = async () => {
         const token = localStorage.getItem('medVisionToken');
 
         if (!token) {
-            setNotificationSettingsMessage({
-                type: 'error',
-                text: 'Please log in again to update notification settings.',
-            });
+            alert('Please log in again to update notification settings.');
+            closeNotificationToggleDialog();
             return;
         }
 
         try {
             setNotificationSettingsSaving(true);
             const response = await axios.put(`${baseURL}/user-notifications`, {
-                isSmsNotificationOn: notifications.sms,
-                isEmailNotificationOn: notifications.email,
+                isSmsNotificationOn: key === 'sms' ? value : notifications.sms,
+                isEmailNotificationOn: key === 'email' ? value : notifications.email,
             }, {
                 headers: {
                     Authorization: `Bearer ${token}`,
@@ -505,16 +534,13 @@ const Dashboard = () => {
                 sms: preferences?.isSmsNotificationOn ?? notifications.sms,
                 email: preferences?.isEmailNotificationOn ?? notifications.email,
             });
-            setNotificationSettingsMessage({
-                type: 'success',
-                text: 'Notification settings updated successfully.',
-            });
+            setNotificationToggleSuccess(true);
+            window.setTimeout(() => {
+                closeNotificationToggleDialog();
+            }, 850);
         } catch (error) {
             console.error('Error saving notification settings:', error.message);
-            setNotificationSettingsMessage({
-                type: 'error',
-                text: 'Failed to save notification settings. Please try again.',
-            });
+            alert('Failed to update notification settings. Please try again.');
         } finally {
             setNotificationSettingsSaving(false);
         }
@@ -563,6 +589,8 @@ const Dashboard = () => {
         fetchMyOrders();
         fetchNotificationPreferences();
         fetchMyPrescriptionRequests();
+        fetchMyQueries();
+        loadVaccinations();
     }, []);
 
     useEffect(() => {
@@ -585,6 +613,7 @@ const Dashboard = () => {
         setShowPrescriptions(false);
         setShowNotifications(false);
         setShowRaiseQuery(false);
+        setShowQueryForm(false);
         setShowMyOrders(false);
         setShowMyVaccinations(false);
         setShowProfile(false);
@@ -648,7 +677,22 @@ const Dashboard = () => {
         { icon: Syringe,      text: "My Vaccinations", onClick: () => { const n = !showMyVaccinations;  resetDashboardPanels(); setShowMyVaccinations(n); if (!n) {} else { loadVaccinations(); } setSidebarOpen(false); },           color: "text-teal-600"   },
         { icon: UserCircle,   text: "Profile",         onClick: () => { const n = !showProfile;         resetDashboardPanels(); setShowProfile(n);         setSidebarOpen(false); },           color: "text-slate-600"},
         { icon: Bell,         text: "Notifications",   onClick: () => { const n = !showNotifications;   resetDashboardPanels(); setShowNotifications(n);   setSidebarOpen(false); },           color: "text-amber-500" },
-        { icon: MessageSquare,text: "Raise a Query",   onClick: () => { const n = !showRaiseQuery;      resetDashboardPanels(); setShowRaiseQuery(n);      setSidebarOpen(false); },           color: "text-cyan-600"   },
+        {
+            icon: MessageSquare,
+            text: "Raise a Query",
+            onClick: () => {
+                const n = !showRaiseQuery;
+                resetDashboardPanels();
+                setShowRaiseQuery(n);
+                setShowQueryForm(false);
+                if (n) {
+                    fetchMyQueries();
+                }
+                setSidebarOpen(false);
+            },
+            color: "text-cyan-600",
+            badgeCount: userQueries.filter(q => (q.status || "").toLowerCase() === "open").length,
+        },
     ];
 
     const statsCards = [
@@ -769,9 +813,16 @@ ${sidebarOpen ? "translate-x-0" : "-translate-x-full"} lg:translate-x-0`}>
                                     <div className={`w-9 h-9 rounded-xl flex items-center justify-center bg-white/10 border border-white/10 group-hover:bg-white/20 transition`}>
                                         <item.icon className={`w-4 h-4 ${item.color}`} />
                                     </div>
-                                    <span className="font-semibold text-slate-300 group-hover:text-white text-sm">
-                                        {item.text}
-                                    </span>
+                                    <div className="flex items-center justify-between flex-1 min-w-0">
+                                        <span className="font-semibold text-slate-300 group-hover:text-white text-sm truncate">
+                                            {item.text}
+                                        </span>
+                                        {item.badgeCount > 0 && (
+                                            <span className="ml-3 inline-flex min-w-[1.5rem] h-6 px-2 items-center justify-center rounded-full bg-cyan-500/20 border border-cyan-400/30 text-cyan-200 text-xs font-bold">
+                                                {item.badgeCount}
+                                            </span>
+                                        )}
+                                    </div>
                                 </button>
                             ))}
                         </nav>
@@ -790,36 +841,59 @@ ${sidebarOpen ? "translate-x-0" : "-translate-x-full"} lg:translate-x-0`}>
                 <main className="flex-1 overflow-auto">
                     <div className="max-w-7xl mx-auto p-4 lg:p-8 space-y-8">
                         {/* Welcome Section */}
-                        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-slate-900 via-cyan-950 to-emerald-900 p-8 text-white shadow-2xl">
-                            <div className="absolute -right-12 -top-12 h-48 w-48 rounded-full bg-cyan-400/15 blur-3xl" />
-                            <div className="absolute -left-10 bottom-0 h-40 w-40 rounded-full bg-emerald-400/15 blur-3xl" />
-                            <div className="relative z-10 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
-                                <div>
-                                    <p className="text-xs font-semibold uppercase tracking-[0.25em] text-cyan-200">Patient Dashboard</p>
-                                    <h1 className="mt-2 text-3xl lg:text-4xl font-black leading-tight">
-                                        Welcome back, {userData?.name?.split(' ')[0] || 'User'}!
-                                    </h1>
-                                    <p className="mt-2 text-cyan-100 text-base">
-                                        Here's your health overview for today
-                                    </p>
+                        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-slate-900 via-cyan-950 to-emerald-900 p-7 lg:p-10 text-white shadow-2xl">
+                            {/* decorative blobs */}
+                            <div className="absolute -right-16 -top-16 h-64 w-64 rounded-full bg-cyan-400/20 blur-3xl pointer-events-none" />
+                            <div className="absolute -left-12 bottom-0 h-52 w-52 rounded-full bg-emerald-400/20 blur-3xl pointer-events-none" />
+                            <div className="absolute right-1/3 top-0 h-32 w-32 rounded-full bg-teal-300/10 blur-2xl pointer-events-none" />
+
+                            <div className="relative z-10 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-8">
+                                {/* Left: greeting */}
+                                <div className="flex items-start gap-4">
+                                    {/* avatar circle */}
+                                    <div className="hidden sm:flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-white/10 border border-white/20 text-2xl font-black text-white backdrop-blur-sm">
+                                        {(userData?.name || userData?.firstName || 'U')[0].toUpperCase()}
+                                    </div>
+                                    <div>
+                                        <div className="flex items-center gap-2 mb-1">
+                                            <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-400/20 border border-emerald-400/30 px-3 py-0.5 text-[11px] font-semibold uppercase tracking-widest text-emerald-300">
+                                                <span className="relative flex h-2 w-2">
+                                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                                                    <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-400"></span>
+                                                </span>
+                                                Patient Dashboard
+                                            </span>
+                                        </div>
+                                        <h1 className="text-3xl lg:text-4xl font-black leading-tight tracking-tight">
+                                            {(() => {
+                                                const h = new Date().getHours();
+                                                return h < 12 ? 'Good Morning' : h < 17 ? 'Good Afternoon' : 'Good Evening';
+                                            })()}, {userData?.name?.split(' ')[0] || userData?.firstName || 'User'}!
+                                        </h1>
+                                        <p className="mt-2 text-cyan-200 text-sm lg:text-base leading-relaxed">
+                                            Here's your personal health overview for today. Stay on top of your wellness.
+                                        </p>
+                                    </div>
                                 </div>
 
-                                <div className="lg:min-w-[260px]">
-                                    <div className="rounded-2xl border border-white/15 bg-white/10 backdrop-blur-sm px-5 py-4 space-y-3">
-                                        <div>
-                                            <p className="text-xs text-cyan-200 uppercase tracking-widest">Today's Date</p>
-                                            <p className="text-lg font-bold text-white mt-1">
-                                                {new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                                            </p>
-                                        </div>
-                                        <button
-                                            onClick={() => navigate('/')}
-                                            className="w-full inline-flex items-center gap-2 rounded-xl border border-white/20 bg-white/10 px-4 py-2.5 text-sm font-semibold text-white hover:bg-white/20 transition"
-                                        >
-                                            <Home size={15} />
-                                            Return to Home
-                                        </button>
+                                {/* Right: date + action */}
+                                <div className="lg:min-w-[240px] flex flex-row lg:flex-col gap-3">
+                                    <div className="flex-1 rounded-2xl border border-white/15 bg-white/10 backdrop-blur-sm px-5 py-4">
+                                        <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-cyan-300 mb-1">Today's Date</p>
+                                        <p className="text-xl font-extrabold text-white leading-tight">
+                                            {new Date().toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}
+                                        </p>
+                                        <p className="text-xs text-cyan-200 mt-0.5">
+                                            {new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
+                                        </p>
                                     </div>
+                                    <button
+                                        onClick={() => navigate('/')}
+                                        className="flex-1 lg:flex-none inline-flex items-center justify-center gap-2 rounded-2xl border border-white/20 bg-white/10 px-4 py-3 text-sm font-semibold text-white hover:bg-white/20 active:scale-95 transition-all duration-150 backdrop-blur-sm"
+                                    >
+                                        <Home size={15} />
+                                        Return to Home
+                                    </button>
                                 </div>
                             </div>
                         </div>
@@ -883,7 +957,7 @@ ${sidebarOpen ? "translate-x-0" : "-translate-x-full"} lg:translate-x-0`}>
                                                 <p className="mt-1 text-xs text-blue-100">Review current medicines quickly.</p>
                                             </button>
                                             <button
-                                                onClick={() => { resetDashboardPanels(); setShowRaiseQuery(true); }}
+                                                onClick={() => { resetDashboardPanels(); setShowRaiseQuery(true); setShowQueryForm(false); fetchMyQueries(); }}
                                                 className="rounded-2xl border border-white/15 bg-white/10 px-4 py-4 text-left hover:bg-white/15 transition"
                                             >
                                                 <MessageSquare className="mb-3 text-cyan-200" size={20} />
@@ -1120,15 +1194,6 @@ ${sidebarOpen ? "translate-x-0" : "-translate-x-full"} lg:translate-x-0`}>
                                 </div>
 
                                 <div className="space-y-6">
-                                    {notificationSettingsMessage && (
-                                        <div className={`rounded-xl border px-4 py-3 text-sm ${notificationSettingsMessage.type === 'success'
-                                            ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
-                                            : 'border-rose-200 bg-rose-50 text-rose-700'
-                                            }`}>
-                                            {notificationSettingsMessage.text}
-                                        </div>
-                                    )}
-
                                     <div className="flex items-center justify-between p-4 border border-gray-200 rounded-xl">
                                         <div className="flex items-center space-x-3">
                                             <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
@@ -1183,19 +1248,6 @@ ${sidebarOpen ? "translate-x-0" : "-translate-x-full"} lg:translate-x-0`}>
                                         </ul>
                                     </div>
 
-                                    <div className="flex justify-end">
-                                        <button
-                                            onClick={handleNotificationSave}
-                                            disabled={notificationSettingsLoading || notificationSettingsSaving}
-                                            className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-6 py-2.5 text-sm font-semibold text-white hover:bg-slate-800 transition disabled:cursor-not-allowed disabled:opacity-60"
-                                        >
-                                            {notificationSettingsLoading
-                                                ? 'Loading Preferences...'
-                                                : notificationSettingsSaving
-                                                    ? 'Saving...'
-                                                    : 'Save Preferences'}
-                                        </button>
-                                    </div>
                                 </div>
                             </div>
                         )}
@@ -1214,23 +1266,63 @@ ${sidebarOpen ? "translate-x-0" : "-translate-x-full"} lg:translate-x-0`}>
                                             <p className="text-sm text-gray-500">We typically respond within 24 hours.</p>
                                         </div>
                                     </div>
-                                    <button onClick={() => { setShowRaiseQuery(false); setQuerySubmitted(false); }} className="text-gray-400 hover:text-gray-600 transition">
+                                    <button onClick={() => { setShowRaiseQuery(false); setShowQueryForm(false); }} className="text-gray-400 hover:text-gray-600 transition">
                                         <X size={20} />
                                     </button>
                                 </div>
 
-                                {querySubmitted ? (
-                                    <div className="flex flex-col items-center justify-center py-14 gap-4 text-center">
-                                        <div className="w-20 h-20 rounded-full bg-emerald-100 flex items-center justify-center">
-                                            <Activity className="text-emerald-600" size={36} />
+                                {!showQueryForm && userQueries.length > 0 ? (
+                                    <div className="space-y-5">
+                                        <div className="border border-gray-200 rounded-xl p-4 bg-gray-50">
+                                            <div className="flex items-center justify-between mb-3">
+                                                <h3 className="text-sm font-semibold text-gray-800">Your Queries</h3>
+                                                <button
+                                                    type="button"
+                                                    onClick={fetchMyQueries}
+                                                    className="text-xs font-medium text-cyan-700 hover:text-cyan-800"
+                                                    disabled={queriesLoading}
+                                                >
+                                                    {queriesLoading ? 'Refreshing...' : 'Refresh'}
+                                                </button>
+                                            </div>
+
+                                            {queriesLoading ? (
+                                                <p className="text-xs text-gray-500">Loading your queries...</p>
+                                            ) : (
+                                                <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
+                                                    {userQueries.map((query) => (
+                                                        <div key={query._id} className="bg-white border border-gray-200 rounded-lg p-3">
+                                                            <div className="flex items-start justify-between gap-3">
+                                                                <p className="text-xs font-semibold text-gray-800">{query.subject}</p>
+                                                                <span className="text-[11px] px-2 py-0.5 rounded-full bg-cyan-100 text-cyan-700 capitalize">
+                                                                    {String(query.status || 'open').toLowerCase() === 'resolved'
+                                                                        ? 'answered'
+                                                                        : String(query.status || 'open').replace('_', ' ')}
+                                                                </span>
+                                                            </div>
+                                                            <p className="text-xs text-gray-500 mt-1 line-clamp-2">{query.message}</p>
+                                                            {query.answer && (
+                                                                <div className="mt-2 rounded-md border border-emerald-200 bg-emerald-50 px-2.5 py-2">
+                                                                    <p className="text-[11px] font-semibold text-emerald-800">Store Answer</p>
+                                                                    <p className="mt-0.5 text-xs text-emerald-700">{query.answer}</p>
+                                                                </div>
+                                                            )}
+                                                            <p className="text-[11px] text-gray-400 mt-1">{new Date(query.createdAt).toLocaleString()}</p>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
                                         </div>
-                                        <h3 className="text-2xl font-bold text-gray-900">Query Submitted!</h3>
-                                        <p className="text-gray-500 text-sm max-w-sm">Our pharmacy support team will get back to you within 24 hours. Check your registered email for updates.</p>
+
                                         <button
-                                            onClick={() => setQuerySubmitted(false)}
-                                            className="mt-2 px-6 py-2.5 rounded-xl bg-cyan-600 text-white text-sm font-semibold hover:bg-cyan-700 transition"
+                                            type="button"
+                                            onClick={() => {
+                                                setShowQueryForm(true);
+                                                setQueryErrors({});
+                                            }}
+                                            className="w-full bg-gradient-to-r from-cyan-600 to-blue-600 text-white font-semibold py-3.5 rounded-xl hover:opacity-90 active:scale-[.98] transition flex items-center justify-center gap-2 text-sm shadow-md"
                                         >
-                                            Raise Another Query
+                                            <MessageSquare size={16} /> Raise a Query
                                         </button>
                                     </div>
                                 ) : (
@@ -1299,11 +1391,25 @@ ${sidebarOpen ? "translate-x-0" : "-translate-x-full"} lg:translate-x-0`}>
                                             </ul>
                                         </div>
 
+                                        {userQueries.length > 0 && (
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    setShowQueryForm(false);
+                                                    fetchMyQueries();
+                                                }}
+                                                className="w-full border border-cyan-200 text-cyan-700 font-semibold py-3 rounded-xl hover:bg-cyan-50 transition text-sm"
+                                            >
+                                                Back to Query List
+                                            </button>
+                                        )}
+
                                         <button
                                             type="submit"
+                                            disabled={querySubmitting}
                                             className="w-full bg-gradient-to-r from-cyan-600 to-blue-600 text-white font-semibold py-3.5 rounded-xl hover:opacity-90 active:scale-[.98] transition flex items-center justify-center gap-2 text-sm shadow-md"
                                         >
-                                            <MessageSquare size={16} /> Submit Query
+                                            <MessageSquare size={16} /> {querySubmitting ? 'Submitting...' : 'Submit Query'}
                                         </button>
                                     </form>
                                 )}
@@ -1866,7 +1972,7 @@ ${sidebarOpen ? "translate-x-0" : "-translate-x-full"} lg:translate-x-0`}>
                                         </span>
                                     </div>
                                     <p className="text-base font-semibold text-emerald-700">Preference updated</p>
-                                    <p className="mt-1 text-sm text-slate-600">Your change has been applied locally.</p>
+                                    <p className="mt-1 text-sm text-slate-600">Your change is saved and synced successfully.</p>
                                 </div>
                             ) : (
                                 <>
@@ -1877,7 +1983,7 @@ ${sidebarOpen ? "translate-x-0" : "-translate-x-full"} lg:translate-x-0`}>
                                     </p>
 
                                     <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs text-slate-600">
-                                        Your preference will be applied after you click Save Preferences.
+                                        Your preference will be saved instantly when you click Confirm.
                                     </div>
 
                                     <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
@@ -1891,9 +1997,10 @@ ${sidebarOpen ? "translate-x-0" : "-translate-x-full"} lg:translate-x-0`}>
                                         <button
                                             type="button"
                                             onClick={confirmNotificationToggle}
+                                            disabled={notificationSettingsSaving}
                                             className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800"
                                         >
-                                            Confirm
+                                            {notificationSettingsSaving ? 'Saving...' : 'Confirm'}
                                         </button>
                                     </div>
                                 </>

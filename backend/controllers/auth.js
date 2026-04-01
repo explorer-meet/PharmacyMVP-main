@@ -7,6 +7,7 @@ const Store = require("../models/store");
 const StoreStaff = require("../models/storeStaff");
 const Order = require("../models/order");
 const UserNotification = require("../models/userNotification");
+const UserQuery = require("../models/userQuery");
 const PrescriptionRequest = require("../models/prescriptionRequest");
 const Prescription = require("../models/prescription");
 const Cart = require("../models/cart");
@@ -1878,8 +1879,305 @@ const reuploadPrescriptionRequest = async (req, res) => {
     }
 };
 
+const createUserQuery = async (req, res) => {
+    try {
+        const { subject, message, storeId } = req.body;
+
+        if (!subject || !String(subject).trim()) {
+            return res.status(StatusCodes.BAD_REQUEST).json({
+                message: "Subject is required",
+            });
+        }
+
+        const trimmedMessage = String(message || "").trim();
+        if (trimmedMessage.length < 20) {
+            return res.status(StatusCodes.BAD_REQUEST).json({
+                message: "Message must be at least 20 characters",
+            });
+        }
+
+        const resolvedStoreId = await resolveOrderStoreId(storeId);
+        if (!resolvedStoreId) {
+            return res.status(StatusCodes.BAD_REQUEST).json({
+                message: "No active store available to receive your query",
+            });
+        }
+
+        const createdQuery = await UserQuery.create({
+            userId: req.user._id,
+            storeId: resolvedStoreId,
+            subject: String(subject).trim(),
+            message: trimmedMessage,
+            status: "open",
+        });
+
+        return res.status(StatusCodes.CREATED).json({
+            success: true,
+            message: "Query submitted successfully",
+            query: createdQuery,
+        });
+    } catch (error) {
+        console.error("Error creating user query:", error);
+        return res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({
+            message: "Failed to submit query",
+        });
+    }
+};
+
+const getUserQueries = async (req, res) => {
+    try {
+        const queries = await UserQuery.find({ userId: req.user._id })
+            .sort({ createdAt: -1 })
+            .lean();
+
+        return res.status(StatusCodes.OK).json({
+            success: true,
+            queries,
+        });
+    } catch (error) {
+        console.error("Error fetching user queries:", error);
+        return res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({
+            message: "Failed to fetch queries",
+        });
+    }
+};
+
+const getStoreQueries = async (req, res) => {
+    try {
+        const storeId = req.user?._id;
+        const queries = await UserQuery.find({ storeId })
+            .populate('userId', 'name email mobile')
+            .sort({ status: 1, createdAt: -1 })
+            .lean();
+
+        return res.status(StatusCodes.OK).json({
+            success: true,
+            queries,
+        });
+    } catch (error) {
+        console.error('Error fetching store queries:', error);
+        return res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({
+            message: 'Failed to fetch store queries',
+        });
+    }
+};
+
+const answerStoreQuery = async (req, res) => {
+    try {
+        const storeId = req.user?._id;
+        const { id } = req.params;
+        const answer = String(req.body?.answer || '').trim();
+
+        if (!answer) {
+            return res.status(StatusCodes.BAD_REQUEST).json({
+                message: 'Answer is required',
+            });
+        }
+
+        const updatedQuery = await UserQuery.findOneAndUpdate(
+            { _id: id, storeId },
+            {
+                $set: {
+                    answer,
+                    status: 'resolved',
+                    answeredByStoreId: storeId,
+                    answeredAt: new Date(),
+                },
+            },
+            { new: true }
+        ).populate('userId', 'name email mobile');
+
+        if (!updatedQuery) {
+            return res.status(StatusCodes.NOT_FOUND).json({
+                message: 'Query not found',
+            });
+        }
+
+        return res.status(StatusCodes.OK).json({
+            success: true,
+            message: 'Query answered successfully',
+            query: updatedQuery,
+        });
+    } catch (error) {
+        console.error('Error answering query:', error);
+        return res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({
+            message: 'Failed to answer query',
+        });
+    }
+};
+
+const parseCsvRow = (line) => {
+    const values = [];
+    let current = '';
+    let inQuotes = false;
+
+    for (let i = 0; i < line.length; i += 1) {
+        const ch = line[i];
+
+        if (ch === '"') {
+            if (inQuotes && line[i + 1] === '"') {
+                current += '"';
+                i += 1;
+            } else {
+                inQuotes = !inQuotes;
+            }
+        } else if (ch === ',' && !inQuotes) {
+            values.push(current.trim());
+            current = '';
+        } else {
+            current += ch;
+        }
+    }
+
+    values.push(current.trim());
+    return values;
+};
+
+const normalizeHeader = (header) =>
+    String(header || '')
+        .trim()
+        .toLowerCase()
+        .replace(/[^a-z0-9]/g, '');
+
+const getCsvValue = (rowMap, keys) => {
+    for (const key of keys) {
+        const value = rowMap[key];
+        if (value !== undefined && value !== null && String(value).trim() !== '') {
+            return String(value).trim();
+        }
+    }
+    return '';
+};
+
+const importPatientsFromCsv = async (req, res) => {
+    try {
+        if (!req.file || !req.file.buffer) {
+            return res.status(StatusCodes.BAD_REQUEST).json({
+                message: 'Patients CSV file is required',
+            });
+        }
+
+        const csvText = req.file.buffer.toString('utf8').replace(/^\uFEFF/, '');
+        const lines = csvText
+            .split(/\r?\n/)
+            .map((line) => line.trim())
+            .filter((line) => line.length > 0);
+
+        if (lines.length < 2) {
+            return res.status(StatusCodes.BAD_REQUEST).json({
+                message: 'CSV must include header and at least one patient row',
+            });
+        }
+
+        const headers = parseCsvRow(lines[0]).map(normalizeHeader);
+        const totalRows = lines.length - 1;
+
+        const summary = {
+            totalRows,
+            created: 0,
+            skipped: 0,
+            errors: [],
+        };
+
+        for (let idx = 1; idx < lines.length; idx += 1) {
+            const line = lines[idx];
+            const cells = parseCsvRow(line);
+            const rowNumber = idx + 1;
+            const rowMap = {};
+
+            headers.forEach((header, colIndex) => {
+                rowMap[header] = cells[colIndex] || '';
+            });
+
+            const email = getCsvValue(rowMap, ['email', 'emailid']);
+            if (!email) {
+                summary.skipped += 1;
+                summary.errors.push(`Row ${rowNumber}: Email is required`);
+                continue;
+            }
+
+            const existingUser = await User.findOne({ email }).select('_id').lean();
+            if (existingUser) {
+                summary.skipped += 1;
+                summary.errors.push(`Row ${rowNumber}: Email already exists (${email})`);
+                continue;
+            }
+
+            const firstName = getCsvValue(rowMap, ['firstname']);
+            const middleName = getCsvValue(rowMap, ['middlename']);
+            const lastName = getCsvValue(rowMap, ['lastname']);
+            const mobile = getCsvValue(rowMap, ['mobile', 'contact', 'contactnumber']);
+            const address = getCsvValue(rowMap, ['address']);
+            const city = getCsvValue(rowMap, ['city']);
+            const state = getCsvValue(rowMap, ['state']);
+            const pincode = getCsvValue(rowMap, ['pincode', 'postalcode']);
+            const salutation = getCsvValue(rowMap, ['salutation']);
+            const countryCode = getCsvValue(rowMap, ['countrycode']);
+            const dob = getCsvValue(rowMap, ['dob', 'dateofbirth']);
+            const sex = getCsvValue(rowMap, ['sex', 'gender']);
+            const bloodgroup = getCsvValue(rowMap, ['bloodgroup', 'blood']);
+
+            const weightRaw = getCsvValue(rowMap, ['weight']);
+            const heightRaw = getCsvValue(rowMap, ['height']);
+            const parsedWeight = Number(weightRaw);
+            const parsedHeight = Number(heightRaw);
+
+            const baseName = [firstName, middleName, lastName].filter(Boolean).join(' ').trim() || email.split('@')[0] || 'patient';
+            const uniqueName = `${baseName}-${Math.random().toString(36).slice(2, 8)}`;
+            const temporaryPassword = `MedVision@${Math.random().toString(36).slice(2, 10)}`;
+            const hash_password = await bcrypt.hash(temporaryPassword, 10);
+
+            const userPayload = {
+                name: uniqueName,
+                firstName,
+                middleName,
+                lastName,
+                email,
+                mobile,
+                address,
+                city,
+                state,
+                pincode,
+                salutation,
+                countryCode,
+                dob,
+                sex,
+                bloodgroup,
+                role: 'User',
+                hash_password,
+            };
+
+            if (!Number.isNaN(parsedWeight) && weightRaw !== '') {
+                userPayload.weight = parsedWeight;
+            }
+            if (!Number.isNaN(parsedHeight) && heightRaw !== '') {
+                userPayload.height = parsedHeight;
+            }
+
+            try {
+                await User.create(userPayload);
+                summary.created += 1;
+            } catch (createError) {
+                summary.skipped += 1;
+                summary.errors.push(`Row ${rowNumber}: ${createError.message}`);
+            }
+        }
+
+        return res.status(StatusCodes.OK).json({
+            success: true,
+            message: `Import completed. Created: ${summary.created}, Skipped: ${summary.skipped}`,
+            summary,
+        });
+    } catch (error) {
+        console.error('Error importing patients CSV:', error);
+        return res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({
+            message: 'Failed to import patients CSV',
+        });
+    }
+};
+
 module.exports = {
     signUp, signIn, fetchData, adminsignIn, AdminfetchData, uploadPrescriptionFile, UpdatePatientProfile, fetchpharmacymedicines, updateorderedmedicines, updatecartquantity, addmedicinetodb, decreaseupdatecartquantity, deletemedicine, finalitems, finaladdress, finalpayment, deletecartItems, createStoreApprovalRequest, getStoreApprovalRequests, reviewStoreApprovalRequest, getAllStores, updateStoreStatus, addStore, getUserNotificationPreferences, updateUserNotificationPreferences,
     uploadPrescriptionRequest, reuploadPrescriptionRequest, getMyPrescriptionRequests, getStorePrescriptionRequests, reviewPrescriptionRequest,
-        getStoreOrders, updateOrderTrackingStatus, getMyOrders, getOrderById, getStoreStaffMembers, createStoreStaffMember, updateStoreStaffMember, updateStoreStaffStatus, deleteStoreStaffMember, getCart, seedVaccinationMasterIfEmpty, upsertUserVaccination, getUserVaccinations, getVaccinationMaster, getUserVaccinationsForDashboard, updateUserVaccinationByMasterId
+    getStoreOrders, updateOrderTrackingStatus, getMyOrders, getOrderById, getStoreStaffMembers, createStoreStaffMember, updateStoreStaffMember, updateStoreStaffStatus, deleteStoreStaffMember, getCart, seedVaccinationMasterIfEmpty, upsertUserVaccination, getUserVaccinations, getVaccinationMaster, getUserVaccinationsForDashboard, updateUserVaccinationByMasterId, createUserQuery, getUserQueries, getStoreQueries, answerStoreQuery, importPatientsFromCsv
 };

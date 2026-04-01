@@ -63,10 +63,13 @@ const StoreDashboard = () => {
       maximumFractionDigits: 2,
     }).format(Number(value) || 0);
   const isCompletedOrder = (status) => ['completed', 'delivered'].includes(String(status || '').toLowerCase());
-  const getOrderStatusBadgeClass = (status) =>
-    isCompletedOrder(status)
-      ? 'bg-emerald-100 text-emerald-700'
-      : 'bg-amber-100 text-amber-700';
+  const getTrackingBadge = (trackingStatus) => {
+    const s = (trackingStatus || 'Order Placed').toLowerCase();
+    if (s.includes('delivered') || s.includes('pick up')) return { dot: 'bg-emerald-500', pill: 'bg-emerald-50 text-emerald-700 border border-emerald-200' };
+    if (s.includes('out for') || s.includes('out for delivery')) return { dot: 'bg-blue-500', pill: 'bg-blue-50 text-blue-700 border border-blue-200' };
+    if (s.includes('packed')) return { dot: 'bg-violet-500', pill: 'bg-violet-50 text-violet-700 border border-violet-200' };
+    return { dot: 'bg-amber-400', pill: 'bg-amber-50 text-amber-700 border border-amber-200' };
+  };
   const reportOrdersTotal = orders.length;
   const reportCompletedOrders = orders.filter((order) => isCompletedOrder(order.status)).length;
   const reportPendingOrders = orders.filter((order) => !isCompletedOrder(order.status)).length;
@@ -80,20 +83,20 @@ const StoreDashboard = () => {
   const selectedPrescription = prescriptions.find((item) => item._id === selectedPrescriptionId);
   const [patientsCsvFile, setPatientsCsvFile] = useState(null);
   const [csvUploadMessage, setCsvUploadMessage] = useState('');
+  const [csvImporting, setCsvImporting] = useState(false);
+  const [csvImportSummary, setCsvImportSummary] = useState(null);
   const [revenueSummary] = useState({
     monthly: 6200,
     weekly: 1400,
     revenueToday: 480,
     growth: 14,
   });
-  const [queries, setQueries] = useState([
-    { id: 1, patientName: 'Meera Singh', email: 'meera@email.com', subject: 'Order & Delivery Issue', message: 'My order was supposed to arrive by March 27. It still hasn\'t arrived. Order ID: 1087', status: 'pending', date: 'Mar 26' },
-    { id: 2, patientName: 'Amit Shah', email: 'amit@email.com', subject: 'Medicine Availability Query', message: 'Is Metformin 500mg tablet available in 30-tab packs?', status: 'pending', date: 'Mar 26' },
-    { id: 3, patientName: 'Sneha Patel', email: 'sneha@email.com', subject: 'Refund / Return Request', message: 'I received the wrong medicine. I need to return Antacid tablets. Can you help?', status: 'answered', date: 'Mar 25', answer: 'We apologize for the inconvenience. Please visit our store with your order details for a prompt replacement.' },
-  ]);
-  const [selectedQueryId, setSelectedQueryId] = useState(queries[0]?.id || null);
+  const [queries, setQueries] = useState([]);
+  const [queriesLoading, setQueriesLoading] = useState(false);
+  const [answerSubmitting, setAnswerSubmitting] = useState(false);
+  const [selectedQueryId, setSelectedQueryId] = useState(null);
   const [answerText, setAnswerText] = useState('');
-  const selectedQuery = queries.find((item) => item.id === selectedQueryId);
+  const selectedQuery = queries.find((item) => item._id === selectedQueryId);
 
   const formatShortDate = (value) => {
     if (!value) return 'N/A';
@@ -185,6 +188,27 @@ const StoreDashboard = () => {
       setSelectedPrescriptionId(null);
     } finally {
       setPrescriptionsLoading(false);
+    }
+  };
+
+  const loadStoreQueries = async () => {
+    const token = localStorage.getItem('medVisionToken');
+    if (!token) return;
+
+    try {
+      setQueriesLoading(true);
+      const response = await axios.get(`${baseURL}/queries/store`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const rows = response.data.queries || [];
+      setQueries(rows);
+      setSelectedQueryId((prev) => (rows.some((q) => q._id === prev) ? prev : rows[0]?._id || null));
+    } catch (error) {
+      console.error('Failed to load store queries:', error.message);
+      setQueries([]);
+      setSelectedQueryId(null);
+    } finally {
+      setQueriesLoading(false);
     }
   };
 
@@ -433,25 +457,84 @@ const StoreDashboard = () => {
     if (selectedSection === 'prescription') {
       loadStorePrescriptions();
     }
+    if (selectedSection === 'queries') {
+      loadStoreQueries();
+    }
   }, [selectedSection]);
 
-  const handleSubmitAnswer = (queryId) => {
-    if (!answerText.trim()) return;
-    setQueries((prev) =>
-      prev.map((q) =>
-        q.id === queryId ? { ...q, status: 'answered', answer: answerText } : q
-      )
-    );
-    setAnswerText('');
+  const handleSubmitAnswer = async (queryId) => {
+    const answer = answerText.trim();
+    if (!answer) return;
+
+    const token = localStorage.getItem('medVisionToken');
+    if (!token) return;
+
+    try {
+      setAnswerSubmitting(true);
+      const response = await axios.patch(
+        `${baseURL}/queries/${queryId}/answer`,
+        { answer },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      const updated = response.data.query;
+      setQueries((prev) => prev.map((q) => (q._id === updated._id ? updated : q)));
+      setAnswerText('');
+      toast.success('Answer sent to patient');
+    } catch (error) {
+      console.error('Failed to answer query:', error.message);
+      toast.error(error.response?.data?.message || 'Failed to send answer');
+    } finally {
+      setAnswerSubmitting(false);
+    }
   };
 
   const handlePatientsCsvUpload = (e) => {
     const file = e.target.files?.[0] || null;
     setPatientsCsvFile(file);
+    setCsvImportSummary(null);
     if (file) {
       setCsvUploadMessage(`CSV selected: ${file.name}`);
     } else {
       setCsvUploadMessage('');
+    }
+  };
+
+  const handleImportPatientsCsv = async () => {
+    if (!patientsCsvFile) {
+      setCsvUploadMessage('Please select a CSV file first.');
+      return;
+    }
+
+    const token = localStorage.getItem('medVisionToken');
+    if (!token) {
+      setCsvUploadMessage('Please login again to import patients.');
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append('patientsCsv', patientsCsvFile);
+
+    try {
+      setCsvImporting(true);
+      setCsvUploadMessage('Import in progress...');
+      const response = await axios.post(`${baseURL}/patients/import-csv`, formData, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+
+      setCsvImportSummary(response.data?.summary || null);
+      setCsvUploadMessage(response.data?.message || 'Patients imported successfully.');
+      toast.success('Patient import completed');
+    } catch (error) {
+      const message = error.response?.data?.message || 'Failed to import patients CSV';
+      setCsvImportSummary(null);
+      setCsvUploadMessage(message);
+      toast.error(message);
+    } finally {
+      setCsvImporting(false);
     }
   };
 
@@ -1006,10 +1089,11 @@ const StoreDashboard = () => {
                             </div>
                             <ChevronRight size={20} className={`transition ${active ? 'text-sky-600' : 'text-slate-400'}`} />
                           </div>
-                          <div className="mt-3 flex items-center justify-between text-sm text-slate-500">
-                            <span>{order.date}</span>
-                            <span className={`rounded-full px-3 py-1 text-xs font-semibold ${getOrderStatusBadgeClass(order.status)}`}>
-                              {order.status}
+                          <div className="mt-3 flex items-center justify-between gap-2">
+                            <span className="text-xs text-slate-400">{order.date}</span>
+                            <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ${getTrackingBadge(order.trackingStatus).pill}`}>
+                              <span className={`h-1.5 w-1.5 rounded-full ${getTrackingBadge(order.trackingStatus).dot}`} />
+                              {order.trackingStatus || 'Order Placed'}
                             </span>
                           </div>
                         </button>
@@ -1029,9 +1113,7 @@ const StoreDashboard = () => {
                             <h3 className="text-2xl font-semibold text-slate-900">Order #{selectedOrder.id}</h3>
                             <p className="text-sm text-slate-500">{selectedOrder.customer} • {selectedOrder.date}</p>
                           </div>
-                          <span className={`inline-flex rounded-full px-4 py-2 text-sm font-semibold ${getOrderStatusBadgeClass(selectedOrder.status)}`}>
-                            {selectedOrder.status}
-                          </span>
+
                         </div>
                         <div className="grid gap-4 sm:grid-cols-2">
                           <div className="rounded-3xl bg-white p-4">
@@ -1062,31 +1144,22 @@ const StoreDashboard = () => {
                           </div>
                         </div>
                         <div className="mt-6 rounded-3xl bg-white p-4">
-                          <p className="text-sm font-medium text-slate-500">Tracking status</p>
-                          <div className="mt-4 space-y-4">
-                            <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4">
-                              <p className="text-sm font-semibold text-blue-900 mb-2">Current Status</p>
-                              <p className="text-lg font-bold text-blue-700">{selectedOrder.trackingStatus || 'Order Placed'}</p>
-                            </div>
-                            <div className="border-t border-slate-200 pt-4">
-                              <p className="text-sm font-medium text-slate-600 mb-3">Update Tracking Status</p>
-                              <div className="space-y-2">
-                                {getAvailableTrackingStatuses().map((status) => (
-                                  <button
-                                    key={status}
-                                    onClick={() => handleUpdateTrackingStatus(status)}
-                                    disabled={updatingTrackingStatus || status === (selectedOrder.trackingStatus || 'Order Placed')}
-                                    className={`w-full text-left p-3 rounded-xl border-2 transition-all ${
-                                      status === (selectedOrder.trackingStatus || 'Order Placed')
-                                        ? 'border-green-500 bg-green-50 text-green-700 font-semibold cursor-not-allowed'
-                                        : 'border-slate-200 hover:border-blue-500 hover:bg-blue-50 text-slate-700 disabled:opacity-50'
-                                    }`}
-                                  >
-                                    {status === (selectedOrder.trackingStatus || 'Order Placed') ? '✓ ' : ''}{status}
-                                  </button>
-                                ))}
-                              </div>
-                            </div>
+                          <p className="text-sm font-medium text-slate-500">Update order tracking</p>
+                          <div className="mt-4 space-y-2">
+                            {getAvailableTrackingStatuses().map((status) => (
+                              <button
+                                key={status}
+                                onClick={() => handleUpdateTrackingStatus(status)}
+                                disabled={updatingTrackingStatus || status === (selectedOrder.trackingStatus || 'Order Placed')}
+                                className={`w-full text-left p-3 rounded-xl border-2 transition-all ${
+                                  status === (selectedOrder.trackingStatus || 'Order Placed')
+                                    ? 'border-green-500 bg-green-50 text-green-700 font-semibold cursor-not-allowed'
+                                    : 'border-slate-200 hover:border-blue-500 hover:bg-blue-50 text-slate-700 disabled:opacity-50'
+                                }`}
+                              >
+                                {status === (selectedOrder.trackingStatus || 'Order Placed') ? '✓ ' : ''}{status}
+                              </button>
+                            ))}
                           </div>
                         </div>
                       </>
@@ -1237,13 +1310,21 @@ const StoreDashboard = () => {
                   {/* Queries List */}
                   <div className="border-r border-slate-200 p-6 max-h-[600px] overflow-y-auto">
                     <p className="mb-4 text-sm font-medium text-slate-500">Patient Queries ({queries.length})</p>
+                    {queriesLoading ? (
+                      <div className="rounded-2xl border border-slate-200 bg-slate-50 p-6 text-center text-sm text-slate-500">
+                        Loading queries...
+                      </div>
+                    ) : (
                     <div className="space-y-2">
                       {queries.map((q) => {
-                        const active = selectedQueryId === q.id;
+                        const active = selectedQueryId === q._id;
+                        const patientName = q.userId?.name || 'Unknown Patient';
+                        const normalizedStatus = String(q.status || 'open').toLowerCase();
+                        const isAnswered = normalizedStatus === 'resolved';
                         return (
                           <button
-                            key={q.id}
-                            onClick={() => { setSelectedQueryId(q.id); setAnswerText(q.answer || ''); }}
+                            key={q._id}
+                            onClick={() => { setSelectedQueryId(q._id); setAnswerText(q.answer || ''); }}
                             className={`w-full rounded-2xl border p-3.5 text-left transition ${
                               active
                                 ? 'border-blue-600 bg-blue-50'
@@ -1251,11 +1332,11 @@ const StoreDashboard = () => {
                             }`}
                           >
                             <div className="flex items-start justify-between gap-2 mb-1.5">
-                              <p className="text-sm font-semibold text-slate-800 truncate">{q.patientName}</p>
+                              <p className="text-sm font-semibold text-slate-800 truncate">{patientName}</p>
                               <span className={`inline-flex shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${
-                                q.status === 'answered' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
+                                isAnswered ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
                               }`}>
-                                {q.status === 'answered' ? 'Answered' : 'Pending'}
+                                {isAnswered ? 'Answered' : 'Pending'}
                               </span>
                             </div>
                             <p className="text-xs text-slate-500 truncate">{q.subject}</p>
@@ -1264,6 +1345,7 @@ const StoreDashboard = () => {
                         );
                       })}
                     </div>
+                    )}
                   </div>
 
                   {/* Query Detail & Answer */}
@@ -1272,14 +1354,14 @@ const StoreDashboard = () => {
                       <div>
                         <div className="mb-6 flex items-start justify-between">
                           <div>
-                            <h3 className="text-xl font-semibold text-slate-900">{selectedQuery.patientName}</h3>
-                            <p className="text-sm text-slate-500">{selectedQuery.email}</p>
-                            <p className="mt-2 text-xs text-slate-400">Query Date: {selectedQuery.date}</p>
+                            <h3 className="text-xl font-semibold text-slate-900">{selectedQuery.userId?.name || 'Unknown Patient'}</h3>
+                            <p className="text-sm text-slate-500">{selectedQuery.userId?.email || 'No email available'}</p>
+                            <p className="mt-2 text-xs text-slate-400">Query Date: {formatShortDate(selectedQuery.createdAt)}</p>
                           </div>
                           <span className={`inline-flex rounded-full px-3 py-1 text-sm font-semibold ${
-                            selectedQuery.status === 'answered' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
+                            selectedQuery.status === 'resolved' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
                           }`}>
-                            {selectedQuery.status === 'answered' ? 'Answered' : 'Pending'}
+                            {selectedQuery.status === 'resolved' ? 'Answered' : 'Pending'}
                           </span>
                         </div>
 
@@ -1290,7 +1372,7 @@ const StoreDashboard = () => {
                         </div>
 
                         {/* Answer Section */}
-                        {selectedQuery.status === 'answered' && selectedQuery.answer ? (
+                        {selectedQuery.status === 'resolved' && selectedQuery.answer ? (
                           <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 mb-6">
                             <p className="text-sm font-semibold text-emerald-900 mb-2">Your Answer</p>
                             <p className="text-sm text-emerald-800">{selectedQuery.answer}</p>
@@ -1309,13 +1391,13 @@ const StoreDashboard = () => {
                         )}
 
                         {/* Action Buttons */}
-                        {selectedQuery.status !== 'answered' && (
+                        {selectedQuery.status !== 'resolved' && (
                           <button
-                            onClick={() => handleSubmitAnswer(selectedQuery.id)}
-                            disabled={!answerText.trim()}
+                            onClick={() => handleSubmitAnswer(selectedQuery._id)}
+                            disabled={!answerText.trim() || answerSubmitting}
                             className="inline-flex items-center gap-2 rounded-2xl bg-emerald-600 px-5 py-3 text-sm font-semibold text-white hover:bg-emerald-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
                           >
-                            <Send size={18} /> Submit Answer
+                            <Send size={18} /> {answerSubmitting ? 'Submitting...' : 'Submit Answer'}
                           </button>
                         )}
                       </div>
@@ -1399,7 +1481,49 @@ const StoreDashboard = () => {
                     <p className="mt-2 text-sm font-medium text-slate-700">Selected file: {patientsCsvFile.name}</p>
                   )}
                   {csvUploadMessage && (
-                    <p className="mt-2 text-sm font-medium text-emerald-600">{csvUploadMessage}</p>
+                    <p className={`mt-2 text-sm font-medium ${csvUploadMessage.toLowerCase().includes('failed') || csvUploadMessage.toLowerCase().includes('please') ? 'text-rose-600' : 'text-emerald-600'}`}>
+                      {csvUploadMessage}
+                    </p>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={handleImportPatientsCsv}
+                    disabled={!patientsCsvFile || csvImporting}
+                    className="mt-4 inline-flex items-center rounded-2xl bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-blue-300"
+                  >
+                    {csvImporting ? 'Importing Patients...' : 'Import Patients'}
+                  </button>
+
+                  {csvImportSummary && (
+                    <div className="mt-5 rounded-2xl border border-slate-200 bg-white p-4">
+                      <h3 className="text-sm font-semibold text-slate-900">Import Summary</h3>
+                      <div className="mt-3 grid gap-3 sm:grid-cols-3">
+                        <div className="rounded-xl bg-slate-50 p-3">
+                          <p className="text-xs text-slate-500">Total Rows</p>
+                          <p className="text-lg font-semibold text-slate-900">{csvImportSummary.totalRows || 0}</p>
+                        </div>
+                        <div className="rounded-xl bg-emerald-50 p-3">
+                          <p className="text-xs text-emerald-700">Created</p>
+                          <p className="text-lg font-semibold text-emerald-800">{csvImportSummary.created || 0}</p>
+                        </div>
+                        <div className="rounded-xl bg-amber-50 p-3">
+                          <p className="text-xs text-amber-700">Skipped</p>
+                          <p className="text-lg font-semibold text-amber-800">{csvImportSummary.skipped || 0}</p>
+                        </div>
+                      </div>
+
+                      {Array.isArray(csvImportSummary.errors) && csvImportSummary.errors.length > 0 && (
+                        <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-3">
+                          <p className="text-xs font-semibold text-amber-800">Skipped Row Details</p>
+                          <ul className="mt-2 list-disc space-y-1 pl-5 text-xs text-amber-900">
+                            {csvImportSummary.errors.slice(0, 6).map((err, index) => (
+                              <li key={`${err}-${index}`}>{err}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                    </div>
                   )}
                 </div>
               </div>
