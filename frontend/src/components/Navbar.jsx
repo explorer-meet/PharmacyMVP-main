@@ -199,31 +199,31 @@ const Navbar = () => {
                 ) : (
                 <>
 
-                <div className="border-b border-cyan-200/60 bg-gradient-to-r from-slate-950 via-cyan-950 to-emerald-900 text-white">
+                <div className="border-b border-slate-200 bg-white text-slate-700">
                     <div className="max-w-[1400px] mx-auto flex items-center justify-between gap-4 px-4 sm:px-6 lg:px-10 py-1.5 text-[10px] sm:text-[11px]">
-                        <div className="flex items-center gap-2 text-cyan-100">
-                            <Sparkles className="w-3.5 h-3.5 text-cyan-300" />
+                        <div className="flex items-center gap-2 text-slate-700">
+                            <Sparkles className="w-3.5 h-3.5 text-cyan-600" />
                             <span className="font-semibold tracking-[0.18em] uppercase">Pharmacy First Care</span>
                         </div>
 
-                        <div className="hidden lg:flex items-center gap-4 text-cyan-50/90">
+                        <div className="hidden lg:flex items-center gap-4 text-slate-600">
                             <span className="inline-flex items-center gap-1.5">
-                                <ShieldCheck className="w-3.5 h-3.5 text-emerald-300" />
+                                <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" />
                                 Genuine medicines
                             </span>
                             <span className="inline-flex items-center gap-1.5">
-                                <ShoppingBag className="w-3.5 h-3.5 text-sky-300" />
+                                <ShoppingBag className="w-3.5 h-3.5 text-sky-500" />
                                 Fast doorstep delivery
                             </span>
                             <span className="inline-flex items-center gap-1.5">
-                                <FileText className="w-3.5 h-3.5 text-violet-300" />
+                                <FileText className="w-3.5 h-3.5 text-violet-500" />
                                 Prescription support
                             </span>
                         </div>
                     </div>
                 </div>
 
-                <div className="backdrop-blur-xl bg-white/82 shadow-lg border-b border-cyan-100/70">
+                <div className="bg-white shadow-lg border-b border-cyan-100/70">
 
                 <div className="flex justify-between items-center px-4 sm:px-6 lg:px-10 py-3 max-w-[1400px] mx-auto gap-4">
 

@@ -1,8 +1,21 @@
-import React from 'react'
+import React, { useEffect } from 'react'
+import { useLocation } from 'react-router-dom'
 import { AlertTriangle, Phone, Clock, MapPin, Heart, Thermometer, Stethoscope, Pill } from 'lucide-react'
 import CheckoutFooter from '../components/CheckoutFooter'
 
 export default function EmergencyCare() {
+  const location = useLocation()
+
+  useEffect(() => {
+    if (!location.hash) return
+
+    const id = location.hash.replace('#', '')
+    const section = document.getElementById(id)
+    if (section) {
+      section.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }
+  }, [location.hash])
+
   const emergencyPrecautions = [
     { icon: Heart, title: 'Check breathing first', description: 'Look for chest movement. If not breathing, start CPR if trained.' },
     { icon: Thermometer, title: 'Control heavy bleeding', description: 'Use firm direct pressure with clean cloth and keep pressure steady.' },
@@ -63,7 +76,7 @@ export default function EmergencyCare() {
         </header>
 
         <main className="mt-8 space-y-8">
-          <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <section id="emergency-guidelines" className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             {emergencyPrecautions.map((precaution, index) => (
               <article
                 key={index}

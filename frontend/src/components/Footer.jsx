@@ -56,12 +56,12 @@ function Footer() {
                         <ul className="flex flex-col gap-3">
                             {[
                                 { label: "Online Pharmacy", to: "/onlinePharmacy", icon: <Pill className="w-4 h-4" /> },
-                                { label: "Emergency Care", to: "/emergencyCare", icon: <Activity className="w-4 h-4" /> },
+                                { label: "Emergency Care", to: "/emergencyguidelines", icon: <Activity className="w-4 h-4" /> },
                             ].map(({ label, to, icon }) => (
                                 <li key={label}>
                                     <Link
                                         to={to}
-                                        onClick={scrollSmooth}
+                                        onClick={to.includes("#") ? undefined : scrollSmooth}
                                         className="flex items-center gap-2.5 text-sm text-white/60 hover:text-teal-200 transition-all duration-200 group"
                                     >
                                         <span className="text-white/30 group-hover:text-teal-300 transition-colors duration-200">{icon}</span>
