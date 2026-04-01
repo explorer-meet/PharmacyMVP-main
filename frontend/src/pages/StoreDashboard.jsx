@@ -77,6 +77,53 @@ const StoreDashboard = () => {
   const reportAverageOrderValue = reportOrdersTotal ? reportTotalRevenue / reportOrdersTotal : 0;
   const reportUniqueCustomers = new Set(orders.map((order) => order.customer)).size;
   const reportCompletionRate = reportOrdersTotal ? Math.round((reportCompletedOrders / reportOrdersTotal) * 100) : 0;
+
+  // Calculate dynamic revenue summary from orders
+  const calculateRevenueSummary = () => {
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const weekAgo = new Date(today);
+    weekAgo.setDate(weekAgo.getDate() - 7);
+    const monthAgo = new Date(today);
+    monthAgo.setMonth(monthAgo.getMonth() - 1);
+
+    const todayOrders = orders.filter((order) => {
+      const orderDate = new Date(order.createdAt);
+      return orderDate >= today;
+    });
+    const weekOrders = orders.filter((order) => {
+      const orderDate = new Date(order.createdAt);
+      return orderDate >= weekAgo && orderDate < today;
+    });
+    const monthOrders = orders.filter((order) => {
+      const orderDate = new Date(order.createdAt);
+      return orderDate >= monthAgo && orderDate < today;
+    });
+
+    const revenueToday = todayOrders.reduce((sum, order) => sum + (order.totalPrice || 0), 0);
+    const revenueWeek = weekOrders.reduce((sum, order) => sum + (order.totalPrice || 0), 0);
+    const revenueMonth = monthOrders.reduce((sum, order) => sum + (order.totalPrice || 0), 0);
+    
+    // Growth: percentage change from last week to this week
+    const lastWeekStart = new Date(weekAgo);
+    lastWeekStart.setDate(lastWeekStart.getDate() - 7);
+    const lastWeekOrders = orders.filter((order) => {
+      const orderDate = new Date(order.createdAt);
+      return orderDate >= lastWeekStart && orderDate < weekAgo;
+    });
+    const revenueLastWeek = lastWeekOrders.reduce((sum, order) => sum + (order.totalPrice || 0), 0);
+    const growth = revenueLastWeek > 0 ? Math.round(((revenueWeek - revenueLastWeek) / revenueLastWeek) * 100) : 0;
+
+    return {
+      monthly: revenueMonth,
+      weekly: revenueWeek,
+      revenueToday: revenueToday,
+      growth: growth,
+    };
+  };
+
+  const revenueSummary = calculateRevenueSummary();
+
   const [prescriptions, setPrescriptions] = useState([]);
   const [selectedPrescriptionId, setSelectedPrescriptionId] = useState(null);
   const [prescriptionsLoading, setPrescriptionsLoading] = useState(false);
@@ -85,12 +132,6 @@ const StoreDashboard = () => {
   const [csvUploadMessage, setCsvUploadMessage] = useState('');
   const [csvImporting, setCsvImporting] = useState(false);
   const [csvImportSummary, setCsvImportSummary] = useState(null);
-  const [revenueSummary] = useState({
-    monthly: 6200,
-    weekly: 1400,
-    revenueToday: 480,
-    growth: 14,
-  });
   const [queries, setQueries] = useState([]);
   const [queriesLoading, setQueriesLoading] = useState(false);
   const [answerSubmitting, setAnswerSubmitting] = useState(false);
