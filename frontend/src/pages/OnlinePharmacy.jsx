@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Pill, HeartPulse, Activity, Brain, ShieldPlus, Thermometer, MapPin, ChevronDown, AlertCircle } from 'lucide-react';
+import { Pill, HeartPulse, Activity, Brain, ShieldPlus, Thermometer, MapPin, ChevronDown, AlertCircle, Star } from 'lucide-react';
 import SearchBar from '../components/SearchBar';
 import CartButton from '../components/CartButton';
 import axios from 'axios';
@@ -24,6 +24,8 @@ function OnlinePharmacy() {
   const [medicinename, setMedicineName] = useState(null);
   const [openCartOnLoad, setOpenCartOnLoad] = useState(false);
   const [isSwitchingStore, setIsSwitchingStore] = useState(false);
+  const [storeReviews, setStoreReviews] = useState([]);
+  const [storeReviewsLoading, setStoreReviewsLoading] = useState(false);
 
   const location = useLocation();
   const navigate = useNavigate();
@@ -116,6 +118,24 @@ function OnlinePharmacy() {
       setIsSwitchingStore(false); // ✅ stop switching
     }
   };
+
+  const fetchStoreReviews = async (storeId) => {
+    if (!storeId) {
+      setStoreReviews([]);
+      return;
+    }
+
+    try {
+      setStoreReviewsLoading(true);
+      const response = await axios.get(`${baseURL}/reviews/store/${storeId}?limit=6`);
+      setStoreReviews(response.data?.reviews || []);
+    } catch (error) {
+      console.error('Error fetching store reviews:', error.message);
+      setStoreReviews([]);
+    } finally {
+      setStoreReviewsLoading(false);
+    }
+  };
   // Filter Functions
   const matchesCondition = (medicine, keywords) => {
     if (!keywords.length) return true;
@@ -159,6 +179,7 @@ function OnlinePharmacy() {
   useEffect(() => {
     if (selectedStore) {
       fetchMedicinesByStore(selectedStore);
+      fetchStoreReviews(selectedStore);
     }
   }, [selectedStore]);
 
@@ -503,6 +524,43 @@ function OnlinePharmacy() {
                     ))}
                   </div>
                 </div>
+              </div>
+            )}
+          </div>
+
+          <div className="mt-10 rounded-3xl border border-cyan-100 bg-white p-6 sm:p-8 shadow-sm">
+            <div className="flex items-center justify-between gap-3 flex-wrap">
+              <h2 className="text-2xl font-black text-slate-900">What patients say about this store</h2>
+              {currentStore && (
+                <span className="rounded-full bg-cyan-50 px-3 py-1 text-xs font-semibold text-cyan-700 border border-cyan-200">
+                  {currentStore.storeName || currentStore.name}
+                </span>
+              )}
+            </div>
+
+            {storeReviewsLoading ? (
+              <p className="mt-4 text-sm text-slate-500">Loading reviews...</p>
+            ) : storeReviews.length === 0 ? (
+              <p className="mt-4 text-sm text-slate-500">No reviews yet for this store. Be the first to review from your dashboard.</p>
+            ) : (
+              <div className="mt-5 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {storeReviews.map((review) => (
+                  <div key={review._id} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                    <div className="mb-2 flex items-center gap-1">
+                      {[1, 2, 3, 4, 5].map((star) => (
+                        <Star
+                          key={star}
+                          size={14}
+                          className={star <= review.rating ? 'text-yellow-400' : 'text-slate-300'}
+                          fill={star <= review.rating ? 'currentColor' : 'none'}
+                        />
+                      ))}
+                    </div>
+                    <p className="text-sm text-slate-700 leading-relaxed">{review.comment}</p>
+                    <p className="mt-3 text-xs font-semibold text-slate-800">{review.name}</p>
+                    <p className="text-xs text-slate-500">{review.role || 'Patient'}</p>
+                  </div>
+                ))}
               </div>
             )}
           </div>

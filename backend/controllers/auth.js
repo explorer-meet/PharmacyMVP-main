@@ -1,6 +1,7 @@
 const { StatusCodes } = require("http-status-codes");
 const User = require("../models/user");
 const Admin = require("../models/admin")
+const Review = require("../models/review");
 const Pharmacy = require("../models/pharmacy");
 const StoreApprovalRequest = require("../models/storeApprovalRequest");
 const Store = require("../models/store");
@@ -1133,6 +1134,145 @@ const addmedicinetodb = async (req, res) => {
     } catch (error) {
         console.error('Error adding medicine:', error.message);
         res.status(500).json({ error: 'Failed to add medicine' });
+    }
+};
+
+const computeInventoryStatus = (stockValue) => {
+    const stock = Math.max(0, Number(stockValue) || 0);
+    if (stock === 0) return 'Out of Stock';
+    if (stock <= 20) return 'Low Stock';
+    return 'In Stock';
+};
+
+const getStoreInventory = async (req, res) => {
+    try {
+        const storeId = req.user?._id;
+        if (!storeId) {
+            return res.status(StatusCodes.UNAUTHORIZED).json({ message: 'Unauthorized store access' });
+        }
+
+        const medicines = await Pharmacy.find({ storeId }).sort({ createdAt: -1 }).lean();
+        const inventory = medicines.map((medicine) => ({
+            ...medicine,
+            status: computeInventoryStatus(medicine.stock),
+        }));
+
+        return res.status(StatusCodes.OK).json({ success: true, inventory });
+    } catch (error) {
+        console.error('Error fetching store inventory:', error.message);
+        return res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({ message: 'Failed to fetch store inventory' });
+    }
+};
+
+const createStoreInventoryMedicine = async (req, res) => {
+    try {
+        const storeId = req.user?._id;
+        const { name, manufacturer = '', dosage = '', type = '', price = 0, stock = 0 } = req.body;
+
+        if (!storeId) {
+            return res.status(StatusCodes.UNAUTHORIZED).json({ message: 'Unauthorized store access' });
+        }
+
+        if (!String(name || '').trim()) {
+            return res.status(StatusCodes.BAD_REQUEST).json({ message: 'Medicine name is required' });
+        }
+
+        const normalizedStock = Math.max(0, Number(stock) || 0);
+        const normalizedPrice = Math.max(0, Number(price) || 0);
+
+        const medicine = await Pharmacy.create({
+            storeId,
+            name: String(name).trim(),
+            manufacturer: String(manufacturer || '').trim(),
+            dosage: String(dosage || '').trim(),
+            type: String(type || '').trim(),
+            price: normalizedPrice,
+            stock: normalizedStock,
+        });
+
+        return res.status(StatusCodes.CREATED).json({
+            success: true,
+            message: 'Medicine added to your inventory',
+            medicine: {
+                ...medicine.toObject(),
+                status: computeInventoryStatus(medicine.stock),
+            },
+        });
+    } catch (error) {
+        console.error('Error creating store inventory medicine:', error.message);
+        return res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({ message: 'Failed to add medicine' });
+    }
+};
+
+const updateStoreInventoryMedicine = async (req, res) => {
+    try {
+        const storeId = req.user?._id;
+        const { medicineId } = req.params;
+        const { name, manufacturer, dosage, type, price, stock } = req.body;
+
+        if (!storeId) {
+            return res.status(StatusCodes.UNAUTHORIZED).json({ message: 'Unauthorized store access' });
+        }
+
+        const updatePayload = {};
+        if (name !== undefined) updatePayload.name = String(name || '').trim();
+        if (manufacturer !== undefined) updatePayload.manufacturer = String(manufacturer || '').trim();
+        if (dosage !== undefined) updatePayload.dosage = String(dosage || '').trim();
+        if (type !== undefined) updatePayload.type = String(type || '').trim();
+        if (price !== undefined) updatePayload.price = Math.max(0, Number(price) || 0);
+        if (stock !== undefined) updatePayload.stock = Math.max(0, Number(stock) || 0);
+
+        if (updatePayload.name !== undefined && !updatePayload.name) {
+            return res.status(StatusCodes.BAD_REQUEST).json({ message: 'Medicine name is required' });
+        }
+
+        const medicine = await Pharmacy.findOneAndUpdate(
+            { _id: medicineId, storeId },
+            { $set: updatePayload },
+            { new: true, runValidators: true }
+        );
+
+        if (!medicine) {
+            return res.status(StatusCodes.NOT_FOUND).json({ message: 'Medicine not found for your store' });
+        }
+
+        return res.status(StatusCodes.OK).json({
+            success: true,
+            message: 'Inventory item updated',
+            medicine: {
+                ...medicine.toObject(),
+                status: computeInventoryStatus(medicine.stock),
+            },
+        });
+    } catch (error) {
+        console.error('Error updating store inventory medicine:', error.message);
+        return res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({ message: 'Failed to update medicine' });
+    }
+};
+
+const deleteStoreInventoryMedicine = async (req, res) => {
+    try {
+        const storeId = req.user?._id;
+        const { medicineId } = req.params;
+
+        if (!storeId) {
+            return res.status(StatusCodes.UNAUTHORIZED).json({ message: 'Unauthorized store access' });
+        }
+
+        const deleted = await Pharmacy.findOneAndDelete({ _id: medicineId, storeId });
+
+        if (!deleted) {
+            return res.status(StatusCodes.NOT_FOUND).json({ message: 'Medicine not found for your store' });
+        }
+
+        return res.status(StatusCodes.OK).json({
+            success: true,
+            message: 'Inventory item deleted',
+            medicineId,
+        });
+    } catch (error) {
+        console.error('Error deleting store inventory medicine:', error.message);
+        return res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({ message: 'Failed to delete medicine' });
     }
 };
 
@@ -2406,6 +2546,7 @@ const createUserQuery = async (req, res) => {
 const getUserQueries = async (req, res) => {
     try {
         const queries = await UserQuery.find({ userId: req.user._id })
+            .populate('storeId', 'storeName name')
             .sort({ createdAt: -1 })
             .lean();
 
@@ -2698,9 +2839,245 @@ const getMedicinesByStore = async (req, res) => {
 };
 
 
+// ─── Reviews ────────────────────────────────────────────────────────────────
+const normalizeReviewResponse = (reviewDoc) => ({
+    _id: reviewDoc._id,
+    userId: reviewDoc.userId,
+    storeId: reviewDoc.storeId,
+    storeName: reviewDoc.storeName,
+    name: reviewDoc.name,
+    role: reviewDoc.role,
+    rating: reviewDoc.rating,
+    comment: reviewDoc.comment,
+    approved: reviewDoc.approved,
+    createdAt: reviewDoc.createdAt,
+    updatedAt: reviewDoc.updatedAt,
+});
+
+const createReview = async (req, res) => {
+    try {
+        const userId = req.user._id;
+        const user = await User.findById(userId).select('firstName lastName name');
+        if (!user) return res.status(StatusCodes.NOT_FOUND).json({ message: 'User not found' });
+
+        const { rating, comment, role, storeId } = req.body;
+        if (!storeId || !rating || !comment) {
+            return res.status(StatusCodes.BAD_REQUEST).json({ message: 'Store, rating and comment are required' });
+        }
+
+        const store = await Store.findById(storeId).select('storeName name status').lean();
+        if (!store) {
+            return res.status(StatusCodes.NOT_FOUND).json({ message: 'Store not found' });
+        }
+
+        if (store.status && store.status !== 'Active') {
+            return res.status(StatusCodes.BAD_REQUEST).json({ message: 'You can review only active stores' });
+        }
+
+        const existingReview = await Review.findOne({ userId, storeId });
+        if (existingReview) {
+            return res.status(StatusCodes.CONFLICT).json({
+                message: 'You have already reviewed this store. Please edit your existing review.',
+                review: normalizeReviewResponse(existingReview),
+            });
+        }
+
+        const displayName = user.firstName
+            ? `${user.firstName}${user.lastName ? ' ' + user.lastName : ''}`
+            : (user.name || 'Patient');
+
+        const review = await Review.create({
+            userId,
+            storeId,
+            storeName: store.storeName || store.name || 'Store',
+            name: displayName,
+            role: role || 'Patient',
+            rating: Math.min(5, Math.max(1, Number(rating))),
+            comment: comment.trim(),
+        });
+
+        return res.status(StatusCodes.CREATED).json({
+            message: 'Review submitted successfully',
+            review: normalizeReviewResponse(review),
+        });
+    } catch (err) {
+        if (err?.code === 11000) {
+            return res.status(StatusCodes.CONFLICT).json({
+                message: 'You have already reviewed this store. Please edit your existing review.',
+            });
+        }
+        console.error('[Review] createReview error', err.message);
+        return res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({ message: 'Server error' });
+    }
+};
+
+const updateReview = async (req, res) => {
+    try {
+        const userId = req.user._id;
+        const { id } = req.params;
+        const { rating, comment, role } = req.body;
+
+        if (!rating || !comment) {
+            return res.status(StatusCodes.BAD_REQUEST).json({ message: 'Rating and comment are required' });
+        }
+
+        const updatedReview = await Review.findOneAndUpdate(
+            { _id: id, userId },
+            {
+                $set: {
+                    rating: Math.min(5, Math.max(1, Number(rating))),
+                    comment: String(comment).trim(),
+                    ...(role ? { role: String(role).trim() } : {}),
+                },
+            },
+            { new: true, runValidators: true },
+        );
+
+        if (!updatedReview) {
+            return res.status(StatusCodes.NOT_FOUND).json({ message: 'Review not found' });
+        }
+
+        return res.status(StatusCodes.OK).json({
+            message: 'Review updated successfully',
+            review: normalizeReviewResponse(updatedReview),
+        });
+    } catch (err) {
+        console.error('[Review] updateReview error', err.message);
+        return res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({ message: 'Server error' });
+    }
+};
+
+const deleteReview = async (req, res) => {
+    try {
+        const userId = req.user._id;
+        const { id } = req.params;
+
+        const deletedReview = await Review.findOneAndDelete({ _id: id, userId });
+        if (!deletedReview) {
+            return res.status(StatusCodes.NOT_FOUND).json({ message: 'Review not found' });
+        }
+
+        return res.status(StatusCodes.OK).json({ message: 'Review deleted successfully' });
+    } catch (err) {
+        console.error('[Review] deleteReview error', err.message);
+        return res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({ message: 'Server error' });
+    }
+};
+
+const getPublicReviews = async (req, res) => {
+    try {
+        const { storeId, random, limit } = req.query;
+        const parsedLimit = Math.min(50, Math.max(1, Number(limit) || 20));
+        const match = { approved: true };
+
+        if (storeId) {
+            const store = await Store.findById(storeId).select('_id').lean();
+            if (!store) {
+                return res.status(StatusCodes.NOT_FOUND).json({ message: 'Store not found' });
+            }
+            match.storeId = storeId;
+        }
+
+        const shouldRandomize = String(random || '').toLowerCase() === 'true';
+        let reviews = [];
+
+        if (shouldRandomize) {
+            reviews = await Review.aggregate([
+                { $match: match },
+                { $sample: { size: parsedLimit } },
+                {
+                    $project: {
+                        name: 1,
+                        role: 1,
+                        rating: 1,
+                        comment: 1,
+                        storeId: 1,
+                        storeName: 1,
+                        createdAt: 1,
+                        updatedAt: 1,
+                    },
+                },
+            ]);
+        } else {
+            reviews = await Review.find(match)
+                .sort({ createdAt: -1 })
+                .limit(parsedLimit)
+                .select('name role rating comment storeId storeName createdAt updatedAt')
+                .lean();
+        }
+
+        return res.status(StatusCodes.OK).json({ reviews });
+    } catch (err) {
+        console.error('[Review] getPublicReviews error', err.message);
+        return res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({ message: 'Server error' });
+    }
+};
+
+const getStoreReviews = async (req, res) => {
+    try {
+        const { storeId } = req.params;
+        const { limit } = req.query;
+        const parsedLimit = Math.min(50, Math.max(1, Number(limit) || 20));
+
+        const store = await Store.findById(storeId).select('_id').lean();
+        if (!store) {
+            return res.status(StatusCodes.NOT_FOUND).json({ message: 'Store not found' });
+        }
+
+        const reviews = await Review.find({ approved: true, storeId })
+            .sort({ createdAt: -1 })
+            .limit(parsedLimit)
+            .select('name role rating comment storeId storeName createdAt updatedAt')
+            .lean();
+
+        return res.status(StatusCodes.OK).json({ reviews });
+    } catch (err) {
+        console.error('[Review] getStoreReviews error', err.message);
+        return res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({ message: 'Server error' });
+    }
+};
+
+const getMyReviews = async (req, res) => {
+    try {
+        const userId = req.user._id;
+        const reviewDocs = await Review.find({ userId })
+            .sort({ updatedAt: -1 })
+            .select('name role rating comment storeId storeName approved createdAt updatedAt')
+            .populate('storeId', 'storeName name')
+            .lean();
+
+        const reviews = reviewDocs.map((review) => {
+            const resolvedStoreId =
+                review?.storeId && typeof review.storeId === 'object'
+                    ? review.storeId._id
+                    : review.storeId;
+
+            const resolvedStoreName =
+                review.storeName ||
+                (review?.storeId && typeof review.storeId === 'object'
+                    ? (review.storeId.storeName || review.storeId.name)
+                    : undefined) ||
+                'Store';
+
+            return {
+                ...review,
+                storeId: resolvedStoreId,
+                storeName: resolvedStoreName,
+            };
+        });
+
+        return res.status(StatusCodes.OK).json({ reviews });
+    } catch (err) {
+        console.error('[Review] getMyReviews error', err.message);
+        return res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({ message: 'Server error' });
+    }
+};
+
 module.exports = {
     signUp, signIn, fetchData, adminsignIn, AdminfetchData, uploadPrescriptionFile, UpdatePatientProfile, fetchpharmacymedicines, updateorderedmedicines, updatecartquantity, addmedicinetodb, decreaseupdatecartquantity, deletemedicine, finalitems, finaladdress, finalpayment, deletecartItems, createStoreApprovalRequest, getStoreApprovalRequests, reviewStoreApprovalRequest, getAllStores, updateStoreStatus, addStore, getUserNotificationPreferences, updateUserNotificationPreferences,
     uploadPrescriptionRequest, reuploadPrescriptionRequest, getMyPrescriptionRequests, getStorePrescriptionRequests, reviewPrescriptionRequest,
     getStoreOrders, updateOrderTrackingStatus, getMyOrders, getOrderById, getStoreStaffMembers, createStoreStaffMember, updateStoreStaffMember, updateStoreStaffStatus, deleteStoreStaffMember, getCart, seedVaccinationMasterIfEmpty, upsertUserVaccination, getUserVaccinations, getVaccinationMaster, getUserVaccinationsForDashboard, updateUserVaccinationByMasterId, createUserQuery, getUserQueries, getStoreQueries, answerStoreQuery, importPatientsFromCsv,
-    getMedicinesByStore
+    getMedicinesByStore,
+    getStoreInventory, createStoreInventoryMedicine, updateStoreInventoryMedicine, deleteStoreInventoryMedicine,
+    createReview, updateReview, deleteReview, getPublicReviews, getStoreReviews, getMyReviews
 };

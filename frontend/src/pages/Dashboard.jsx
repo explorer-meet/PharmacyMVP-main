@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import axios from 'axios';
-import { Activity, Calendar, Pill, FileText, Clock, User, Mail, Phone, Menu, X, Home, CircleUser as UserCircle, ShoppingBag, Syringe, Bell, MessageSquare, Mail as MailIcon, Pencil, ClipboardList, DollarSign, Package, Truck, ChevronDown, ChevronUp, CreditCard, Plus, Minus, Trash2, CheckCircle2 } from 'lucide-react';
+import { Activity, Calendar, Pill, FileText, Clock, User, Mail, Phone, Menu, X, Home, CircleUser as UserCircle, ShoppingBag, Syringe, Bell, MessageSquare, Mail as MailIcon, Pencil, ClipboardList, DollarSign, Package, Truck, ChevronDown, ChevronUp, CreditCard, Plus, Minus, Trash2, CheckCircle2, Star, AlertTriangle, Info } from 'lucide-react';
 import { baseURL } from '../main';
 import Loader from '../components/Loader';
 import PrescriptionDialog from '../components/PrescriptionDialog';
@@ -24,6 +24,27 @@ const Dashboard = () => {
     const [vacSaving, setVacSaving] = useState({});
     const [vacLoading, setVacLoading] = useState(false);
     const [showProfile, setShowProfile] = useState(false);
+    const [showFeedback, setShowFeedback] = useState(false);
+    const [feedbackForm, setFeedbackForm] = useState({ rating: 5, comment: '', role: 'Patient' });
+    const [feedbackSubmitting, setFeedbackSubmitting] = useState(false);
+    const [feedbackSuccessMessage, setFeedbackSuccessMessage] = useState('');
+    const [myReviews, setMyReviews] = useState([]);
+    const [reviewsLoading, setReviewsLoading] = useState(false);
+    const [storesForReviews, setStoresForReviews] = useState([]);
+    const [storesForReviewsLoading, setStoresForReviewsLoading] = useState(false);
+    const [selectedReviewStoreId, setSelectedReviewStoreId] = useState('');
+    const [editingReviewId, setEditingReviewId] = useState(null);
+    const [showReviewForm, setShowReviewForm] = useState(false);
+    const [reviewNoticeModal, setReviewNoticeModal] = useState({
+        isOpen: false,
+        title: '',
+        message: '',
+    });
+    const [reviewDeleteModal, setReviewDeleteModal] = useState({
+        isOpen: false,
+        reviewId: null,
+    });
+    const [reviewDeleteLoading, setReviewDeleteLoading] = useState(false);
     const [prescriptionRequests, setPrescriptionRequests] = useState([]);
     const [prescriptionsLoading, setPrescriptionsLoading] = useState(false);
     const [expandedDashboardOrder, setExpandedDashboardOrder] = useState(null);
@@ -42,7 +63,7 @@ const Dashboard = () => {
     });
     const [profileErrors, setProfileErrors] = useState({});
     const [profileImage, setProfileImage] = useState('');
-    const [queryForm, setQueryForm] = useState({ subject: '', message: '' });
+    const [queryForm, setQueryForm] = useState({ subject: '', message: '', storeId: '' });
     const [queryErrors, setQueryErrors] = useState({});
     const [showQueryForm, setShowQueryForm] = useState(false);
     const [querySubmitting, setQuerySubmitting] = useState(false);
@@ -73,6 +94,40 @@ const Dashboard = () => {
         'Feedback & Suggestions',
         'Other',
     ];
+
+    const getReviewStoreId = (review) => {
+        if (!review) return '';
+        if (typeof review.storeId === 'object' && review.storeId?._id) return String(review.storeId._id);
+        if (review.storeId) return String(review.storeId);
+        return '';
+    };
+
+    const getReviewStoreName = (review) => {
+        if (!review) return 'Store';
+        if (review.storeName) return review.storeName;
+        if (typeof review.storeId === 'object') {
+            return review.storeId.storeName || review.storeId.name || 'Store';
+        }
+
+        const matchedStore = storesForReviews.find((store) => String(store._id) === String(review.storeId));
+        return matchedStore?.storeName || matchedStore?.name || 'Store';
+    };
+
+    const openReviewNoticeModal = (title, message) => {
+        setReviewNoticeModal({
+            isOpen: true,
+            title,
+            message,
+        });
+    };
+
+    const closeReviewNoticeModal = () => {
+        setReviewNoticeModal({
+            isOpen: false,
+            title: '',
+            message: '',
+        });
+    };
 
     // ── Vaccination helpers ──────────────────────────────────────────────────
     const getVacStatus = (id) => userVaccinationMap[id]?.status ?? 'not_vaccinated';
@@ -132,6 +187,143 @@ const Dashboard = () => {
         setQueryErrors({ ...queryErrors, [e.target.name]: undefined });
     };
 
+    const fetchMyReviews = async () => {
+        const token = localStorage.getItem('medVisionToken');
+        if (!token) return;
+        try {
+            setReviewsLoading(true);
+            const res = await axios.get(`${baseURL}/reviews/me`, { headers: { Authorization: `Bearer ${token}` } });
+            setMyReviews(res.data.reviews || []);
+        } catch { setMyReviews([]); } finally { setReviewsLoading(false); }
+    };
+
+    const fetchStoresForReviews = async () => {
+        try {
+            setStoresForReviewsLoading(true);
+            const response = await axios.get(`${baseURL}/allstores`);
+            const stores = response?.data?.stores || [];
+            setStoresForReviews(stores);
+
+            if (!selectedReviewStoreId && stores.length > 0) {
+                setSelectedReviewStoreId(stores[0]._id);
+            }
+        } catch {
+            setStoresForReviews([]);
+        } finally {
+            setStoresForReviewsLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        if (!selectedReviewStoreId) {
+            setEditingReviewId(null);
+            setFeedbackForm({ rating: 5, comment: '', role: 'Patient' });
+            return;
+        }
+
+        const existingReview = myReviews.find((review) => getReviewStoreId(review) === String(selectedReviewStoreId));
+        if (existingReview) {
+            setEditingReviewId(existingReview._id);
+            setFeedbackForm({
+                rating: existingReview.rating || 5,
+                comment: existingReview.comment || '',
+                role: existingReview.role || 'Patient',
+            });
+            return;
+        }
+
+        setEditingReviewId(null);
+        setFeedbackForm({ rating: 5, comment: '', role: 'Patient' });
+    }, [selectedReviewStoreId, myReviews]);
+
+    const handleFeedbackSubmit = async (e) => {
+        e.preventDefault();
+        const token = localStorage.getItem('medVisionToken');
+        if (!token) return;
+        if (!feedbackForm.comment.trim() || feedbackForm.comment.trim().length < 10) {
+            openReviewNoticeModal('Review Too Short', 'Please write at least 10 characters in your review.');
+            return;
+        }
+        try {
+            setFeedbackSubmitting(true);
+            if (!selectedReviewStoreId) {
+                openReviewNoticeModal('Store Required', 'Please select a store before submitting your review.');
+                return;
+            }
+
+            const payload = {
+                ...feedbackForm,
+                storeId: selectedReviewStoreId,
+            };
+
+            if (editingReviewId) {
+                await axios.put(`${baseURL}/reviews/${editingReviewId}`, payload, { headers: { Authorization: `Bearer ${token}` } });
+                setFeedbackSuccessMessage('Your review was updated successfully.');
+            } else {
+                await axios.post(`${baseURL}/reviews`, payload, { headers: { Authorization: `Bearer ${token}` } });
+                setFeedbackSuccessMessage('Your review was submitted successfully.');
+            }
+
+            await fetchMyReviews();
+            setShowReviewForm(false);
+        } catch (err) {
+            const errorMessage = err?.response?.data?.message || 'Failed to submit review. Please try again.';
+            if (/active stores|inactive/i.test(errorMessage)) {
+                openReviewNoticeModal('Store Is Inactive', 'This store is currently inactive and cannot receive reviews. Please choose an active store.');
+            } else {
+                openReviewNoticeModal('Unable To Submit Review', errorMessage);
+            }
+        } finally {
+            setFeedbackSubmitting(false);
+        }
+    };
+
+    const handleReviewEdit = (review) => {
+        const normalizedStoreId = getReviewStoreId(review);
+        setSelectedReviewStoreId(normalizedStoreId);
+        setEditingReviewId(review._id);
+        setShowReviewForm(true);
+        setFeedbackForm({
+            rating: review.rating || 5,
+            comment: review.comment || '',
+            role: review.role || 'Patient',
+        });
+        setFeedbackSuccessMessage('');
+    };
+
+    const handleReviewDelete = (reviewId) => {
+        setReviewDeleteModal({
+            isOpen: true,
+            reviewId,
+        });
+    };
+
+    const closeReviewDeleteModal = () => {
+        if (reviewDeleteLoading) return;
+        setReviewDeleteModal({
+            isOpen: false,
+            reviewId: null,
+        });
+    };
+
+    const confirmReviewDelete = async () => {
+        const token = localStorage.getItem('medVisionToken');
+        if (!token || !reviewDeleteModal.reviewId) return;
+
+        try {
+            setReviewDeleteLoading(true);
+            await axios.delete(`${baseURL}/reviews/${reviewDeleteModal.reviewId}`, { headers: { Authorization: `Bearer ${token}` } });
+            setFeedbackSuccessMessage('Review deleted successfully.');
+            closeReviewDeleteModal();
+            await fetchMyReviews();
+        } catch (error) {
+            closeReviewDeleteModal();
+            openReviewNoticeModal('Delete Failed', error?.response?.data?.message || 'Failed to delete review. Please try again.');
+        } finally {
+            setReviewDeleteLoading(false);
+        }
+    };
+
     const fetchMyQueries = async () => {
         const token = localStorage.getItem('medVisionToken');
         if (!token) return;
@@ -156,6 +348,7 @@ const Dashboard = () => {
         e.preventDefault();
         const errs = {};
         if (!queryForm.subject) errs.subject = 'Please select a subject.';
+        if (!queryForm.storeId) errs.storeId = 'Please select a store.';
         if (queryForm.message.trim().length < 20) errs.message = 'Minimum 20 characters required.';
         if (Object.keys(errs).length > 0) { setQueryErrors(errs); return; }
 
@@ -170,6 +363,7 @@ const Dashboard = () => {
             const response = await axios.post(`${baseURL}/queries`, {
                 subject: queryForm.subject,
                 message: queryForm.message.trim(),
+                storeId: queryForm.storeId,
             }, {
                 headers: {
                     Authorization: `Bearer ${token}`,
@@ -182,7 +376,7 @@ const Dashboard = () => {
             }
             await fetchMyQueries();
             setShowQueryForm(false);
-            setQueryForm({ subject: '', message: '' });
+            setQueryForm({ subject: '', message: '', storeId: '' });
         } catch (error) {
             console.error('Error submitting query:', error.message);
             alert(error.response?.data?.message || 'Could not submit query right now. Please try again.');
@@ -617,6 +811,9 @@ const Dashboard = () => {
         setShowMyOrders(false);
         setShowMyVaccinations(false);
         setShowProfile(false);
+        setShowFeedback(false);
+        setShowReviewForm(false);
+        setFeedbackSuccessMessage('');
         setIsEditingProfile(false);
         setProfileErrors({});
         setExpandedDashboardOrder(null);
@@ -631,7 +828,9 @@ const Dashboard = () => {
         }
     }, [location, navigate]);
 
-    const hasActivePanel = showPrescriptions || showNotifications || showRaiseQuery || showMyOrders || showMyVaccinations || showProfile;
+    const hasActivePanel = showPrescriptions || showNotifications || showRaiseQuery || showMyOrders || showMyVaccinations || showProfile || showFeedback;
+    const reviewedStoreIds = new Set(myReviews.map((review) => getReviewStoreId(review)).filter(Boolean));
+    const availableStoresForNewReview = storesForReviews.filter((store) => !reviewedStoreIds.has(String(store._id)));
 
     const getDashboardOrderAmount = (order) => {
         if (!order) return 0;
@@ -699,15 +898,37 @@ const Dashboard = () => {
     };
 
     const sidebarItems = [
-        { icon: Home,         text: "Dashboard",      onClick: () => { resetDashboardPanels(); setSidebarOpen(false); },                                                                     color: "text-cyan-600"   },
-        { icon: Pill,         text: "My Prescriptions",onClick: () => { const n = !showPrescriptions;  resetDashboardPanels(); setShowPrescriptions(n); if (n) { fetchMyPrescriptionRequests(); } setSidebarOpen(false); },           color: "text-sky-600" },
-        { icon: ShoppingBag,  text: "My Orders",       onClick: () => { const n = !showMyOrders;        resetDashboardPanels(); setShowMyOrders(n);        setSidebarOpen(false); },           color: "text-emerald-600" },
-        { icon: Syringe,      text: "My Vaccinations", onClick: () => { const n = !showMyVaccinations;  resetDashboardPanels(); setShowMyVaccinations(n); if (!n) {} else { loadVaccinations(); } setSidebarOpen(false); },           color: "text-teal-600"   },
-        { icon: UserCircle,   text: "Profile",         onClick: () => { const n = !showProfile;         resetDashboardPanels(); setShowProfile(n);         setSidebarOpen(false); },           color: "text-slate-600"},
-        { icon: Bell,         text: "Notifications",   onClick: () => { const n = !showNotifications;   resetDashboardPanels(); setShowNotifications(n);   setSidebarOpen(false); },           color: "text-amber-500" },
+        { icon: Home,        text: "Dashboard",       isActive: !showPrescriptions && !showMyOrders && !showMyVaccinations && !showProfile && !showNotifications && !showFeedback && !showRaiseQuery, iconBg: "bg-cyan-500/20",    color: "text-cyan-400",    onClick: () => { resetDashboardPanels(); setSidebarOpen(false); } },
+        { icon: Pill,        text: "My Prescriptions", isActive: showPrescriptions,   iconBg: "bg-sky-500/20",     color: "text-sky-400",     onClick: () => { const n = !showPrescriptions;  resetDashboardPanels(); setShowPrescriptions(n); if (n) { fetchMyPrescriptionRequests(); } setSidebarOpen(false); } },
+        { icon: ShoppingBag, text: "My Orders",        isActive: showMyOrders,        iconBg: "bg-emerald-500/20", color: "text-emerald-400", onClick: () => { const n = !showMyOrders;        resetDashboardPanels(); setShowMyOrders(n);        setSidebarOpen(false); } },
+        { icon: Syringe,     text: "My Vaccinations",  isActive: showMyVaccinations,  iconBg: "bg-teal-500/20",    color: "text-teal-400",    onClick: () => { const n = !showMyVaccinations;  resetDashboardPanels(); setShowMyVaccinations(n); if (n) { loadVaccinations(); } setSidebarOpen(false); } },
+        { icon: UserCircle,  text: "Profile",          isActive: showProfile,         iconBg: "bg-slate-500/20",   color: "text-slate-300",   onClick: () => { const n = !showProfile;        resetDashboardPanels(); setShowProfile(n);         setSidebarOpen(false); } },
+        { icon: Bell,        text: "Notifications",    isActive: showNotifications,   iconBg: "bg-amber-500/20",   color: "text-amber-400",   onClick: () => { const n = !showNotifications;   resetDashboardPanels(); setShowNotifications(n);   setSidebarOpen(false); } },
+        {
+            icon: Star,
+            text: "Feedback",
+            isActive: showFeedback,
+            iconBg: "bg-yellow-500/20",
+            color: "text-yellow-400",
+            onClick: () => {
+                const n = !showFeedback;
+                resetDashboardPanels();
+                setShowFeedback(n);
+                if (n) {
+                    setShowReviewForm(false);
+                    fetchStoresForReviews();
+                    fetchMyReviews();
+                }
+                setSidebarOpen(false);
+            },
+        },
         {
             icon: MessageSquare,
             text: "Raise a Query",
+            isActive: showRaiseQuery,
+            iconBg: "bg-purple-500/20",
+            color: "text-purple-400",
+            badgeCount: userQueries.filter(q => (q.status || "").toLowerCase() === "open").length,
             onClick: () => {
                 const n = !showRaiseQuery;
                 resetDashboardPanels();
@@ -715,11 +936,10 @@ const Dashboard = () => {
                 setShowQueryForm(false);
                 if (n) {
                     fetchMyQueries();
+                    fetchStoresForReviews();
                 }
                 setSidebarOpen(false);
             },
-            color: "text-cyan-600",
-            badgeCount: userQueries.filter(q => (q.status || "").toLowerCase() === "open").length,
         },
     ];
 
@@ -779,81 +999,95 @@ const Dashboard = () => {
 
             <div className="flex relative">
                 {/* Sidebar */}
-                <aside className={`fixed lg:sticky top-0 h-screen w-72 bg-slate-950 border-r border-cyan-900/40 shadow-xl transform transition-all duration-300 z-40
-${sidebarOpen ? "translate-x-0" : "-translate-x-full"} lg:translate-x-0`}>
+                <aside className={`fixed lg:sticky top-0 h-screen w-72 flex flex-col bg-gradient-to-b from-[#0c1424] via-slate-950 to-[#080e18] shadow-2xl transform transition-all duration-300 z-40 ${sidebarOpen ? "translate-x-0" : "-translate-x-full"} lg:translate-x-0`}>
 
-                    <div className="h-full flex flex-col">
+                    {/* Top accent bar */}
+                    <div className="h-0.5 w-full bg-gradient-to-r from-cyan-400 via-teal-500 to-transparent flex-shrink-0" />
 
-                        {/* Sidebar Header - close button only on mobile */}
-                        <div className="flex lg:hidden items-center justify-end px-4 pt-4">
-                            <button
-                                className="text-slate-400 hover:text-white p-2 rounded-lg transition-colors"
-                                onClick={() => setSidebarOpen(false)}
-                            >
-                                <X size={22} />
-                            </button>
-                        </div>
+                    {/* Mobile close */}
+                    <div className="flex lg:hidden items-center justify-end px-4 pt-3 flex-shrink-0">
+                        <button className="text-slate-400 hover:text-white p-1.5 rounded-lg transition-colors" onClick={() => setSidebarOpen(false)}>
+                            <X size={20} />
+                        </button>
+                    </div>
 
-                        {/* User Profile Section */}
-                        <div className="px-5 pt-4 pb-5 border-b border-white/10">
-                            <div className="flex items-center space-x-3">
-                                <div className="relative flex-shrink-0">
-                                    <div className="w-14 h-14 rounded-2xl overflow-hidden bg-gradient-to-br from-cyan-500 to-teal-600 flex items-center justify-center text-white font-bold text-xl shadow-md">
-                                        {profileImage ? (
-                                            <img
-                                                src={profileImage}
-                                                alt="Profile"
-                                                className="w-full h-full object-cover"
-                                            />
-                                        ) : (
-                                            userData?.name?.charAt(0) || 'U'
-                                        )}
-                                    </div>
-                                    <label className="absolute -bottom-1.5 -right-1.5 w-6 h-6 rounded-full bg-cyan-600 text-white flex items-center justify-center shadow-lg cursor-pointer hover:bg-cyan-700 transition border-2 border-slate-950">
-                                        <Pencil size={11} />
-                                        <input
-                                            type="file"
-                                            accept="image/*"
-                                            className="hidden"
-                                            onChange={handleProfileImageChange}
-                                        />
-                                    </label>
+                    {/* Profile Card */}
+                    <div className="mx-3 mt-4 mb-1 flex-shrink-0 rounded-2xl bg-white/5 border border-white/[0.08] p-4">
+                        <div className="flex items-center gap-3">
+                            <div className="relative flex-shrink-0">
+                                <div className="w-12 h-12 rounded-xl overflow-hidden bg-gradient-to-br from-cyan-500 to-teal-600 flex items-center justify-center text-white font-bold text-lg shadow-lg ring-2 ring-cyan-400/30">
+                                    {profileImage ? (
+                                        <img src={profileImage} alt="Profile" className="w-full h-full object-cover" />
+                                    ) : (
+                                        userData?.name?.charAt(0)?.toUpperCase() || 'U'
+                                    )}
                                 </div>
-                                <div className="flex-1 min-w-0">
-                                    <p className="font-bold text-white truncate text-base">
-                                        {userData?.name || 'Unknown User'}
-                                    </p>
-                                    <p className="text-xs text-cyan-300 font-medium mt-0.5">
-                                        Patient Account
-                                    </p>
-                                </div>
+                                <label className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-cyan-500 text-white flex items-center justify-center shadow cursor-pointer hover:bg-cyan-400 transition border-2 border-slate-950">
+                                    <Pencil size={9} />
+                                    <input type="file" accept="image/*" className="hidden" onChange={handleProfileImageChange} />
+                                </label>
+                            </div>
+                            <div className="flex-1 min-w-0">
+                                <p className="font-bold text-white truncate text-sm">{userData?.name || 'Unknown User'}</p>
+                                <p className="text-[11px] text-slate-400 truncate mt-0.5">{userData?.email || ''}</p>
+                                <span className="inline-flex items-center gap-1 mt-1">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse inline-block" />
+                                    <span className="text-[10px] font-semibold text-emerald-400">Active</span>
+                                </span>
                             </div>
                         </div>
+                    </div>
 
-                        {/* Navigation */}
-                        <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-1">
-                            {sidebarItems.map((item, index) => (
-                                <button
-                                    key={index}
-                                    className="flex items-center w-full px-4 py-3 space-x-3 text-left rounded-2xl hover:bg-white/10 active:bg-white/15 transition-all group"
-                                    onClick={item.onClick}
-                                >
-                                    <div className={`w-9 h-9 rounded-xl flex items-center justify-center bg-white/10 border border-white/10 group-hover:bg-white/20 transition`}>
-                                        <item.icon className={`w-4 h-4 ${item.color}`} />
-                                    </div>
-                                    <div className="flex items-center justify-between flex-1 min-w-0">
-                                        <span className="font-semibold text-slate-300 group-hover:text-white text-sm truncate">
+                    {/* Navigation */}
+                    <nav className="flex-1 overflow-y-auto px-3 pt-2 pb-2">
+                        {[{ label: 'Navigation', items: sidebarItems.slice(0, 4) }, { label: 'Account', items: sidebarItems.slice(4, 6) }, { label: 'Support', items: sidebarItems.slice(6) }].map((group) => (
+                            <React.Fragment key={group.label}>
+                                <p className="px-3 pt-3 pb-1.5 text-[10px] font-bold tracking-widest text-slate-500 uppercase select-none">{group.label}</p>
+                                {group.items.map((item, idx) => (
+                                    <button
+                                        key={idx}
+                                        onClick={item.onClick}
+                                        className={`flex items-center w-full gap-3 py-2.5 pr-3 mb-0.5 text-left rounded-xl transition-all duration-150 group border-l-2 ${
+                                            item.isActive
+                                                ? 'border-cyan-400 bg-gradient-to-r from-cyan-500/20 via-cyan-500/10 to-transparent pl-[10px]'
+                                                : 'border-transparent hover:bg-white/[0.07] pl-3'
+                                        }`}
+                                    >
+                                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 transition-all ${item.iconBg}`}>
+                                            <item.icon className={`w-[15px] h-[15px] ${item.color}`} />
+                                        </div>
+                                        <span className={`font-medium text-sm truncate flex-1 transition-colors ${
+                                            item.isActive ? 'text-white font-semibold' : 'text-slate-400 group-hover:text-white'
+                                        }`}>
                                             {item.text}
                                         </span>
                                         {item.badgeCount > 0 && (
-                                            <span className="ml-3 inline-flex min-w-[1.5rem] h-6 px-2 items-center justify-center rounded-full bg-cyan-500/20 border border-cyan-400/30 text-cyan-200 text-xs font-bold">
+                                            <span className="inline-flex min-w-[1.25rem] h-5 px-1.5 items-center justify-center rounded-full bg-cyan-500 text-white text-[10px] font-bold shadow">
                                                 {item.badgeCount}
                                             </span>
                                         )}
-                                    </div>
-                                </button>
-                            ))}
-                        </nav>
+                                    </button>
+                                ))}
+                            </React.Fragment>
+                        ))}
+                    </nav>
+
+                    {/* Footer */}
+                    <div className="flex-shrink-0 px-3 pb-4 pt-3 border-t border-white/[0.07]">
+                        <button
+                            onClick={() => navigate('/')}
+                            className="flex items-center w-full gap-3 pl-3 pr-3 py-2.5 rounded-xl text-slate-400 hover:text-white hover:bg-white/[0.07] transition-all text-sm font-medium group"
+                        >
+                            <div className="w-8 h-8 rounded-lg bg-white/[0.07] flex items-center justify-center group-hover:bg-white/[0.12] transition flex-shrink-0">
+                                <Home size={15} className="text-slate-400 group-hover:text-cyan-400 transition-colors" />
+                            </div>
+                            Back to Home
+                        </button>
+                        <div className="flex items-center justify-center gap-2 pt-3">
+                            <div className="h-px flex-1 bg-white/[0.06]" />
+                            <span className="text-[10px] text-slate-600 font-semibold tracking-widest uppercase">MedVision</span>
+                            <div className="h-px flex-1 bg-white/[0.06]" />
+                        </div>
                     </div>
                 </aside>
 
@@ -868,169 +1102,156 @@ ${sidebarOpen ? "translate-x-0" : "-translate-x-full"} lg:translate-x-0`}>
                 {/* Main Content */}
                 <main className="flex-1 overflow-auto">
                     <div className="max-w-7xl mx-auto p-4 lg:p-8 space-y-8">
-                        {/* Welcome Section */}
-                        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-slate-900 via-cyan-950 to-emerald-900 p-7 lg:p-10 text-white shadow-2xl">
-                            {/* decorative blobs */}
-                            <div className="absolute -right-16 -top-16 h-64 w-64 rounded-full bg-cyan-400/20 blur-3xl pointer-events-none" />
-                            <div className="absolute -left-12 bottom-0 h-52 w-52 rounded-full bg-emerald-400/20 blur-3xl pointer-events-none" />
-                            <div className="absolute right-1/3 top-0 h-32 w-32 rounded-full bg-teal-300/10 blur-2xl pointer-events-none" />
+                        {/* Welcome Hero */}
+                        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#0a1628] via-[#0e2240] to-[#083028] p-7 lg:p-10 text-white shadow-2xl">
+                            {/* Decorative glows */}
+                            <div className="absolute -right-20 -top-20 h-80 w-80 rounded-full bg-cyan-400/15 blur-3xl pointer-events-none" />
+                            <div className="absolute -left-16 -bottom-16 h-64 w-64 rounded-full bg-emerald-500/15 blur-3xl pointer-events-none" />
+                            <div className="absolute right-1/3 top-0 h-40 w-40 rounded-full bg-teal-300/10 blur-2xl pointer-events-none" />
+                            {/* Grid texture */}
+                            <div className="absolute inset-0 opacity-[0.03] pointer-events-none" style={{backgroundImage: 'linear-gradient(rgba(255,255,255,0.5) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,0.5) 1px,transparent 1px)', backgroundSize: '40px 40px'}} />
 
                             <div className="relative z-10 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-8">
                                 {/* Left: greeting */}
-                                <div className="flex items-start gap-4">
-                                    {/* avatar circle */}
-                                    <div className="hidden sm:flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-white/10 border border-white/20 text-2xl font-black text-white backdrop-blur-sm">
-                                        {(userData?.name || userData?.firstName || 'U')[0].toUpperCase()}
+                                <div className="flex items-start gap-5">
+                                    <div className="hidden sm:flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-cyan-500/30 to-teal-600/30 border border-cyan-400/30 text-2xl font-black text-white shadow-lg backdrop-blur-sm ring-2 ring-white/10">
+                                        {(userData?.name || 'U')[0].toUpperCase()}
                                     </div>
                                     <div>
-                                        <div className="flex items-center gap-2 mb-1">
-                                            <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-400/20 border border-emerald-400/30 px-3 py-0.5 text-[11px] font-semibold uppercase tracking-widest text-emerald-300">
-                                                <span className="relative flex h-2 w-2">
-                                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                                                    <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-400"></span>
-                                                </span>
-                                                Patient Dashboard
+                                        <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-400/15 border border-emerald-400/30 px-3 py-0.5 text-[11px] font-bold uppercase tracking-widest text-emerald-300 mb-2">
+                                            <span className="relative flex h-2 w-2">
+                                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                                                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-400" />
                                             </span>
-                                        </div>
+                                            Patient Dashboard
+                                        </span>
                                         <h1 className="text-3xl lg:text-4xl font-black leading-tight tracking-tight">
-                                            {(() => {
-                                                const h = new Date().getHours();
-                                                return h < 12 ? 'Good Morning' : h < 17 ? 'Good Afternoon' : 'Good Evening';
-                                            })()}, {userData?.name?.split(' ')[0] || userData?.firstName || 'User'}!
+                                            {(() => { const h = new Date().getHours(); return h < 12 ? 'Good Morning' : h < 17 ? 'Good Afternoon' : 'Good Evening'; })()},{' '}
+                                            <span className="bg-gradient-to-r from-cyan-300 to-teal-300 bg-clip-text text-transparent">{userData?.name?.split(' ')[0] || 'User'}!</span>
                                         </h1>
-                                        <p className="mt-2 text-cyan-200 text-sm lg:text-base leading-relaxed">
-                                            Here's your personal health overview for today. Stay on top of your wellness.
+                                        <p className="mt-2 text-slate-400 text-sm lg:text-base leading-relaxed max-w-lg">
+                                            Here's your personal health overview. Manage prescriptions, orders, vaccinations and more — all in one place.
                                         </p>
                                     </div>
                                 </div>
 
-                                {/* Right: date + action */}
-                                <div className="lg:min-w-[240px] flex flex-row lg:flex-col gap-3">
-                                    <div className="flex-1 rounded-2xl border border-white/15 bg-white/10 backdrop-blur-sm px-5 py-4">
-                                        <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-cyan-300 mb-1">Today's Date</p>
+                                {/* Right: date card */}
+                                <div className="lg:min-w-[220px] flex-shrink-0">
+                                    <div className="rounded-2xl border border-white/10 bg-white/[0.07] backdrop-blur-sm px-5 py-4 text-center">
+                                        <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-cyan-400 mb-1.5">Today</p>
                                         <p className="text-xl font-extrabold text-white leading-tight">
-                                            {new Date().toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}
+                                            {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}
                                         </p>
-                                        <p className="text-xs text-cyan-200 mt-0.5">
+                                        <p className="text-xs text-slate-400 mt-1">{new Date().getFullYear()}</p>
+                                        <div className="mt-3 pt-3 border-t border-white/10 text-lg font-bold tabular-nums text-cyan-300">
                                             {new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
-                                        </p>
+                                        </div>
                                     </div>
-                                    <button
-                                        onClick={() => navigate('/')}
-                                        className="flex-1 lg:flex-none inline-flex items-center justify-center gap-2 rounded-2xl border border-white/20 bg-white/10 px-4 py-3 text-sm font-semibold text-white hover:bg-white/20 active:scale-95 transition-all duration-150 backdrop-blur-sm"
-                                    >
-                                        <Home size={15} />
-                                        Return to Home
-                                    </button>
                                 </div>
                             </div>
                         </div>
-                        {/* Dashboard Overview */}
-                        {!hasActivePanel && <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-                            {statsCards.map((stat, index) => (
-                                <div
-                                    key={index}
-                                    onClick={stat.onClick}
-                                    className="h-full bg-white rounded-3xl border border-slate-200 shadow-sm p-6 hover:shadow-lg transition-all duration-300 hover:-translate-y-1 cursor-pointer"
-                                    data-prescription-card={stat.label === 'Prescriptions' ? 'true' : undefined}
-                                >
-                                    <div className="flex items-center justify-between mb-5">
-                                        <div className={`${stat.color} p-3 rounded-2xl text-white shadow-md`}>
-                                            <stat.icon size={22} />
-                                        </div>
-                                        <span className="text-xs font-semibold text-slate-400 uppercase tracking-[0.18em]">Overview</span>
-                                    </div>
-                                    <h3 className="text-slate-500 text-sm font-medium mb-1">
-                                        {stat.label}
-                                    </h3>
-                                    <p className="text-3xl font-black text-slate-900 mb-2">
-                                        {stat.value}
-                                    </p>
-                                    {stat.change && (
-                                        <p className="text-sm text-slate-500 leading-5">{stat.change}</p>
-                                    )}
-                                </div>
-                            ))}
-                        </div>}
 
+                        {/* Stats Cards */}
                         {!hasActivePanel && (
-                            <div className="grid grid-cols-1 xl:grid-cols-[1.4fr_1fr] gap-6">
-                                <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-slate-900 via-blue-900 to-cyan-700 p-8 text-white shadow-2xl">
-                                    <div className="absolute -right-8 -top-10 h-40 w-40 rounded-full bg-white/10 blur-2xl" />
-                                    <div className="absolute bottom-0 right-10 h-24 w-24 rounded-full bg-cyan-300/20 blur-2xl" />
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
+                                {statsCards.map((stat, index) => (
+                                    <div
+                                        key={index}
+                                        onClick={stat.onClick}
+                                        className="group relative overflow-hidden bg-white rounded-2xl border border-slate-100 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 cursor-pointer p-6"
+                                    >
+                                        {/* corner glow */}
+                                        <div className={`absolute -top-8 -right-8 h-24 w-24 rounded-full blur-2xl opacity-20 group-hover:opacity-40 transition ${stat.color}`} />
+                                        <div className="relative z-10">
+                                            <div className="flex items-center justify-between mb-4">
+                                                <div className={`w-11 h-11 rounded-xl ${stat.color} flex items-center justify-center shadow-md`}>
+                                                    <stat.icon size={20} className="text-white" />
+                                                </div>
+                                                <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Overview</span>
+                                            </div>
+                                            <p className="text-4xl font-black text-slate-900 mb-1">{stat.value}</p>
+                                            <p className="text-sm font-semibold text-slate-600">{stat.label}</p>
+                                            {stat.change && <p className="text-xs text-slate-400 mt-1">{stat.change}</p>}
+                                        </div>
+                                        <div className="absolute bottom-0 left-0 right-0 h-0.5 opacity-0 group-hover:opacity-100 transition bg-gradient-to-r from-transparent via-cyan-400 to-transparent" />
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+
+                        {/* Feature Cards + Quick Snapshot */}
+                        {!hasActivePanel && (
+                            <div className="grid grid-cols-1 xl:grid-cols-[1.5fr_1fr] gap-6">
+                                {/* Feature CTA card */}
+                                <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#0c1e3c] via-[#0d2a38] to-[#083020] p-7 lg:p-8 text-white shadow-xl">
+                                    <div className="absolute -right-10 -top-10 h-48 w-48 rounded-full bg-cyan-400/10 blur-2xl" />
+                                    <div className="absolute bottom-0 left-1/2 h-32 w-32 rounded-full bg-emerald-400/10 blur-2xl" />
                                     <div className="relative z-10">
-                                        <p className="text-xs font-semibold uppercase tracking-[0.3em] text-cyan-100">Dashboard Focus</p>
-                                        <h2 className="mt-3 text-2xl lg:text-3xl font-bold leading-tight">
-                                            Keep your medicines, orders, and support requests in one place.
+                                        <span className="inline-block text-[10px] font-bold uppercase tracking-[0.3em] text-cyan-400 mb-3">Quick Access</span>
+                                        <h2 className="text-2xl lg:text-[1.7rem] font-bold leading-tight mb-3">
+                                            Everything your health needs,<br />
+                                            <span className="text-cyan-300">at your fingertips.</span>
                                         </h2>
-                                        <p className="mt-4 max-w-2xl text-sm lg:text-base text-blue-100 leading-7">
-                                            This dashboard is now built as a clean patient workspace. Open the panels you need from the left side and keep the rest of the screen distraction-free.
+                                        <p className="text-sm text-slate-400 leading-relaxed mb-7 max-w-md">
+                                            Open the panels you need from the left sidebar. Your prescriptions, orders, and support are always a click away.
                                         </p>
 
-                                        <div className="mt-8 grid grid-cols-1 sm:grid-cols-3 gap-4">
-                                            <button
-                                                onClick={() => { resetDashboardPanels(); setShowMyOrders(true); }}
-                                                className="rounded-2xl border border-white/15 bg-white/10 px-4 py-4 text-left hover:bg-white/15 transition"
-                                            >
-                                                <ShoppingBag className="mb-3 text-orange-300" size={20} />
-                                                <p className="font-semibold">Track Orders</p>
-                                                <p className="mt-1 text-xs text-blue-100">See delivery status and items.</p>
-                                            </button>
-                                            <button
-                                                onClick={() => { resetDashboardPanels(); setShowPrescriptions(true); }}
-                                                className="rounded-2xl border border-white/15 bg-white/10 px-4 py-4 text-left hover:bg-white/15 transition"
-                                            >
-                                                <Pill className="mb-3 text-violet-200" size={20} />
-                                                <p className="font-semibold">Open Prescriptions</p>
-                                                <p className="mt-1 text-xs text-blue-100">Review current medicines quickly.</p>
-                                            </button>
-                                            <button
-                                                onClick={() => { resetDashboardPanels(); setShowRaiseQuery(true); setShowQueryForm(false); fetchMyQueries(); }}
-                                                className="rounded-2xl border border-white/15 bg-white/10 px-4 py-4 text-left hover:bg-white/15 transition"
-                                            >
-                                                <MessageSquare className="mb-3 text-cyan-200" size={20} />
-                                                <p className="font-semibold">Raise a Query</p>
-                                                <p className="mt-1 text-xs text-blue-100">Contact pharmacy support directly.</p>
-                                            </button>
+                                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                                            {[
+                                                { icon: ShoppingBag, label: 'Track Orders', sub: 'Delivery status & items', color: 'text-orange-300', bg: 'bg-orange-400/10 border-orange-400/20', onClick: () => { resetDashboardPanels(); setShowMyOrders(true); } },
+                                                { icon: Pill, label: 'Prescriptions', sub: 'Medicines at a glance', color: 'text-violet-300', bg: 'bg-violet-400/10 border-violet-400/20', onClick: () => { resetDashboardPanels(); setShowPrescriptions(true); fetchMyPrescriptionRequests(); } },
+                                                { icon: MessageSquare, label: 'Raise a Query', sub: 'Pharmacy support', color: 'text-cyan-300', bg: 'bg-cyan-400/10 border-cyan-400/20', onClick: () => { resetDashboardPanels(); setShowRaiseQuery(true); setShowQueryForm(false); fetchMyQueries(); fetchStoresForReviews(); } },
+                                            ].map((card) => (
+                                                <button
+                                                    key={card.label}
+                                                    onClick={card.onClick}
+                                                    className={`rounded-xl border ${card.bg} px-4 py-4 text-left hover:brightness-125 active:scale-95 transition-all`}
+                                                >
+                                                    <card.icon className={`mb-2.5 ${card.color}`} size={18} />
+                                                    <p className="font-semibold text-sm text-white">{card.label}</p>
+                                                    <p className="mt-0.5 text-[11px] text-slate-400">{card.sub}</p>
+                                                </button>
+                                            ))}
                                         </div>
                                     </div>
                                 </div>
 
-                                <div className="space-y-6">
-                                    <div className="rounded-3xl bg-white p-6 shadow-lg border border-slate-100">
-                                        <div className="flex items-center justify-between mb-5">
-                                            <div>
-                                                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-gray-400">Quick Snapshot</p>
-                                                <h3 className="mt-2 text-xl font-bold text-gray-800">Today at a glance</h3>
-                                            </div>
-                                            <Activity className="text-cyan-500" size={22} />
+                                {/* Quick Snapshot */}
+                                <div className="rounded-2xl bg-white p-6 shadow-lg border border-slate-100 flex flex-col">
+                                    <div className="flex items-center justify-between mb-5">
+                                        <div>
+                                            <p className="text-[10px] font-bold uppercase tracking-[0.25em] text-slate-400">Live Summary</p>
+                                            <h3 className="mt-1 text-lg font-bold text-slate-800">Today at a glance</h3>
                                         </div>
-
-                                        <div className="space-y-4">
-                                            <div className="flex items-center justify-between rounded-2xl bg-sky-50 px-4 py-3">
-                                                <div>
-                                                    <p className="text-sm font-semibold text-sky-900">Active Prescriptions</p>
-                                                    <p className="text-xs text-sky-700">Medicines currently visible in your account</p>
-                                                </div>
-                                                <span className="text-2xl font-bold text-sky-900">{prescriptionRequests.length}</span>
-                                            </div>
-                                            <div className="flex items-center justify-between rounded-2xl bg-amber-50 px-4 py-3">
-                                                <div>
-                                                    <p className="text-sm font-semibold text-amber-900">Orders in history</p>
-                                                    <p className="text-xs text-amber-700">Recent pharmacy purchases</p>
-                                                </div>
-                                                <span className="text-2xl font-bold text-amber-900">{dashboardOrders.length}</span>
-                                            </div>
-                                            <div className="flex items-center justify-between rounded-2xl bg-emerald-50 px-4 py-3">
-                                                <div>
-                                                    <p className="text-sm font-semibold text-emerald-900">Vaccination records</p>
-                                                    <p className="text-xs text-emerald-700">Immunization entries available</p>
-                                                </div>
-                                                <span className="text-2xl font-bold text-emerald-900">{vaccinatedCount} / {vaccinationMaster.length}</span>
-                                            </div>
+                                        <div className="w-9 h-9 rounded-xl bg-cyan-50 flex items-center justify-center">
+                                            <Activity className="text-cyan-500" size={18} />
                                         </div>
                                     </div>
 
+                                    <div className="space-y-3 flex-1">
+                                        {[
+                                            { label: 'Active Prescriptions', sub: 'In your account', value: prescriptionRequests.length, bg: 'bg-sky-50', text: 'text-sky-900', sub2: 'text-sky-600', val: 'text-sky-700', bar: 'bg-sky-400' },
+                                            { label: 'Orders in History', sub: 'Recent purchases', value: dashboardOrders.length, bg: 'bg-amber-50', text: 'text-amber-900', sub2: 'text-amber-600', val: 'text-amber-700', bar: 'bg-amber-400' },
+                                            { label: 'Vaccination Records', sub: 'Immunization entries', value: `${vaccinatedCount}/${vaccinationMaster.length}`, bg: 'bg-emerald-50', text: 'text-emerald-900', sub2: 'text-emerald-600', val: 'text-emerald-700', bar: 'bg-emerald-400' },
+                                        ].map((row) => (
+                                            <div key={row.label} className={`flex items-center justify-between rounded-xl ${row.bg} px-4 py-3.5 group`}>
+                                                <div>
+                                                    <p className={`text-sm font-semibold ${row.text}`}>{row.label}</p>
+                                                    <p className={`text-xs ${row.sub2} mt-0.5`}>{row.sub}</p>
+                                                </div>
+                                                <span className={`text-2xl font-black ${row.val}`}>{row.value}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+
+                                    <div className="mt-5 pt-4 border-t border-slate-100">
+                                        <button
+                                            onClick={() => navigate('/onlinepharmacy')}
+                                            className="w-full flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-cyan-600 to-teal-600 text-white text-sm font-semibold py-3 hover:opacity-90 active:scale-[.98] transition shadow-md"
+                                        >
+                                            <ShoppingBag size={15} /> Browse Pharmacy
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
                         )}
@@ -1280,6 +1501,248 @@ ${sidebarOpen ? "translate-x-0" : "-translate-x-full"} lg:translate-x-0`}>
                             </div>
                         )}
 
+                        {/* Feedback / Review Panel */}
+                        {showFeedback && (
+                            <div className="bg-white rounded-2xl shadow-lg p-8">
+                                <div className="flex items-center gap-3 mb-6">
+                                    <div className="w-10 h-10 rounded-xl bg-yellow-100 flex items-center justify-center">
+                                        <Star className="text-yellow-500" size={20} />
+                                    </div>
+                                    <div>
+                                        <h2 className="text-xl font-bold text-slate-800">Feedback & Reviews</h2>
+                                        <p className="text-sm text-slate-500">Choose a store, then add, edit, or delete your review</p>
+                                    </div>
+                                </div>
+
+                                {feedbackSuccessMessage && (
+                                    <div className="mb-5 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700 flex items-center gap-2">
+                                        <CheckCircle2 size={18} />
+                                        <span>{feedbackSuccessMessage}</span>
+                                    </div>
+                                )}
+
+                                <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+                                    <h3 className="font-semibold text-slate-700">My Reviews</h3>
+                                    {!showReviewForm && (
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                if (availableStoresForNewReview.length === 0) {
+                                                    openReviewNoticeModal('No Stores Left To Review', 'You have already reviewed all available stores. You can edit an existing review from the list below.');
+                                                    return;
+                                                }
+
+                                                setEditingReviewId(null);
+                                                setSelectedReviewStoreId(String(availableStoresForNewReview[0]._id));
+                                                setFeedbackForm({ rating: 5, comment: '', role: 'Patient' });
+                                                setFeedbackSuccessMessage('');
+                                                setShowReviewForm(true);
+                                            }}
+                                            className="inline-flex items-center gap-2 rounded-lg bg-yellow-400 px-4 py-2 text-sm font-semibold text-white hover:bg-yellow-500 transition"
+                                        >
+                                            <Plus size={16} /> Add New Review
+                                        </button>
+                                    )}
+                                </div>
+
+                                {showReviewForm && (
+                                    <form onSubmit={handleFeedbackSubmit} className="mb-8 space-y-5 bg-yellow-50 rounded-2xl p-6 border border-yellow-100">
+                                        <h3 className="font-semibold text-slate-700">
+                                            {editingReviewId ? 'Edit your review for this store' : 'Submit a new store review'}
+                                        </h3>
+
+                                        <div>
+                                            <label className="block text-sm font-medium text-slate-600 mb-1">Store</label>
+                                            <select
+                                                value={selectedReviewStoreId}
+                                                onChange={(e) => {
+                                                    setSelectedReviewStoreId(e.target.value);
+                                                    setFeedbackSuccessMessage('');
+                                                }}
+                                                disabled={storesForReviewsLoading || storesForReviews.length === 0 || Boolean(editingReviewId)}
+                                                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-yellow-300 disabled:bg-slate-100"
+                                            >
+                                                {storesForReviews.length === 0 ? (
+                                                    <option value="">No stores found</option>
+                                                ) : (
+                                                    storesForReviews.map((store) => (
+                                                        <option
+                                                            key={store._id}
+                                                            value={store._id}
+                                                            disabled={!editingReviewId && reviewedStoreIds.has(String(store._id))}
+                                                        >
+                                                            {store.storeName || store.name}{!editingReviewId && reviewedStoreIds.has(String(store._id)) ? ' (already reviewed)' : ''}
+                                                        </option>
+                                                    ))
+                                                )}
+                                            </select>
+                                        </div>
+
+                                        <div className="flex gap-2">
+                                            {[1,2,3,4,5].map(s => (
+                                                <button
+                                                    type="button"
+                                                    key={s}
+                                                    onClick={() => setFeedbackForm(f => ({ ...f, rating: s }))}
+                                                    className={`transition-transform hover:scale-110 ${s <= feedbackForm.rating ? 'text-yellow-400' : 'text-slate-300'}`}
+                                                >
+                                                    <Star size={28} fill={s <= feedbackForm.rating ? 'currentColor' : 'none'} />
+                                                </button>
+                                            ))}
+                                            <span className="ml-2 text-sm text-slate-500 self-center">{feedbackForm.rating} / 5</span>
+                                        </div>
+
+                                        <div>
+                                            <label className="block text-sm font-medium text-slate-600 mb-1">Your role</label>
+                                            <select value={feedbackForm.role} onChange={e => setFeedbackForm(f => ({ ...f, role: e.target.value }))}
+                                                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-yellow-300">
+                                                <option>Patient</option>
+                                                <option>Regular Patient</option>
+                                                <option>New Patient</option>
+                                                <option>Caregiver</option>
+                                            </select>
+                                        </div>
+
+                                        <div>
+                                            <label className="block text-sm font-medium text-slate-600 mb-1">Your review</label>
+                                            <textarea rows={4} value={feedbackForm.comment} onChange={e => setFeedbackForm(f => ({ ...f, comment: e.target.value }))}
+                                                placeholder="Tell us about your experience with this store..."
+                                                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-yellow-300" />
+                                            <p className="text-xs text-slate-400 mt-1">{feedbackForm.comment.length} / 600 characters</p>
+                                        </div>
+
+                                        <div className="flex flex-wrap gap-3">
+                                            <button type="submit" disabled={feedbackSubmitting || !selectedReviewStoreId}
+                                                className="flex-1 min-w-[180px] py-2.5 rounded-xl bg-yellow-400 hover:bg-yellow-500 text-white font-semibold text-sm transition disabled:opacity-60">
+                                                {feedbackSubmitting ? 'Submitting...' : editingReviewId ? 'Update Review' : 'Submit Review'}
+                                            </button>
+
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    setEditingReviewId(null);
+                                                    setFeedbackForm({ rating: 5, comment: '', role: 'Patient' });
+                                                    setFeedbackSuccessMessage('');
+                                                    setShowReviewForm(false);
+                                                }}
+                                                className="min-w-[160px] py-2.5 rounded-xl border border-slate-300 text-slate-700 font-semibold text-sm hover:bg-slate-100 transition"
+                                            >
+                                                Cancel
+                                            </button>
+                                        </div>
+                                    </form>
+                                )}
+
+                                {/* My past reviews */}
+                                <div>
+                                    {reviewsLoading ? (
+                                        <p className="text-sm text-slate-400">Loading...</p>
+                                    ) : myReviews.length === 0 ? (
+                                        <p className="text-sm text-slate-400">You haven't submitted any reviews yet. Click Add New Review to create your first review.</p>
+                                    ) : (
+                                        <div className="space-y-4">
+                                            {myReviews.map((r, i) => (
+                                                <div key={i} className="rounded-xl border border-slate-100 bg-slate-50 p-4">
+                                                    <div className="flex items-center justify-between gap-2 mb-1">
+                                                        <div className="flex items-center gap-2">
+                                                            {[1,2,3,4,5].map(s => (
+                                                                <Star key={s} size={14} className={s <= r.rating ? 'text-yellow-400' : 'text-slate-300'} fill={s <= r.rating ? 'currentColor' : 'none'} />
+                                                            ))}
+                                                            <span className="text-xs text-slate-400 ml-1">{r.role}</span>
+                                                        </div>
+                                                        <div className="flex items-center gap-2">
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => handleReviewEdit(r)}
+                                                                className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-white px-2 py-1 text-xs text-slate-600 hover:bg-slate-100"
+                                                            >
+                                                                <Pencil size={12} /> Edit
+                                                            </button>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => handleReviewDelete(r._id)}
+                                                                className="inline-flex items-center gap-1 rounded-md border border-red-200 bg-white px-2 py-1 text-xs text-red-600 hover:bg-red-50"
+                                                            >
+                                                                <Trash2 size={12} /> Delete
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                    <p className="text-xs font-semibold text-cyan-700 mb-1">Store: {getReviewStoreName(r)}</p>
+                                                    <p className="text-sm text-slate-700">{r.comment}</p>
+                                                    <p className="text-xs text-slate-400 mt-1">
+                                                        {new Date(r.updatedAt || r.createdAt).toLocaleDateString('en-IN', { day:'numeric', month:'short', year:'numeric' })}
+                                                        {(r.updatedAt && r.createdAt && new Date(r.updatedAt).getTime() !== new Date(r.createdAt).getTime()) ? ' (edited)' : ''}
+                                                    </p>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Review Notice Modal */}
+                        {reviewNoticeModal.isOpen && (
+                            <div className="fixed inset-0 z-[400] flex items-center justify-center bg-slate-900/55 backdrop-blur-sm px-4">
+                                <div className="w-full max-w-md rounded-2xl border border-amber-100 bg-white p-6 shadow-2xl animate-[fade-in-up_0.25s_ease-out]">
+                                    <div className="flex items-start gap-3">
+                                        <div className="mt-0.5 flex h-10 w-10 items-center justify-center rounded-xl bg-amber-100 text-amber-600">
+                                            <Info size={20} />
+                                        </div>
+                                        <div className="flex-1">
+                                            <h3 className="text-lg font-bold text-slate-900">{reviewNoticeModal.title}</h3>
+                                            <p className="mt-1 text-sm text-slate-600 leading-relaxed">{reviewNoticeModal.message}</p>
+                                        </div>
+                                    </div>
+                                    <div className="mt-6 flex justify-end">
+                                        <button
+                                            type="button"
+                                            onClick={closeReviewNoticeModal}
+                                            className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800 transition"
+                                        >
+                                            Got It
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Delete Review Confirmation Modal */}
+                        {reviewDeleteModal.isOpen && (
+                            <div className="fixed inset-0 z-[400] flex items-center justify-center bg-slate-900/55 backdrop-blur-sm px-4">
+                                <div className="w-full max-w-md rounded-2xl border border-red-100 bg-white p-6 shadow-2xl animate-[fade-in-up_0.25s_ease-out]">
+                                    <div className="flex items-start gap-3">
+                                        <div className="mt-0.5 flex h-10 w-10 items-center justify-center rounded-xl bg-red-100 text-red-600">
+                                            <AlertTriangle size={20} />
+                                        </div>
+                                        <div className="flex-1">
+                                            <h3 className="text-lg font-bold text-slate-900">Delete This Review?</h3>
+                                            <p className="mt-1 text-sm text-slate-600 leading-relaxed">This action cannot be undone. The review will be removed from your profile and public view.</p>
+                                        </div>
+                                    </div>
+                                    <div className="mt-6 flex justify-end gap-3">
+                                        <button
+                                            type="button"
+                                            onClick={closeReviewDeleteModal}
+                                            disabled={reviewDeleteLoading}
+                                            className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100 transition disabled:opacity-50"
+                                        >
+                                            Cancel
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={confirmReviewDelete}
+                                            disabled={reviewDeleteLoading}
+                                            className="inline-flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700 transition disabled:opacity-60"
+                                        >
+                                            <Trash2 size={14} />
+                                            {reviewDeleteLoading ? 'Deleting...' : 'Delete Review'}
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
                         {/* Raise a Query Panel */}
                         {showRaiseQuery && (
                             <div className="bg-white rounded-2xl shadow-lg p-8">
@@ -1328,6 +1791,11 @@ ${sidebarOpen ? "translate-x-0" : "-translate-x-full"} lg:translate-x-0`}>
                                                                         : String(query.status || 'open').replace('_', ' ')}
                                                                 </span>
                                                             </div>
+                                                            {(query.storeId?.storeName || query.storeId?.name) && (
+                                                                <p className="text-[11px] text-cyan-700 font-medium mt-0.5">
+                                                                    🏪 {query.storeId?.storeName || query.storeId?.name}
+                                                                </p>
+                                                            )}
                                                             <p className="text-xs text-gray-500 mt-1 line-clamp-2">{query.message}</p>
                                                             {query.answer && (
                                                                 <div className="mt-2 rounded-md border border-emerald-200 bg-emerald-50 px-2.5 py-2">
@@ -1384,6 +1852,32 @@ ${sidebarOpen ? "translate-x-0" : "-translate-x-full"} lg:translate-x-0`}>
                                                 {querySubjects.map((s) => <option key={s} value={s}>{s}</option>)}
                                             </select>
                                             {queryErrors.subject && <p className="text-red-500 text-xs mt-1">{queryErrors.subject}</p>}
+                                        </div>
+
+                                        {/* Store */}
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                                                Select Store <span className="text-red-500">*</span>
+                                            </label>
+                                            <select
+                                                name="storeId"
+                                                value={queryForm.storeId}
+                                                onChange={handleQueryChange}
+                                                className={`w-full px-4 py-3 rounded-xl border text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500 transition bg-gray-50 ${
+                                                    queryErrors.storeId ? 'border-red-400 bg-red-50' : 'border-gray-200'
+                                                }`}
+                                            >
+                                                <option value="">Select a store…</option>
+                                                {storesForReviewsLoading
+                                                    ? <option disabled>Loading stores…</option>
+                                                    : storesForReviews.map((store) => (
+                                                        <option key={store._id} value={store._id}>
+                                                            {store.storeName || store.name} — {store.city || store.address || ''}
+                                                        </option>
+                                                    ))
+                                                }
+                                            </select>
+                                            {queryErrors.storeId && <p className="text-red-500 text-xs mt-1">{queryErrors.storeId}</p>}
                                         </div>
 
                                         {/* Message */}

@@ -5,7 +5,13 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "dev": "nodemon server.js",
-    "start": "node server.js"
+    "start": "node server.js",
+    "reviews:backfill-storeid": "node scripts/backfillReviewStoreIds.js",
+    "reviews:backfill-storeid:write": "node scripts/backfillReviewStoreIds.js --write",
+    "reviews:backfill-storeid:infer": "node scripts/backfillReviewStoreIds.js --infer-from-orders",
+    "reviews:backfill-storeid:infer:write": "node scripts/backfillReviewStoreIds.js --infer-from-orders --write",
+    "reviews:cleanup-legacy": "node scripts/cleanupLegacyReviews.js",
+    "reviews:cleanup-legacy:write": "node scripts/cleanupLegacyReviews.js --write"
   },
   "author": "",
   "license": "ISC",

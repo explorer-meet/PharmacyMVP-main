@@ -4,7 +4,7 @@ const multer = require("multer");
 const fs = require("fs");
 const os = require("os");
 const path = require("path");
-const { signUp, signIn, fetchData, AdminfetchData, adminsignIn, uploadPrescriptionFile, UpdatePatientProfile, fetchpharmacymedicines, updateorderedmedicines, updatecartquantity, addmedicinetodb, decreaseupdatecartquantity, deletemedicine, finalitems, finaladdress, finalpayment, deletecartItems, createStoreApprovalRequest, getStoreApprovalRequests, reviewStoreApprovalRequest, getAllStores, updateStoreStatus, addStore, getUserNotificationPreferences, updateUserNotificationPreferences, uploadPrescriptionRequest, reuploadPrescriptionRequest, getMyPrescriptionRequests, getStorePrescriptionRequests, reviewPrescriptionRequest, getStoreOrders, updateOrderTrackingStatus, getMyOrders, getOrderById, getStoreStaffMembers, createStoreStaffMember, updateStoreStaffMember, updateStoreStaffStatus, deleteStoreStaffMember, getCart, seedVaccinationMasterIfEmpty, upsertUserVaccination, getUserVaccinations, getVaccinationMaster, getUserVaccinationsForDashboard, updateUserVaccinationByMasterId, createUserQuery, getUserQueries, getStoreQueries, answerStoreQuery, importPatientsFromCsv, getMedicinesByStore } = require("../controllers/auth");
+const { signUp, signIn, fetchData, AdminfetchData, adminsignIn, uploadPrescriptionFile, UpdatePatientProfile, fetchpharmacymedicines, updateorderedmedicines, updatecartquantity, addmedicinetodb, decreaseupdatecartquantity, deletemedicine, finalitems, finaladdress, finalpayment, deletecartItems, createStoreApprovalRequest, getStoreApprovalRequests, reviewStoreApprovalRequest, getAllStores, updateStoreStatus, addStore, getUserNotificationPreferences, updateUserNotificationPreferences, uploadPrescriptionRequest, reuploadPrescriptionRequest, getMyPrescriptionRequests, getStorePrescriptionRequests, reviewPrescriptionRequest, getStoreOrders, updateOrderTrackingStatus, getMyOrders, getOrderById, getStoreStaffMembers, createStoreStaffMember, updateStoreStaffMember, updateStoreStaffStatus, deleteStoreStaffMember, getCart, seedVaccinationMasterIfEmpty, upsertUserVaccination, getUserVaccinations, getVaccinationMaster, getUserVaccinationsForDashboard, updateUserVaccinationByMasterId, createUserQuery, getUserQueries, getStoreQueries, answerStoreQuery, importPatientsFromCsv, getMedicinesByStore, getStoreInventory, createStoreInventoryMedicine, updateStoreInventoryMedicine, deleteStoreInventoryMedicine, createReview, updateReview, deleteReview, getPublicReviews, getStoreReviews, getMyReviews } = require("../controllers/auth");
 const verifyToken  = require("../middleware/authMiddleware");  
 
 const uploadsDir = process.env.UPLOADS_DIR || path.join(os.tmpdir(), "medvision-uploads");
@@ -153,5 +153,17 @@ router.get("/vaccination-master", verifyToken(["User"]), getVaccinationMaster);
 router.get("/user-vaccinations", verifyToken(["User"]), getUserVaccinationsForDashboard);
 router.put("/user-vaccinations/:vaccinationId", verifyToken(["User"]), updateUserVaccinationByMasterId);
 router.get('/medicines-by-store/:storeId', getMedicinesByStore);
+router.get('/store-inventory', verifyToken(['Store']), getStoreInventory);
+router.post('/store-inventory', verifyToken(['Store']), createStoreInventoryMedicine);
+router.put('/store-inventory/:medicineId', verifyToken(['Store']), updateStoreInventoryMedicine);
+router.delete('/store-inventory/:medicineId', verifyToken(['Store']), deleteStoreInventoryMedicine);
+
+// Reviews
+router.get('/reviews', getPublicReviews);
+router.get('/reviews/store/:storeId', getStoreReviews);
+router.post('/reviews', verifyToken(['User']), createReview);
+router.put('/reviews/:id', verifyToken(['User']), updateReview);
+router.delete('/reviews/:id', verifyToken(['User']), deleteReview);
+router.get('/reviews/me', verifyToken(['User']), getMyReviews);
 
 module.exports = router;

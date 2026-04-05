@@ -40,15 +40,26 @@ const StoreDashboard = () => {
   const [staffSearchLastName, setStaffSearchLastName] = useState('');
   const [staffSearchContact, setStaffSearchContact] = useState('');
   const [staffSearchEmail, setStaffSearchEmail] = useState('');
-  const [inventoryItems, setInventoryItems] = useState([
-    { id: 1, name: 'Paracetamol 500mg', stock: 120, status: 'In Stock' },
-    { id: 2, name: 'Cough Syrup', stock: 18, status: 'Low Stock' },
-    { id: 3, name: 'Vitamin D Capsules', stock: 42, status: 'In Stock' },
-    { id: 4, name: 'Insulin Syringes', stock: 7, status: 'Low Stock' },
-  ]);
-  const [newMedicine, setNewMedicine] = useState({ name: '', stock: '', status: 'In Stock' });
+  const [inventoryItems, setInventoryItems] = useState([]);
+  const [inventoryLoading, setInventoryLoading] = useState(false);
+  const [inventorySaving, setInventorySaving] = useState(false);
+  const [newMedicine, setNewMedicine] = useState({
+    name: '',
+    manufacturer: '',
+    dosage: '',
+    type: '',
+    price: '',
+    stock: '',
+  });
   const [editingMedicineId, setEditingMedicineId] = useState(null);
-  const [editMedicine, setEditMedicine] = useState({ name: '', stock: '' });
+  const [editMedicine, setEditMedicine] = useState({
+    name: '',
+    manufacturer: '',
+    dosage: '',
+    type: '',
+    price: '',
+    stock: '',
+  });
   const [orders, setOrders] = useState([]);
   const [ordersLoading, setOrdersLoading] = useState(false);
   const [selectedOrderId, setSelectedOrderId] = useState(null);
@@ -451,30 +462,76 @@ const StoreDashboard = () => {
     }
   };
 
+  const loadStoreInventory = async () => {
+    const token = localStorage.getItem('medVisionToken');
+    if (!token) return;
+
+    try {
+      setInventoryLoading(true);
+      const response = await axios.get(`${baseURL}/store-inventory`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setInventoryItems(response.data?.inventory || []);
+    } catch (error) {
+      console.error('Failed to load store inventory:', error.message);
+      setInventoryItems([]);
+      toast.error('Failed to load inventory');
+    } finally {
+      setInventoryLoading(false);
+    }
+  };
+
   const handleNewMedicineChange = (e) => {
     const { name, value } = e.target;
     setNewMedicine((prev) => ({ ...prev, [name]: value }));
   };
 
-  const addMedicine = (e) => {
+  const addMedicine = async (e) => {
     e.preventDefault();
-    if (!newMedicine.name || !newMedicine.stock) return;
-    const stock = Number(newMedicine.stock);
-    setInventoryItems((prev) => [
-      ...prev,
-      {
-        id: prev.length + 1,
-        name: newMedicine.name,
-        stock,
-        status: stock > 20 ? 'In Stock' : stock > 0 ? 'Low Stock' : 'Out of Stock',
-      },
-    ]);
-    setNewMedicine({ name: '', stock: '', status: 'In Stock' });
+    if (!newMedicine.name || newMedicine.stock === '') return;
+
+    const token = localStorage.getItem('medVisionToken');
+    if (!token) return;
+
+    try {
+      setInventorySaving(true);
+      const response = await axios.post(
+        `${baseURL}/store-inventory`,
+        {
+          name: newMedicine.name.trim(),
+          manufacturer: newMedicine.manufacturer.trim(),
+          dosage: newMedicine.dosage.trim(),
+          type: newMedicine.type.trim(),
+          price: Number(newMedicine.price) || 0,
+          stock: Number(newMedicine.stock) || 0,
+        },
+        { headers: { Authorization: `Bearer ${token}` } },
+      );
+
+      const created = response.data?.medicine;
+      if (created) {
+        setInventoryItems((prev) => [created, ...prev]);
+      }
+      setNewMedicine({ name: '', manufacturer: '', dosage: '', type: '', price: '', stock: '' });
+      toast.success('Medicine added to inventory');
+    } catch (error) {
+      console.error('Failed to add medicine:', error.message);
+      toast.error(error.response?.data?.message || 'Failed to add medicine');
+    } finally {
+      setInventorySaving(false);
+    }
   };
 
   const startEditMedicine = (item) => {
-    setEditingMedicineId(item.id);
-    setEditMedicine({ name: item.name, stock: String(item.stock) });
+    setEditingMedicineId(item._id);
+    setEditMedicine({
+      name: item.name || '',
+      manufacturer: item.manufacturer || '',
+      dosage: item.dosage || '',
+      type: item.type || '',
+      price: String(item.price ?? ''),
+      stock: String(item.stock ?? ''),
+    });
   };
 
   const handleEditMedicineChange = (e) => {
@@ -482,46 +539,94 @@ const StoreDashboard = () => {
     setEditMedicine((prev) => ({ ...prev, [name]: value }));
   };
 
-  const saveMedicine = (id) => {
-    const stock = Number(editMedicine.stock);
-    setInventoryItems((prev) =>
-      prev.map((item) =>
-        item.id === id
-          ? {
-              ...item,
-              name: editMedicine.name,
-              stock,
-              status: stock > 20 ? 'In Stock' : stock > 0 ? 'Low Stock' : 'Out of Stock',
-            }
-          : item,
-      ),
-    );
-    setEditingMedicineId(null);
-    setEditMedicine({ name: '', stock: '' });
+  const saveMedicine = async (id) => {
+    if (!editMedicine.name || editMedicine.stock === '') return;
+
+    const token = localStorage.getItem('medVisionToken');
+    if (!token) return;
+
+    try {
+      setInventorySaving(true);
+      const response = await axios.put(
+        `${baseURL}/store-inventory/${id}`,
+        {
+          name: editMedicine.name.trim(),
+          manufacturer: editMedicine.manufacturer.trim(),
+          dosage: editMedicine.dosage.trim(),
+          type: editMedicine.type.trim(),
+          price: Number(editMedicine.price) || 0,
+          stock: Number(editMedicine.stock) || 0,
+        },
+        { headers: { Authorization: `Bearer ${token}` } },
+      );
+
+      const updated = response.data?.medicine;
+      if (updated) {
+        setInventoryItems((prev) => prev.map((item) => (item._id === id ? updated : item)));
+      }
+      setEditingMedicineId(null);
+      setEditMedicine({ name: '', manufacturer: '', dosage: '', type: '', price: '', stock: '' });
+      toast.success('Medicine updated');
+    } catch (error) {
+      console.error('Failed to update medicine:', error.message);
+      toast.error(error.response?.data?.message || 'Failed to update medicine');
+    } finally {
+      setInventorySaving(false);
+    }
   };
 
   const cancelEditMedicine = () => {
     setEditingMedicineId(null);
-    setEditMedicine({ name: '', stock: '' });
+    setEditMedicine({ name: '', manufacturer: '', dosage: '', type: '', price: '', stock: '' });
   };
 
-  const updateMedicineStock = (id, delta) => {
-    setInventoryItems((prev) =>
-      prev.map((item) => {
-        if (item.id !== id) return item;
-        const stock = Math.max(0, item.stock + delta);
-        return {
-          ...item,
-          stock,
-          status: stock > 20 ? 'In Stock' : stock > 0 ? 'Low Stock' : 'Out of Stock',
-        };
-      }),
-    );
+  const updateMedicineStock = async (item, delta) => {
+    const token = localStorage.getItem('medVisionToken');
+    if (!token) return;
+
+    const nextStock = Math.max(0, (Number(item.stock) || 0) + delta);
+
+    try {
+      const response = await axios.put(
+        `${baseURL}/store-inventory/${item._id}`,
+        { stock: nextStock },
+        { headers: { Authorization: `Bearer ${token}` } },
+      );
+      const updated = response.data?.medicine;
+      if (updated) {
+        setInventoryItems((prev) => prev.map((row) => (row._id === item._id ? updated : row)));
+      }
+    } catch (error) {
+      console.error('Failed to update stock:', error.message);
+      toast.error(error.response?.data?.message || 'Failed to update stock');
+    }
+  };
+
+  const removeInventoryMedicine = async (medicineId) => {
+    const token = localStorage.getItem('medVisionToken');
+    if (!token) return;
+
+    try {
+      setInventorySaving(true);
+      await axios.delete(`${baseURL}/store-inventory/${medicineId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setInventoryItems((prev) => prev.filter((item) => item._id !== medicineId));
+      toast.success('Medicine removed from inventory');
+    } catch (error) {
+      console.error('Failed to remove medicine:', error.message);
+      toast.error(error.response?.data?.message || 'Failed to remove medicine');
+    } finally {
+      setInventorySaving(false);
+    }
   };
 
   useEffect(() => {
     if (selectedSection === 'staff') {
       loadStoreStaffMembers();
+    }
+    if (selectedSection === 'inventory') {
+      loadStoreInventory();
     }
     if (selectedSection === 'orders' || selectedSection === 'reports') {
       loadStoreOrders();
@@ -990,13 +1095,22 @@ const StoreDashboard = () => {
                     <Package className="text-emerald-600" size={24} />
                     <div>
                       <h2 className="text-xl font-semibold text-slate-900">Inventory Management</h2>
-                      <p className="text-sm text-slate-500">Track stock, update quantities, and manage products.</p>
+                      <p className="text-sm text-slate-500">Track stock, update quantities, and manage products mapped to your store only.</p>
                     </div>
                   </div>
-                  <div className="space-y-4">
-                    {inventoryItems.map((item) => (
-                      <div key={item.id} className="rounded-3xl border border-slate-200 p-4">
-                        {editingMedicineId === item.id ? (
+                  {inventoryLoading ? (
+                    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-8 text-center text-sm text-slate-500">
+                      Loading store inventory...
+                    </div>
+                  ) : inventoryItems.length === 0 ? (
+                    <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-8 text-center text-sm text-slate-500">
+                      No medicines in this store inventory yet. Add your first medicine from the panel on the right.
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {inventoryItems.map((item) => (
+                      <div key={item._id} className="rounded-3xl border border-slate-200 p-4">
+                        {editingMedicineId === item._id ? (
                           <div className="space-y-3">
                             <div>
                               <label className="block text-sm font-medium text-slate-700">Medicine Name</label>
@@ -1006,6 +1120,50 @@ const StoreDashboard = () => {
                                 onChange={handleEditMedicineChange}
                                 className="mt-1 block w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-blue-500"
                               />
+                            </div>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                              <div>
+                                <label className="block text-sm font-medium text-slate-700">Manufacturer</label>
+                                <input
+                                  name="manufacturer"
+                                  value={editMedicine.manufacturer}
+                                  onChange={handleEditMedicineChange}
+                                  className="mt-1 block w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-blue-500"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-sm font-medium text-slate-700">Dosage</label>
+                                <input
+                                  name="dosage"
+                                  value={editMedicine.dosage}
+                                  onChange={handleEditMedicineChange}
+                                  className="mt-1 block w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-blue-500"
+                                />
+                              </div>
+                            </div>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                              <div>
+                                <label className="block text-sm font-medium text-slate-700">Type</label>
+                                <input
+                                  name="type"
+                                  value={editMedicine.type}
+                                  onChange={handleEditMedicineChange}
+                                  className="mt-1 block w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-blue-500"
+                                  placeholder="Tablet / Syrup / Capsule"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-sm font-medium text-slate-700">Price</label>
+                                <input
+                                  name="price"
+                                  type="number"
+                                  min="0"
+                                  step="0.01"
+                                  value={editMedicine.price}
+                                  onChange={handleEditMedicineChange}
+                                  className="mt-1 block w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-blue-500"
+                                />
+                              </div>
                             </div>
                             <div>
                               <label className="block text-sm font-medium text-slate-700">Stock</label>
@@ -1021,10 +1179,11 @@ const StoreDashboard = () => {
                             <div className="flex gap-2">
                               <button
                                 type="button"
-                                onClick={() => saveMedicine(item.id)}
+                                onClick={() => saveMedicine(item._id)}
+                                disabled={inventorySaving}
                                 className="inline-flex items-center justify-center rounded-2xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 transition"
                               >
-                                Save
+                                {inventorySaving ? 'Saving...' : 'Save'}
                               </button>
                               <button
                                 type="button"
@@ -1040,6 +1199,8 @@ const StoreDashboard = () => {
                             <div className="flex items-center justify-between mb-3">
                               <div>
                                 <p className="font-semibold text-slate-900">{item.name}</p>
+                                <p className="text-sm text-slate-500">{item.manufacturer || 'No manufacturer'}{item.dosage ? ` • ${item.dosage}` : ''}</p>
+                                <p className="text-sm text-slate-500">Type: <span className="font-medium text-slate-700">{item.type || 'N/A'}</span> • Price: <span className="font-medium text-slate-700">${Number(item.price || 0).toFixed(2)}</span></p>
                                 <p className="text-sm text-slate-500">Stock left: <span className="font-semibold text-slate-900">{item.stock}</span></p>
                               </div>
                               <span className={`rounded-full px-3 py-1 text-xs font-semibold ${item.status === 'Low Stock' ? 'bg-amber-100 text-amber-700' : item.status === 'Out of Stock' ? 'bg-red-100 text-red-700' : 'bg-emerald-100 text-emerald-700'}`}>
@@ -1049,14 +1210,16 @@ const StoreDashboard = () => {
                             <div className="flex flex-wrap gap-2">
                               <button
                                 type="button"
-                                onClick={() => updateMedicineStock(item.id, -1)}
+                                onClick={() => updateMedicineStock(item, -1)}
+                                disabled={inventorySaving}
                                 className="inline-flex items-center justify-center rounded-2xl bg-slate-100 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-200 transition"
                               >
                                 -1
                               </button>
                               <button
                                 type="button"
-                                onClick={() => updateMedicineStock(item.id, 1)}
+                                onClick={() => updateMedicineStock(item, 1)}
+                                disabled={inventorySaving}
                                 className="inline-flex items-center justify-center rounded-2xl bg-slate-100 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-200 transition"
                               >
                                 +1
@@ -1068,12 +1231,21 @@ const StoreDashboard = () => {
                               >
                                 Edit
                               </button>
+                              <button
+                                type="button"
+                                onClick={() => removeInventoryMedicine(item._id)}
+                                disabled={inventorySaving}
+                                className="inline-flex items-center justify-center gap-1 rounded-2xl bg-rose-100 px-3 py-2 text-sm font-semibold text-rose-700 hover:bg-rose-200 transition"
+                              >
+                                <Trash2 size={14} /> Remove
+                              </button>
                             </div>
                           </div>
                         )}
                       </div>
                     ))}
-                  </div>
+                    </div>
+                  )}
                 </div>
                 <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
                   <div className="flex items-center gap-3 mb-6">
@@ -1095,6 +1267,53 @@ const StoreDashboard = () => {
                         required
                       />
                     </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-sm font-medium text-slate-700">Manufacturer</label>
+                        <input
+                          name="manufacturer"
+                          value={newMedicine.manufacturer}
+                          onChange={handleNewMedicineChange}
+                          className="mt-1 block w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-blue-500"
+                          placeholder="e.g. ABC Pharma"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-slate-700">Dosage</label>
+                        <input
+                          name="dosage"
+                          value={newMedicine.dosage}
+                          onChange={handleNewMedicineChange}
+                          className="mt-1 block w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-blue-500"
+                          placeholder="e.g. 500mg"
+                        />
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-sm font-medium text-slate-700">Type</label>
+                        <input
+                          name="type"
+                          value={newMedicine.type}
+                          onChange={handleNewMedicineChange}
+                          className="mt-1 block w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-blue-500"
+                          placeholder="Tablet / Syrup / Capsule"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-slate-700">Price</label>
+                        <input
+                          name="price"
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={newMedicine.price}
+                          onChange={handleNewMedicineChange}
+                          className="mt-1 block w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-blue-500"
+                          placeholder="e.g. 49.99"
+                        />
+                      </div>
+                    </div>
                     <div>
                       <label className="block text-sm font-medium text-slate-700">Stock</label>
                       <input
@@ -1110,9 +1329,10 @@ const StoreDashboard = () => {
                     </div>
                     <button
                       type="submit"
+                      disabled={inventorySaving}
                       className="w-full rounded-2xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white hover:bg-blue-700 transition"
                     >
-                      Add Medicine
+                      {inventorySaving ? 'Adding...' : 'Add Medicine'}
                     </button>
                   </form>
                 </div>

@@ -1,10 +1,13 @@
-import React, { useEffect } from "react";
+import { useEffect, useState } from "react";
+import axios from "axios";
 import emergency from "../assets/emergency.png";
 import info from "../assets/info.png";
 import tracking from "../assets/tracking.png";
 import Footer from "../components/Footer";
 import { useLocation, useNavigate } from "react-router-dom";
-import FeedbackCarousal from "../components/FeedbackCarousal";
+import TestimonialCard from "../components/Testimonials/TestimonialCard";
+import { testimonials as staticTestimonials } from "../components/Testimonials/data";
+import { baseURL } from '../main';
 import {
   Shield,
   Clock,
@@ -24,6 +27,23 @@ const Home = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const token = localStorage.getItem("medVisionToken");
+  const [liveReviews, setLiveReviews] = useState([]);
+
+  useEffect(() => {
+    axios.get(`${baseURL}/reviews?random=true&limit=8`)
+      .then(res => { if (res.data.reviews?.length) setLiveReviews(res.data.reviews); })
+      .catch(() => {});
+  }, []);
+
+  const displayReviews = liveReviews.length > 0
+    ? liveReviews.slice(0, 8).map((r) => ({
+      name: r.name,
+      role: `${r.role || 'Patient'}${r.storeName ? ` • ${r.storeName}` : ''}`,
+      comment: r.comment,
+      rating: r.rating,
+      image: `https://ui-avatars.com/api/?name=${encodeURIComponent(r.name)}&background=0ea5e9&color=fff&size=64`,
+    }))
+    : staticTestimonials;
 
   const handleOnlinePharmacy = () => navigate("/onlinepharmacy");
   const handleEmergencyPharmacy = () => navigate("/emergencyguidelines");
@@ -369,33 +389,46 @@ const Home = () => {
         <div className="absolute top-8 left-10 h-72 w-72 rounded-full bg-cyan-400/20 blur-3xl" />
         <div className="absolute bottom-10 right-10 h-72 w-72 rounded-full bg-emerald-400/20 blur-3xl" />
 
-        <div className="relative mx-auto grid max-w-7xl gap-10 lg:grid-cols-[1fr_1fr] lg:items-center">
-          <div className="text-white">
-            <p className="text-xs font-semibold uppercase tracking-[0.3em] text-cyan-200">Patient Voices</p>
+        <div className="relative mx-auto max-w-7xl">
+          {/* Header */}
+          <div className="mb-12 text-center text-white">
+            <p className="text-xs font-semibold uppercase tracking-[0.3em] text-cyan-300">Patient Voices</p>
             <h2 className="mt-3 text-4xl font-black leading-tight md:text-5xl">
-              First-time users become loyal in one order.
+              First-time users become{" "}
+              <span className="text-cyan-300">loyal in one order.</span>
             </h2>
-            <p className="mt-5 max-w-xl text-base leading-8 text-cyan-100">
+            <p className="mx-auto mt-4 max-w-2xl text-base leading-8 text-cyan-100">
               Consistent delivery, genuine medicines, and transparent tracking create a pharmacy experience people trust.
             </p>
-            <div className="mt-8 flex gap-8">
+            {/* Stats row */}
+            <div className="mt-8 flex justify-center gap-10">
               <div>
                 <p className="text-3xl font-bold text-white">98%</p>
-                <p className="text-sm text-cyan-100">Satisfaction</p>
+                <p className="text-sm text-cyan-200">Satisfaction</p>
               </div>
+              <div className="h-12 w-px bg-white/20" />
               <div>
                 <p className="text-3xl font-bold text-white">24/7</p>
-                <p className="text-sm text-cyan-100">Support</p>
+                <p className="text-sm text-cyan-200">Support</p>
               </div>
+              <div className="h-12 w-px bg-white/20" />
               <div>
                 <p className="text-3xl font-bold text-white">50K+</p>
-                <p className="text-sm text-cyan-100">Reviews</p>
+                <p className="text-sm text-cyan-200">Reviews</p>
               </div>
             </div>
           </div>
 
-          <div className="rounded-3xl border border-white/15 bg-white/10 p-5 backdrop-blur-md">
-            <FeedbackCarousal />
+          {/* Testimonial cards grid */}
+          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+            {displayReviews.map((t, i) => (
+              <div
+                key={i}
+                className="transition-transform duration-300 hover:-translate-y-1"
+              >
+                <TestimonialCard {...t} />
+              </div>
+            ))}
           </div>
         </div>
       </section>
