@@ -4,7 +4,37 @@ const multer = require("multer");
 const fs = require("fs");
 const os = require("os");
 const path = require("path");
-const { signUp, signIn, fetchData, AdminfetchData, adminsignIn, uploadPrescriptionFile, UpdatePatientProfile, fetchpharmacymedicines, updateorderedmedicines, updatecartquantity, addmedicinetodb, decreaseupdatecartquantity, deletemedicine, finalitems, finaladdress, finalpayment, deletecartItems, createStoreApprovalRequest, getStoreApprovalRequests, reviewStoreApprovalRequest, getAllStores, updateStoreStatus, addStore, getUserNotificationPreferences, updateUserNotificationPreferences, uploadPrescriptionRequest, reuploadPrescriptionRequest, getMyPrescriptionRequests, getStorePrescriptionRequests, reviewPrescriptionRequest, getStoreOrders, updateOrderTrackingStatus, getMyOrders, getOrderById, getStoreStaffMembers, createStoreStaffMember, updateStoreStaffMember, updateStoreStaffStatus, deleteStoreStaffMember, getCart, seedVaccinationMasterIfEmpty, upsertUserVaccination, getUserVaccinations, getVaccinationMaster, getUserVaccinationsForDashboard, updateUserVaccinationByMasterId, createUserQuery, getUserQueries, getStoreQueries, answerStoreQuery, importPatientsFromCsv, getMedicinesByStore, getStoreInventory, createStoreInventoryMedicine, updateStoreInventoryMedicine, deleteStoreInventoryMedicine, createReview, updateReview, deleteReview, getPublicReviews, getStoreReviews, getMyReviews } = require("../controllers/auth");
+const { signUp, signIn, fetchData, AdminfetchData, adminsignIn, uploadPrescriptionFile, UpdatePatientProfile, fetchpharmacymedicines, updateorderedmedicines, updatecartquantity, addmedicinetodb, decreaseupdatecartquantity, deletemedicine, finalitems, finaladdress, finalpayment, deletecartItems, createStoreApprovalRequest, getStoreApprovalRequests, reviewStoreApprovalRequest, getAllStores, updateStoreStatus, addStore, getUserNotificationPreferences, updateUserNotificationPreferences, uploadPrescriptionRequest, reuploadPrescriptionRequest, getMyPrescriptionRequests, getStorePrescriptionRequests, reviewPrescriptionRequest, getStoreOrders, updateOrderTrackingStatus, getMyOrders, getOrderById, getStoreStaffMembers, createStoreStaffMember, updateStoreStaffMember, updateStoreStaffStatus, deleteStoreStaffMember, getCart, seedVaccinationMasterIfEmpty, upsertUserVaccination, getUserVaccinations, getVaccinationMaster, getUserVaccinationsForDashboard, updateUserVaccinationByMasterId, createUserQuery, getUserQueries, getStoreQueries, answerStoreQuery, importPatientsFromCsv, getMedicinesByStore, getStoreInventory, createStoreInventoryMedicine, updateStoreInventoryMedicine, deleteStoreInventoryMedicine, createReview, updateReview, deleteReview, getPublicReviews, getStoreReviews, getMyReviews, getMyStoreReviews, replyToReview, uploadPrescriptionForAutoFill, extractMedicinesFromUploadedPrescription, getUserPrescriptionUploads, addExtractedMedicinesToCart, getWishlist, addToWishlist, removeFromWishlist, createMedicineTracker, getMedicineTrackers, logMedicineIntake, checkDrugInteractions, getMedicalTimeline, exportHealthRecordsPdf, getPublicPromotionalCampaigns, validatePublicCoupon } = require("../controllers/auth");
+const {
+  getStoreRolePermissions,
+  createStaffPerformanceRecord,
+  getStaffPerformanceRecords,
+  createStaffAttendanceRecord,
+  getStaffAttendanceRecords,
+  checkInStaffAttendance,
+  checkOutStaffAttendance,
+  createStaffTrainingRecord,
+  getStaffTrainingRecords,
+  createComplianceChecklistItem,
+  getComplianceChecklistItems,
+  updateComplianceChecklistItem,
+  getComplianceReminders,
+  createInvoice,
+  getStoreInvoices,
+  reconcileInvoicePayment,
+  getPaymentReconciliationReport,
+  createSupplier,
+  getSuppliers,
+  updateSupplier,
+  deleteSupplier,
+  addSupplierPayment,
+  getProfitMarginReport,
+  getTaxReport,
+  createPromotionalCampaign,
+  getPromotionalCampaigns,
+  updatePromotionalCampaignStatus,
+  deletePromotionalCampaign,
+} = require("../controllers/auth");
 const verifyToken  = require("../middleware/authMiddleware");  
 
 const uploadsDir = process.env.UPLOADS_DIR || path.join(os.tmpdir(), "medvision-uploads");
@@ -142,6 +172,50 @@ router.post("/store-staff", verifyToken(["Store"]), createStoreStaffMember);
 router.put("/store-staff/:id", verifyToken(["Store"]), updateStoreStaffMember);
 router.patch("/store-staff/:id/status", verifyToken(["Store"]), updateStoreStaffStatus);
 router.delete("/store-staff/:id", verifyToken(["Store"]), deleteStoreStaffMember);
+router.get("/store-staff/permissions", verifyToken(["Store"]), getStoreRolePermissions);
+
+// Staff Performance
+router.post("/staff/performance", verifyToken(["Store"]), createStaffPerformanceRecord);
+router.get("/staff/performance", verifyToken(["Store"]), getStaffPerformanceRecords);
+
+// Attendance & Shift Management
+router.post("/staff/attendance", verifyToken(["Store"]), createStaffAttendanceRecord);
+router.get("/staff/attendance", verifyToken(["Store"]), getStaffAttendanceRecords);
+router.patch("/staff/attendance/:id/check-in", verifyToken(["Store"]), checkInStaffAttendance);
+router.patch("/staff/attendance/:id/check-out", verifyToken(["Store"]), checkOutStaffAttendance);
+
+// Staff Training
+router.post("/staff/training", verifyToken(["Store"]), createStaffTrainingRecord);
+router.get("/staff/training", verifyToken(["Store"]), getStaffTrainingRecords);
+
+// Compliance Checklist
+router.post("/compliance/checklist", verifyToken(["Store"]), createComplianceChecklistItem);
+router.get("/compliance/checklist", verifyToken(["Store"]), getComplianceChecklistItems);
+router.put("/compliance/checklist/:id", verifyToken(["Store"]), updateComplianceChecklistItem);
+router.get("/compliance/reminders", verifyToken(["Store"]), getComplianceReminders);
+
+// Financial Management
+router.post("/finance/invoices", verifyToken(["Store"]), createInvoice);
+router.get("/finance/invoices", verifyToken(["Store"]), getStoreInvoices);
+router.patch("/finance/invoices/:invoiceId/payments", verifyToken(["Store"]), reconcileInvoicePayment);
+router.get("/finance/reconciliation", verifyToken(["Store"]), getPaymentReconciliationReport);
+router.get("/finance/profit-margin", verifyToken(["Store"]), getProfitMarginReport);
+router.get("/finance/tax-report", verifyToken(["Store"]), getTaxReport);
+
+// Promotional Campaign Management
+router.post("/marketing/campaigns", verifyToken(["Store"]), createPromotionalCampaign);
+router.get("/marketing/campaigns", verifyToken(["Store"]), getPromotionalCampaigns);
+router.patch("/marketing/campaigns/:campaignId/status", verifyToken(["Store"]), updatePromotionalCampaignStatus);
+router.delete("/marketing/campaigns/:campaignId", verifyToken(["Store"]), deletePromotionalCampaign);
+router.get('/marketing/campaigns/public', getPublicPromotionalCampaigns);
+router.post('/marketing/campaigns/validate-coupon', validatePublicCoupon);
+
+// Supplier Management
+router.post("/suppliers", verifyToken(["Store"]), createSupplier);
+router.get("/suppliers", verifyToken(["Store"]), getSuppliers);
+router.put("/suppliers/:supplierId", verifyToken(["Store"]), updateSupplier);
+router.delete("/suppliers/:supplierId", verifyToken(["Store"]), deleteSupplier);
+router.patch("/suppliers/:supplierId/payments", verifyToken(["Store"]), addSupplierPayment);
 
 // Order tracking status update
 router.patch("/orders/:orderId/tracking", verifyToken(["Store"]), updateOrderTrackingStatus);
@@ -158,11 +232,32 @@ router.post('/store-inventory', verifyToken(['Store']), createStoreInventoryMedi
 router.put('/store-inventory/:medicineId', verifyToken(['Store']), updateStoreInventoryMedicine);
 router.delete('/store-inventory/:medicineId', verifyToken(['Store']), deleteStoreInventoryMedicine);
 
+// Prescription Upload for Auto-Fill Feature
+router.post('/prescriptions/auto-fill/upload', verifyToken(['User']), prescriptionUploadSingle, uploadPrescriptionForAutoFill);
+router.post('/prescriptions/auto-fill/:prescriptionId/extract', verifyToken(['User']), extractMedicinesFromUploadedPrescription);
+router.get('/prescriptions/auto-fill', verifyToken(['User']), getUserPrescriptionUploads);
+router.post('/prescriptions/auto-fill/:prescriptionId/add-to-cart', verifyToken(['User']), addExtractedMedicinesToCart);
+
+// Wishlist
+router.get('/wishlist', verifyToken(['User']), getWishlist);
+router.post('/wishlist', verifyToken(['User']), addToWishlist);
+router.delete('/wishlist/:medicineId', verifyToken(['User']), removeFromWishlist);
+
+// Health Management
+router.get('/health/trackers', verifyToken(['User']), getMedicineTrackers);
+router.post('/health/trackers', verifyToken(['User']), createMedicineTracker);
+router.patch('/health/trackers/:id/intake', verifyToken(['User']), logMedicineIntake);
+router.post('/health/interactions/check', verifyToken(['User']), checkDrugInteractions);
+router.get('/health/timeline', verifyToken(['User']), getMedicalTimeline);
+router.get('/health/export/pdf', verifyToken(['User']), exportHealthRecordsPdf);
+
 // Reviews
 router.get('/reviews', getPublicReviews);
+router.get('/reviews/store/me', verifyToken(['Store']), getMyStoreReviews);
 router.get('/reviews/store/:storeId', getStoreReviews);
 router.post('/reviews', verifyToken(['User']), createReview);
 router.put('/reviews/:id', verifyToken(['User']), updateReview);
+router.patch('/reviews/:id/reply', verifyToken(['Store']), replyToReview);
 router.delete('/reviews/:id', verifyToken(['User']), deleteReview);
 router.get('/reviews/me', verifyToken(['User']), getMyReviews);
 

@@ -1,8 +1,10 @@
-import React, { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { baseURL } from '../main';
 import axios from 'axios';
-import { Menu, X, LogOut, LayoutDashboard, LogIn, UserPlus, Pill, Clock, ShieldCheck, ShoppingBag, FileText, Sparkles } from 'lucide-react';
+import { Menu, X, LogOut, LayoutDashboard, LogIn, UserPlus, Pill, ShieldCheck, ShoppingBag, FileText, Sparkles, Moon, Sun, Globe } from 'lucide-react';
+import { useTheme } from '../contexts/ThemeContext';
+import { useLanguage } from '../contexts/LanguageContext';
 
 const Navbar = () => {
     const navigate = useNavigate();
@@ -10,13 +12,16 @@ const Navbar = () => {
     const token = localStorage.getItem('medVisionToken');
     const userType = localStorage.getItem('medVisionUserType');
     const navbarRef = useRef(null);
+    const { darkMode, toggleDarkMode } = useTheme();
+    const { language, changeLanguage, SUPPORTED_LANGUAGES } = useLanguage();
+    const langMenuRef = useRef(null);
 
     const [isLoggedIn, setIsLoggedIn] = useState(false);
-    const [userData, setUserData] = useState(null);
     const [adminData, setAdminData] = useState(null);
     const [currentTime, setCurrentTime] = useState(new Date());
     const [menuOpen, setMenuOpen] = useState(false);
     const [showLogoutModal, setShowLogoutModal] = useState(false);
+    const [showLangMenu, setShowLangMenu] = useState(false);
 
 
     const scrollToElement = (id) => {
@@ -33,6 +38,17 @@ const Navbar = () => {
             });
         }
     };
+
+    // Close language menu on outside click
+    useEffect(() => {
+        const handleClick = (e) => {
+            if (langMenuRef.current && !langMenuRef.current.contains(e.target)) {
+                setShowLangMenu(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClick);
+        return () => document.removeEventListener('mousedown', handleClick);
+    }, []);
 
     const navigateToHomeSection = (sectionId) => {
         if (location.pathname === '/') {
@@ -54,7 +70,6 @@ const Navbar = () => {
                 headers: { Authorization: `Bearer ${token}` },
             });
 
-            setUserData(response.data.userData);
             localStorage.setItem('userData', JSON.stringify(response.data.userData));
         } catch (error) {
             console.error("Error fetching data:", error.message);
@@ -223,7 +238,7 @@ const Navbar = () => {
                     </div>
                 </div>
 
-                <div className="bg-white shadow-lg border-b border-cyan-100/70">
+                <div className="bg-gradient-to-r from-white via-slate-50 to-cyan-50/40 shadow-[0_12px_30px_rgba(2,132,199,0.08)] border-b border-cyan-100/80 backdrop-blur-xl">
 
                 <div className="flex justify-between items-center px-4 sm:px-6 lg:px-10 py-3 max-w-[1400px] mx-auto gap-4">
 
@@ -289,21 +304,20 @@ const Navbar = () => {
                     <div className="hidden xl:flex items-center gap-6">
 
                         {!isLoggedIn ? (
-                            <div className="flex items-center gap-4">
+                            <div className="flex items-center gap-3 rounded-2xl border border-cyan-100 bg-white/90 px-2.5 py-2 shadow-sm">
 
                                 <Link to="/login"
-                                    className="px-5 py-2.5 rounded-xl border-2 border-blue-600 text-blue-600 font-semibold
-                                transition-all duration-300 hover:bg-blue-600 hover:text-white hover:shadow-lg active:scale-95
-                                flex items-center gap-2">
+                                    className="inline-flex h-11 min-w-[128px] items-center justify-center gap-2 rounded-xl border-2 border-blue-600 px-5 text-sm font-semibold text-blue-600
+                                transition-all duration-300 hover:bg-blue-600 hover:text-white hover:shadow-md active:scale-95">
                                     <LogIn className="w-4 h-4" />
                                     Login
                                 </Link>
 
                                 <Link to="/signup"
-                                    className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 to-blue-700 text-white font-semibold
-                                shadow-md transition-all duration-300 hover:shadow-lg hover:scale-105 active:scale-95">
-                                    <UserPlus className="w-4 h-4 inline mr-2" />
-                                    SignUp
+                                    className="inline-flex h-11 min-w-[128px] items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 via-cyan-600 to-emerald-500 px-5 text-sm font-semibold text-white
+                                shadow-md transition-all duration-300 hover:shadow-lg hover:brightness-105 active:scale-95">
+                                    <UserPlus className="w-4 h-4" />
+                                    Sign Up
                                 </Link>
 
                             </div>
@@ -335,18 +349,48 @@ const Navbar = () => {
                             </div>
                         )}
 
-                        {/* Timer - Desktop Only */}
-                        <div className="ml-4 pl-4 border-l border-blue-200">
-                            <div className="flex items-center gap-3 bg-gradient-to-br from-sky-50 via-white to-emerald-50 px-4 py-2 rounded-2xl shadow-sm border border-cyan-100">
-                                <div className="w-8 h-8 rounded-xl bg-white shadow-sm border border-cyan-100 flex items-center justify-center">
-                                    <Clock className="w-4 h-4 text-blue-600" />
-                                </div>
-                                <div>
-                                    <p className="text-[10px] uppercase tracking-[0.16em] text-slate-500 font-semibold">Pharmacy Hours Live</p>
-                                    <p className="text-xs text-blue-600 font-medium">{formattedDate}</p>
-                                    <p className="text-sm font-bold text-blue-700">{formattedTime}</p>
-                                </div>
+                        {/* Header Controls */}
+                        <div className="ml-4 pl-4 border-l border-blue-200 flex items-center gap-3">
+
+                            {/* Dark Mode Toggle */}
+                            <button
+                                onClick={toggleDarkMode}
+                                title={darkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+                                className="p-2.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-100 transition dark:bg-slate-800 dark:border-slate-700 dark:hover:bg-slate-700"
+                            >
+                                {darkMode
+                                    ? <Sun className="w-4 h-4 text-amber-500" />
+                                    : <Moon className="w-4 h-4 text-slate-600" />
+                                }
+                            </button>
+
+                            {/* Language Selector */}
+                            <div className="relative" ref={langMenuRef}>
+                                <button
+                                    onClick={() => setShowLangMenu((v) => !v)}
+                                    title="Change Language"
+                                    className="flex items-center gap-1.5 p-2.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-100 transition dark:bg-slate-800 dark:border-slate-700 dark:hover:bg-slate-700"
+                                >
+                                    <Globe className="w-4 h-4 text-slate-600 dark:text-slate-300" />
+                                    <span className="text-xs font-bold text-slate-600 dark:text-slate-300 uppercase">{language}</span>
+                                </button>
+                                {showLangMenu && (
+                                    <div className="absolute right-0 top-full mt-2 w-44 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-xl z-[200] py-1.5 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-150">
+                                        {SUPPORTED_LANGUAGES.map((lang) => (
+                                            <button
+                                                key={lang.code}
+                                                onClick={() => { changeLanguage(lang.code); setShowLangMenu(false); }}
+                                                className={`w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-left transition hover:bg-cyan-50 dark:hover:bg-slate-700 ${language === lang.code ? 'font-bold text-cyan-700 dark:text-cyan-400 bg-cyan-50 dark:bg-slate-700' : 'text-slate-700 dark:text-slate-200'}`}
+                                            >
+                                                <span>{lang.flag}</span>
+                                                <span>{lang.name}</span>
+                                                {language === lang.code && <span className="ml-auto w-2 h-2 rounded-full bg-cyan-500" />}
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
                             </div>
+
                         </div>
 
                     </div>
@@ -426,7 +470,7 @@ const Navbar = () => {
 
                                     <Link to="/login"
                                         onClick={() => setMenuOpen(false)}
-                                        className="px-4 py-3 rounded-lg border-2 border-blue-600 text-blue-600 font-semibold
+                                        className="h-11 px-4 rounded-lg border-2 border-blue-600 text-blue-600 font-semibold
                                     transition-all duration-300 hover:bg-blue-600 hover:text-white
                                     flex items-center justify-center gap-2">
                                         <LogIn className="w-4 h-4" />
@@ -435,8 +479,8 @@ const Navbar = () => {
 
                                     <Link to="/signup"
                                         onClick={() => setMenuOpen(false)}
-                                        className="px-4 py-3 rounded-lg bg-gradient-to-r from-blue-600 to-blue-700 text-white font-semibold
-                                    shadow-md transition-all duration-300 hover:shadow-lg
+                                        className="h-11 px-4 rounded-lg bg-gradient-to-r from-blue-600 via-cyan-600 to-emerald-500 text-white font-semibold
+                                    shadow-md transition-all duration-300 hover:shadow-lg hover:brightness-105
                                     flex items-center justify-center gap-2">
                                         <UserPlus className="w-4 h-4" />
                                         Sign Up
@@ -474,14 +518,28 @@ const Navbar = () => {
                                 </div>
                             )}
 
-                            {/* Mobile Timer */}
-                            <div className="mt-6 pt-6 border-t border-blue-100 bg-gradient-to-br from-blue-50 to-emerald-50 px-4 py-4 rounded-xl">
-                                <div className="flex items-center gap-2 mb-3">
-                                    <Clock className="w-4 h-4 text-blue-600" />
-                                    <p className="text-xs font-bold text-blue-600 uppercase tracking-wide">Current Time</p>
+                            {/* Mobile: Dark Mode / Language */}
+                            <div className="mt-2 flex flex-wrap items-center gap-3 pt-4 border-t border-blue-100">
+                                <button
+                                    onClick={toggleDarkMode}
+                                    className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-slate-200 bg-white text-sm font-semibold text-slate-700 hover:bg-slate-100 transition"
+                                >
+                                    {darkMode ? <Sun className="w-4 h-4 text-amber-500" /> : <Moon className="w-4 h-4 text-slate-500" />}
+                                    {darkMode ? 'Light Mode' : 'Dark Mode'}
+                                </button>
+
+                                <div className="flex-1">
+                                    <select
+                                        value={language}
+                                        onChange={(e) => changeLanguage(e.target.value)}
+                                        className="w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-white text-sm font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-cyan-400"
+                                    >
+                                        {SUPPORTED_LANGUAGES.map((lang) => (
+                                            <option key={lang.code} value={lang.code}>{lang.flag} {lang.name}</option>
+                                        ))}
+                                    </select>
                                 </div>
-                                <p className="text-sm text-gray-600 mb-1">{formattedDate}</p>
-                                <p className="text-2xl font-bold text-blue-700">{formattedTime}</p>
+
                             </div>
 
                         </div>

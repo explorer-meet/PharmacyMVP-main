@@ -38,6 +38,8 @@ const paymentMethods = [
 export function PaymentPage() {
   const latestOrderStorageKey = 'medVisionLatestOrderId';
   const checkoutCartStorageKey = 'medVisionCheckoutCart';
+  const checkoutSummaryStorageKey = 'medVisionCheckoutSummary';
+  const appliedCampaignStorageKey = 'medVisionAppliedCampaign';
   const navigate = useNavigate();
   const [selectedMethod, setSelectedMethod] = useState('card');
   const [pageLoading, setPageLoading] = useState(false);
@@ -61,6 +63,14 @@ export function PaymentPage() {
     quantity: medicine.quantity || 1,
   }));
   const cartItems = routeCartItems.length ? routeCartItems : fallbackCartItems;
+  const storedCheckoutSummary = (() => {
+    try {
+      return JSON.parse(localStorage.getItem(checkoutSummaryStorageKey) || 'null');
+    } catch {
+      return null;
+    }
+  })();
+  const checkoutSummary = location.state?.checkoutSummary || storedCheckoutSummary;
 
   const parseItemPrice = (item) => {
     const rawPrice = item?.price ?? item?.totalPrice ?? 0;
@@ -74,10 +84,12 @@ export function PaymentPage() {
   };
 
   const totalItems = cartItems.reduce((sum, item) => sum + parseItemQuantity(item), 0);
-  const payableAmount = cartItems.reduce(
+  const subtotalAmount = cartItems.reduce(
     (sum, item) => sum + parseItemPrice(item) * parseItemQuantity(item),
     0
   );
+  const discountAmount = Math.max(0, Math.min(subtotalAmount, Number(checkoutSummary?.discountAmount) || 0));
+  const payableAmount = Math.max(0, subtotalAmount - discountAmount);
 
   const formattedPayableAmount = new Intl.NumberFormat('en-US', {
     style: 'currency',
@@ -208,6 +220,8 @@ export function PaymentPage() {
       if (response.status === 200) {
         localStorage.setItem(latestOrderStorageKey, currentOrderId);
         localStorage.removeItem(checkoutCartStorageKey);
+        localStorage.removeItem(checkoutSummaryStorageKey);
+        localStorage.removeItem(appliedCampaignStorageKey);
         setTimeout(() => {
           deletecartitems();
           setIsProcessing(false);
@@ -313,6 +327,23 @@ export function PaymentPage() {
                   <span className="font-semibold text-gray-900">{totalItems}</span>
                 </div>
                 <div className="flex items-center justify-between text-sm text-gray-600">
+                  <span>Subtotal</span>
+                  <span className="font-semibold text-gray-900">{new Intl.NumberFormat('en-US', { style: 'currency', currency: 'INR' }).format(subtotalAmount)}</span>
+                </div>
+                {discountAmount > 0 && (
+                  <>
+                    <div className="flex items-center justify-between text-sm text-emerald-700">
+                      <span>Promo Discount</span>
+                      <span className="font-semibold">- {new Intl.NumberFormat('en-US', { style: 'currency', currency: 'INR' }).format(discountAmount)}</span>
+                    </div>
+                    {checkoutSummary?.campaign?.couponCode && (
+                      <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-700">
+                        Applied coupon: <span className="font-bold">{checkoutSummary.campaign.couponCode}</span>
+                      </div>
+                    )}
+                  </>
+                )}
+                <div className="flex items-center justify-between text-sm text-gray-600">
                   <span>Method</span>
                   <span className="font-semibold text-gray-900">
                     {paymentMethods.find(m => m.id === selectedMethod)?.title || selectedMethod}
@@ -325,7 +356,7 @@ export function PaymentPage() {
               </div>
 
               <button
-                onClick={() => navigate('/addresspage', { state: { cartItems } })}
+                onClick={() => navigate('/addresspage', { state: { cartItems, checkoutSummary } })}
                 className="mt-5 w-full inline-flex items-center justify-center gap-2 py-2.5 rounded-xl border border-blue-200 text-blue-700 hover:bg-blue-50 transition-colors"
               >
                 <ChevronLeft className="w-4 h-4" />

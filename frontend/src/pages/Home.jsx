@@ -12,7 +12,6 @@ import {
   Shield,
   Clock,
   Truck,
-  Pill,
   FileText,
   Search,
   ShoppingCart,
@@ -21,6 +20,7 @@ import {
   ArrowRight,
   HeartPulse,
   CheckCircle2,
+  BadgePercent,
 } from "lucide-react";
 
 const Home = () => {
@@ -28,11 +28,18 @@ const Home = () => {
   const location = useLocation();
   const token = localStorage.getItem("medVisionToken");
   const [liveReviews, setLiveReviews] = useState([]);
+  const [promotions, setPromotions] = useState([]);
 
   useEffect(() => {
     axios.get(`${baseURL}/reviews?random=true&limit=8`)
       .then(res => { if (res.data.reviews?.length) setLiveReviews(res.data.reviews); })
       .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    axios.get(`${baseURL}/marketing/campaigns/public?limit=6`)
+      .then((res) => setPromotions(res.data?.campaigns || []))
+      .catch(() => setPromotions([]));
   }, []);
 
   const displayReviews = liveReviews.length > 0
@@ -97,7 +104,7 @@ const Home = () => {
       elements.forEach((element) => observer.unobserve(element));
       observer.disconnect();
     };
-  }, []);
+  }, [promotions.length]);
 
   return (
     <div className="w-full overflow-hidden bg-[#f7fbff]">
@@ -293,7 +300,58 @@ const Home = () => {
         </div>
       </section>
 
-      <section id="about" className="reveal-on-scroll relative overflow-hidden px-4 sm:px-6 lg:px-16 py-20">
+      {promotions.length > 0 && (
+        <section className="reveal-on-scroll px-4 sm:px-6 lg:px-16 pb-14">
+          <div className="mx-auto max-w-7xl rounded-[2rem] border border-fuchsia-100 bg-gradient-to-r from-fuchsia-50 via-white to-rose-50 p-6 shadow-lg md:p-8">
+            <div className="mb-6 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="inline-flex items-center gap-2 rounded-full border border-fuchsia-200 bg-white px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-fuchsia-700">
+                  <BadgePercent className="h-3.5 w-3.5" />
+                  Live Offers
+                </p>
+                <h2 className="mt-3 text-3xl font-black text-slate-900 md:text-4xl">Today&apos;s Promotions</h2>
+                <p className="mt-2 text-sm text-slate-600 md:text-base">Offers, coupons, and bulk discounts created by our partner stores.</p>
+              </div>
+              <button
+                onClick={handleOnlinePharmacy}
+                className="inline-flex items-center gap-2 rounded-xl border border-fuchsia-200 bg-white px-5 py-2.5 text-sm font-semibold text-fuchsia-700 hover:bg-fuchsia-50"
+              >
+                Redeem In Pharmacy
+                <ArrowRight className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {promotions.map((campaign) => (
+                <div key={campaign._id} className="rounded-2xl border border-fuchsia-100 bg-white p-5 shadow-sm">
+                  <div className="mb-3 flex items-center justify-between">
+                    <span className="rounded-full bg-fuchsia-100 px-2.5 py-1 text-[11px] font-semibold text-fuchsia-700">
+                      {campaign.campaignType}
+                    </span>
+                    {campaign.couponCode ? (
+                      <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-[11px] font-semibold text-emerald-700">
+                        {campaign.couponCode}
+                      </span>
+                    ) : null}
+                  </div>
+                  <h3 className="text-lg font-bold text-slate-900">{campaign.title}</h3>
+                  <p className="mt-1 text-xs text-slate-500">{campaign.storeName}{campaign.storeCity ? ` • ${campaign.storeCity}` : ''}</p>
+                  {campaign.description ? (
+                    <p className="mt-2 text-sm text-slate-600 line-clamp-2">{campaign.description}</p>
+                  ) : null}
+                  <div className="mt-3 rounded-xl bg-fuchsia-50 px-3 py-2 text-sm font-semibold text-fuchsia-800">
+                    {campaign.discountType} {campaign.discountValue}
+                    {campaign.discountType === 'Percentage' ? '%' : ''}
+                    {campaign.minOrderAmount ? ` • Min Order ${campaign.minOrderAmount}` : ''}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
+
+      <section id="about" className="reveal-on-scroll relative overflow-hidden px-4 sm:px-6 lg:px-16 pt-10 pb-20">
         <div className="absolute -left-24 top-10 h-64 w-64 rounded-full bg-cyan-200/25 blur-3xl" />
         <div className="absolute -right-24 bottom-0 h-72 w-72 rounded-full bg-sky-200/25 blur-3xl" />
 

@@ -8,6 +8,11 @@ const reviewSchema = new mongoose.Schema({
     role:     { type: String, default: 'Patient' },
     rating:   { type: Number, required: true, min: 1, max: 5 },
     comment:  { type: String, required: true, maxlength: 600 },
+    storeResponse: {
+        message: { type: String, default: '', maxlength: 1000 },
+        repliedAt: { type: Date, default: null },
+        repliedBy: { type: String, default: '' },
+    },
     approved: { type: Boolean, default: true },
 }, { timestamps: true });
 

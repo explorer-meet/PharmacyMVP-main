@@ -6,6 +6,13 @@ const Pharmacy = require("../models/pharmacy");
 const StoreApprovalRequest = require("../models/storeApprovalRequest");
 const Store = require("../models/store");
 const StoreStaff = require("../models/storeStaff");
+const StaffAttendance = require("../models/staffAttendance");
+const StaffPerformance = require("../models/staffPerformance");
+const StaffTraining = require("../models/staffTraining");
+const ComplianceChecklist = require("../models/complianceChecklist");
+const Supplier = require("../models/supplier");
+const Invoice = require("../models/invoice");
+const PromotionalCampaign = require("../models/promotionalCampaign");
 const Order = require("../models/order");
 const UserNotification = require("../models/userNotification");
 const UserQuery = require("../models/userQuery");
@@ -727,17 +734,23 @@ const getUserNotificationPreferences = async (req, res) => {
 
 const updateUserNotificationPreferences = async (req, res) => {
     try {
-        const { isEmailNotificationOn, isSmsNotificationOn } = req.body;
+        const { isEmailNotificationOn, isSmsNotificationOn, pushPrefs, emailPrefs, smsPrefs } = req.body;
 
         const updatePayload = {};
 
-        if (typeof isEmailNotificationOn === 'boolean') {
-            updatePayload.isEmailNotificationOn = isEmailNotificationOn;
-        }
+        if (typeof isEmailNotificationOn === 'boolean') updatePayload.isEmailNotificationOn = isEmailNotificationOn;
+        if (typeof isSmsNotificationOn   === 'boolean') updatePayload.isSmsNotificationOn   = isSmsNotificationOn;
 
-        if (typeof isSmsNotificationOn === 'boolean') {
-            updatePayload.isSmsNotificationOn = isSmsNotificationOn;
-        }
+        const categoryKeys = ['orderUpdates', 'prescriptionReminders', 'offerAlerts', 'healthReminders'];
+        const applyPrefs = (prefs, prefix) => {
+            if (!prefs || typeof prefs !== 'object') return;
+            for (const key of categoryKeys) {
+                if (typeof prefs[key] === 'boolean') updatePayload[`${prefix}.${key}`] = prefs[key];
+            }
+        };
+        applyPrefs(pushPrefs,  'pushPrefs');
+        applyPrefs(emailPrefs, 'emailPrefs');
+        applyPrefs(smsPrefs,   'smsPrefs');
 
         if (!Object.keys(updatePayload).length) {
             return res.status(StatusCodes.BAD_REQUEST).json({
@@ -2080,7 +2093,7 @@ const createStoreStaffMember = async (req, res) => {
             firstName,
             middleName,
             lastName,
-            role,
+            role: normalizeStaffRole(role),
             email,
             contact,
             address,
@@ -2125,7 +2138,7 @@ const updateStoreStaffMember = async (req, res) => {
                     firstName,
                     middleName,
                     lastName,
-                    role,
+                    role: normalizeStaffRole(role),
                     email,
                     contact,
                     address,
@@ -3002,7 +3015,7 @@ const getPublicReviews = async (req, res) => {
             reviews = await Review.find(match)
                 .sort({ createdAt: -1 })
                 .limit(parsedLimit)
-                .select('name role rating comment storeId storeName createdAt updatedAt')
+                .select('name role rating comment storeId storeName storeResponse createdAt updatedAt')
                 .lean();
         }
 
@@ -3027,12 +3040,96 @@ const getStoreReviews = async (req, res) => {
         const reviews = await Review.find({ approved: true, storeId })
             .sort({ createdAt: -1 })
             .limit(parsedLimit)
-            .select('name role rating comment storeId storeName createdAt updatedAt')
+            .select('name role rating comment storeId storeName storeResponse createdAt updatedAt')
             .lean();
 
         return res.status(StatusCodes.OK).json({ reviews });
     } catch (err) {
         console.error('[Review] getStoreReviews error', err.message);
+        return res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({ message: 'Server error' });
+    }
+};
+
+const getMyStoreReviews = async (req, res) => {
+    try {
+        const storeId = req.user?._id;
+        const { limit } = req.query;
+        const parsedLimit = Math.min(100, Math.max(1, Number(limit) || 50));
+
+        if (!storeId) {
+            return res.status(StatusCodes.UNAUTHORIZED).json({ message: 'Unauthorized' });
+        }
+
+        const reviews = await Review.find({ storeId, approved: true })
+            .sort({ createdAt: -1 })
+            .limit(parsedLimit)
+            .select('name role rating comment storeId storeName storeResponse createdAt updatedAt')
+            .lean();
+
+        const totalReviews = reviews.length;
+        const averageRating = totalReviews
+            ? Number((reviews.reduce((sum, item) => sum + (Number(item.rating) || 0), 0) / totalReviews).toFixed(2))
+            : 0;
+
+        return res.status(StatusCodes.OK).json({
+            reviews,
+            summary: {
+                totalReviews,
+                averageRating,
+                withResponse: reviews.filter((r) => String(r?.storeResponse?.message || '').trim()).length,
+            },
+        });
+    } catch (err) {
+        console.error('[Review] getMyStoreReviews error', err.message);
+        return res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({ message: 'Server error' });
+    }
+};
+
+const replyToReview = async (req, res) => {
+    try {
+        const storeId = req.user?._id;
+        const { id } = req.params;
+        const responseMessage = String(req.body?.message || '').trim();
+
+        if (!storeId) {
+            return res.status(StatusCodes.UNAUTHORIZED).json({ message: 'Unauthorized' });
+        }
+
+        if (!responseMessage) {
+            return res.status(StatusCodes.BAD_REQUEST).json({ message: 'Reply message is required' });
+        }
+
+        const store = await Store.findById(storeId).select('storeName name').lean();
+        if (!store) {
+            return res.status(StatusCodes.NOT_FOUND).json({ message: 'Store not found' });
+        }
+
+        const updated = await Review.findOneAndUpdate(
+            { _id: id, storeId },
+            {
+                $set: {
+                    storeResponse: {
+                        message: responseMessage,
+                        repliedAt: new Date(),
+                        repliedBy: store.storeName || store.name || 'Store Team',
+                    },
+                },
+            },
+            { new: true, runValidators: true }
+        )
+            .select('name role rating comment storeId storeName storeResponse createdAt updatedAt')
+            .lean();
+
+        if (!updated) {
+            return res.status(StatusCodes.NOT_FOUND).json({ message: 'Review not found for this store' });
+        }
+
+        return res.status(StatusCodes.OK).json({
+            message: 'Reply posted successfully',
+            review: updated,
+        });
+    } catch (err) {
+        console.error('[Review] replyToReview error', err.message);
         return res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({ message: 'Server error' });
     }
 };
@@ -3073,11 +3170,2078 @@ const getMyReviews = async (req, res) => {
     }
 };
 
+// Prescription Upload Feature
+const uploadPrescriptionForAutoFill = async (req, res) => {
+    try {
+        const userId = req.user?._id;
+        if (!userId) {
+            return res.status(StatusCodes.UNAUTHORIZED).json({ message: 'Unauthorized' });
+        }
+
+        if (!req.file) {
+            return res.status(StatusCodes.BAD_REQUEST).json({ message: 'No file uploaded' });
+        }
+
+        const PrescriptionUpload = require('../models/prescriptionUpload');
+        const { extractMedicinesFromText, matchMedicineWithDatabase } = require('../utils/prescriptionProcessor');
+        const Pharmacy = require('../models/pharmacy');
+
+        const { filename, mimetype, size, path: filePath } = req.file;
+
+        // Validate file type
+        const allowedMimes = ['application/pdf', 'image/jpeg', 'image/png', 'image/gif'];
+        if (!allowedMimes.includes(mimetype)) {
+            return res.status(StatusCodes.BAD_REQUEST).json({ 
+                message: 'Invalid file type. Only PDF and images allowed.' 
+            });
+        }
+
+        // Create prescription upload record
+        const prescriptionUpload = new PrescriptionUpload({
+            userId,
+            fileName: filename,
+            filePath: filePath,
+            mimeType: mimetype,
+            fileSize: size,
+            status: 'uploaded',
+        });
+
+        await prescriptionUpload.save();
+
+        // For MVP: Return the upload record without extraction
+        // In production: Use OCR/PDF parsing libraries
+        res.status(StatusCodes.CREATED).json({
+            success: true,
+            prescriptionUpload: {
+                _id: prescriptionUpload._id,
+                fileName: prescriptionUpload.fileName,
+                uploadedAt: prescriptionUpload.createdAt,
+                status: prescriptionUpload.status,
+                message: 'Prescription uploaded. To extract medicines, please use the extraction endpoint or upload again.',
+            },
+        });
+    } catch (error) {
+        console.error('uploadPrescriptionForAutoFill error:', error);
+        res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({ 
+            message: 'Failed to upload prescription' 
+        });
+    }
+};
+
+const extractMedicinesFromUploadedPrescription = async (req, res) => {
+    try {
+        const userId = req.user?._id;
+        const { prescriptionId } = req.params;
+        const { manualMedicines } = req.body;
+
+        if (!userId) {
+            return res.status(StatusCodes.UNAUTHORIZED).json({ message: 'Unauthorized' });
+        }
+
+        const PrescriptionUpload = require('../models/prescriptionUpload');
+        const Pharmacy = require('../models/pharmacy');
+
+        const prescriptionUpload = await PrescriptionUpload.findById(prescriptionId);
+        if (!prescriptionUpload) {
+            return res.status(StatusCodes.NOT_FOUND).json({ message: 'Prescription not found' });
+        }
+
+        if (prescriptionUpload.userId.toString() !== userId.toString()) {
+            return res.status(StatusCodes.FORBIDDEN).json({ message: 'Unauthorized access to prescription' });
+        }
+
+        // If manual medicines provided, use those
+        if (manualMedicines && Array.isArray(manualMedicines)) {
+            // Get all medicines from pharmacy database
+            const pharmacyMedicines = await Pharmacy.find({}).lean();
+            const { matchMedicineWithDatabase } = require('../utils/prescriptionProcessor');
+
+            const extractedWithMatches = manualMedicines.map(med => {
+                const match = matchMedicineWithDatabase(med, pharmacyMedicines);
+                return {
+                    ...med,
+                    medicineId: match.medicineId,
+                    isMatched: match.medicineId !== null,
+                    matchConfidence: match.matchConfidence,
+                };
+            });
+
+            prescriptionUpload.extractedMedicines = extractedWithMatches;
+            prescriptionUpload.status = 'extracted';
+            await prescriptionUpload.save();
+
+            return res.status(StatusCodes.OK).json({
+                success: true,
+                prescriptionUpload,
+                message: 'Medicines extracted and matched',
+            });
+        }
+
+        // For MVP: Return empty extracted medicines (requires manual input)
+        res.status(StatusCodes.OK).json({
+            success: true,
+            prescriptionUpload,
+            message: 'Please manually add medicines from your prescription',
+            extractionNote: 'Full OCR support coming soon. For now, please manually enter medicines.',
+        });
+    } catch (error) {
+        console.error('extractMedicinesFromUploadedPrescription error:', error);
+        res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({ 
+            message: 'Failed to extract medicines' 
+        });
+    }
+};
+
+const getUserPrescriptionUploads = async (req, res) => {
+    try {
+        const userId = req.user?._id;
+        if (!userId) {
+            return res.status(StatusCodes.UNAUTHORIZED).json({ message: 'Unauthorized' });
+        }
+
+        const PrescriptionUpload = require('../models/prescriptionUpload');
+
+        const prescriptions = await PrescriptionUpload.find({ userId })
+            .sort({ createdAt: -1 })
+            .populate('extractedMedicines.medicineId', 'name manufacturer price')
+            .lean();
+
+        res.status(StatusCodes.OK).json({
+            success: true,
+            prescriptions,
+        });
+    } catch (error) {
+        console.error('getUserPrescriptionUploads error:', error);
+        res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({ 
+            message: 'Failed to fetch prescriptions' 
+        });
+    }
+};
+
+const addExtractedMedicinesToCart = async (req, res) => {
+    try {
+        const userId = req.user?._id;
+        const { prescriptionId, selectedMedicineIds } = req.body;
+
+        if (!userId) {
+            return res.status(StatusCodes.UNAUTHORIZED).json({ message: 'Unauthorized' });
+        }
+
+        if (!prescriptionId || !Array.isArray(selectedMedicineIds)) {
+            return res.status(StatusCodes.BAD_REQUEST).json({ 
+                message: 'prescriptionId and selectedMedicineIds required' 
+            });
+        }
+
+        const PrescriptionUpload = require('../models/prescriptionUpload');
+        const User = require('../models/user');
+        const Pharmacy = require('../models/pharmacy');
+
+        const prescriptionUpload = await PrescriptionUpload.findById(prescriptionId);
+        if (!prescriptionUpload) {
+            return res.status(StatusCodes.NOT_FOUND).json({ message: 'Prescription not found' });
+        }
+
+        if (prescriptionUpload.userId.toString() !== userId.toString()) {
+            return res.status(StatusCodes.FORBIDDEN).json({ message: 'Unauthorized' });
+        }
+
+        // Get user and their cart
+        const user = await User.findById(userId);
+        if (!user) {
+            return res.status(StatusCodes.NOT_FOUND).json({ message: 'User not found' });
+        }
+
+        // Filter selected medicines and add to cart
+        const medicinesToAdd = prescriptionUpload.extractedMedicines.filter(med =>
+            selectedMedicineIds.includes(med.medicineId?.toString())
+        );
+
+        for (const medicine of medicinesToAdd) {
+            const existing = user.cart.find(item => 
+                item.medicineId.toString() === medicine.medicineId.toString()
+            );
+
+            if (existing) {
+                existing.quantity = (existing.quantity || 0) + (medicine.quantity || 1);
+            } else {
+                user.cart.push({
+                    medicineId: medicine.medicineId,
+                    quantity: medicine.quantity || 1,
+                });
+            }
+        }
+
+        prescriptionUpload.addedToCart = true;
+        await Promise.all([user.save(), prescriptionUpload.save()]);
+
+        res.status(StatusCodes.OK).json({
+            success: true,
+            message: `${medicinesToAdd.length} medicines added to cart`,
+            cartCount: user.cart.length,
+        });
+    } catch (error) {
+        console.error('addExtractedMedicinesToCart error:', error);
+        res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({ 
+            message: 'Failed to add medicines to cart' 
+        });
+    }
+};
+
+// Health Management (Patient)
+const createMedicineTracker = async (req, res) => {
+    try {
+        const userId = req.user?._id;
+        const { medicineName, dosage, frequency, startDate, endDate, expiryDate } = req.body;
+
+        if (!userId) {
+            return res.status(StatusCodes.UNAUTHORIZED).json({ message: 'Unauthorized' });
+        }
+
+        if (!medicineName || !dosage || !frequency || !startDate) {
+            return res.status(StatusCodes.BAD_REQUEST).json({ message: 'medicineName, dosage, frequency and startDate are required' });
+        }
+
+        const MedicineTracker = require('../models/medicineTracker');
+        const tracker = await MedicineTracker.create({
+            userId,
+            medicineName: String(medicineName).trim(),
+            dosage: String(dosage).trim(),
+            frequency: String(frequency).trim(),
+            startDate: new Date(startDate),
+            endDate: endDate ? new Date(endDate) : null,
+            expiryDate: expiryDate ? new Date(expiryDate) : null,
+        });
+
+        return res.status(StatusCodes.CREATED).json({
+            message: 'Medicine tracker created',
+            tracker,
+        });
+    } catch (error) {
+        console.error('createMedicineTracker error:', error.message);
+        return res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({ message: 'Failed to create medicine tracker' });
+    }
+};
+
+const getMedicineTrackers = async (req, res) => {
+    try {
+        const userId = req.user?._id;
+        if (!userId) {
+            return res.status(StatusCodes.UNAUTHORIZED).json({ message: 'Unauthorized' });
+        }
+
+        const MedicineTracker = require('../models/medicineTracker');
+        const trackers = await MedicineTracker.find({ userId, isActive: true })
+            .sort({ createdAt: -1 })
+            .lean();
+
+        const now = new Date();
+        const sevenDaysAhead = new Date(now);
+        sevenDaysAhead.setDate(sevenDaysAhead.getDate() + 7);
+
+        const expiryReminders = trackers
+            .filter((item) => item.expiryDate && new Date(item.expiryDate) <= sevenDaysAhead)
+            .map((item) => ({
+                trackerId: item._id,
+                medicineName: item.medicineName,
+                expiryDate: item.expiryDate,
+                daysLeft: Math.ceil((new Date(item.expiryDate).getTime() - now.getTime()) / (1000 * 60 * 60 * 24)),
+            }))
+            .sort((a, b) => new Date(a.expiryDate) - new Date(b.expiryDate));
+
+        return res.status(StatusCodes.OK).json({
+            trackers,
+            expiryReminders,
+        });
+    } catch (error) {
+        console.error('getMedicineTrackers error:', error.message);
+        return res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({ message: 'Failed to fetch medicine trackers' });
+    }
+};
+
+const logMedicineIntake = async (req, res) => {
+    try {
+        const userId = req.user?._id;
+        const { id } = req.params;
+        const { dose, note, takenAt } = req.body;
+
+        if (!userId) {
+            return res.status(StatusCodes.UNAUTHORIZED).json({ message: 'Unauthorized' });
+        }
+
+        const MedicineTracker = require('../models/medicineTracker');
+        const tracker = await MedicineTracker.findOne({ _id: id, userId });
+        if (!tracker) {
+            return res.status(StatusCodes.NOT_FOUND).json({ message: 'Tracker not found' });
+        }
+
+        const intakeAt = takenAt ? new Date(takenAt) : new Date();
+        tracker.intakeLogs.push({
+            takenAt: intakeAt,
+            dose: String(dose || '').trim(),
+            note: String(note || '').trim(),
+        });
+        tracker.lastTakenAt = intakeAt;
+        await tracker.save();
+
+        return res.status(StatusCodes.OK).json({
+            message: 'Intake logged',
+            tracker,
+        });
+    } catch (error) {
+        console.error('logMedicineIntake error:', error.message);
+        return res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({ message: 'Failed to log intake' });
+    }
+};
+
+const checkDrugInteractions = async (req, res) => {
+    try {
+        const userId = req.user?._id;
+        const medicineNames = Array.isArray(req.body?.medicineNames) ? req.body.medicineNames : [];
+
+        if (!userId) {
+            return res.status(StatusCodes.UNAUTHORIZED).json({ message: 'Unauthorized' });
+        }
+
+        if (!medicineNames.length) {
+            return res.status(StatusCodes.BAD_REQUEST).json({ message: 'medicineNames must be a non-empty array' });
+        }
+
+        const normalized = medicineNames.map((m) => String(m || '').trim().toLowerCase()).filter(Boolean);
+        const knownInteractions = [
+            { a: 'aspirin', b: 'ibuprofen', severity: 'Moderate', note: 'Can reduce aspirin cardioprotective effect.' },
+            { a: 'warfarin', b: 'aspirin', severity: 'High', note: 'Increased bleeding risk.' },
+            { a: 'warfarin', b: 'ibuprofen', severity: 'High', note: 'Increased bleeding risk.' },
+            { a: 'metformin', b: 'alcohol', severity: 'Moderate', note: 'Risk of lactic acidosis may increase.' },
+            { a: 'lisinopril', b: 'ibuprofen', severity: 'Moderate', note: 'May reduce antihypertensive effect and impact kidneys.' },
+            { a: 'amlodipine', b: 'simvastatin', severity: 'Moderate', note: 'May increase simvastatin levels.' },
+        ];
+
+        const warnings = [];
+        for (let i = 0; i < normalized.length; i += 1) {
+            for (let j = i + 1; j < normalized.length; j += 1) {
+                const left = normalized[i];
+                const right = normalized[j];
+                const hit = knownInteractions.find(
+                    (pair) => (pair.a === left && pair.b === right) || (pair.a === right && pair.b === left)
+                );
+                if (hit) {
+                    warnings.push({
+                        medicines: [medicineNames[i], medicineNames[j]],
+                        severity: hit.severity,
+                        note: hit.note,
+                    });
+                }
+            }
+        }
+
+        return res.status(StatusCodes.OK).json({
+            medicineNames,
+            warnings,
+            hasInteractions: warnings.length > 0,
+        });
+    } catch (error) {
+        console.error('checkDrugInteractions error:', error.message);
+        return res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({ message: 'Failed to check interactions' });
+    }
+};
+
+const getMedicalTimeline = async (req, res) => {
+    try {
+        const userId = req.user?._id;
+        if (!userId) {
+            return res.status(StatusCodes.UNAUTHORIZED).json({ message: 'Unauthorized' });
+        }
+
+        const MedicineTracker = require('../models/medicineTracker');
+        const UserVaccination = require('../models/userVaccination');
+        const PrescriptionRequest = require('../models/prescriptionRequest');
+
+        const [orders, vaccinations, prescriptions, trackers] = await Promise.all([
+            Order.find({ userId }).sort({ createdAt: -1 }).limit(100).lean(),
+            UserVaccination.find({ userId, status: 'Completed' }).populate('vaccinationMasterId', 'name').lean(),
+            PrescriptionRequest.find({ userId }).sort({ createdAt: -1 }).limit(100).lean(),
+            MedicineTracker.find({ userId }).sort({ createdAt: -1 }).limit(100).lean(),
+        ]);
+
+        const events = [];
+
+        orders.forEach((order) => {
+            events.push({
+                type: 'Order',
+                title: `Medicine order ${order.orderId || ''}`.trim(),
+                date: order.createdAt,
+                details: `${order.items?.length || 0} item(s), status: ${order.status || 'N/A'}`,
+            });
+        });
+
+        vaccinations.forEach((vac) => {
+            events.push({
+                type: 'Vaccination',
+                title: vac.vaccinationMasterId?.name || 'Vaccination',
+                date: vac.vaccinationDate || vac.createdAt,
+                details: 'Vaccination completed',
+            });
+        });
+
+        prescriptions.forEach((pres) => {
+            events.push({
+                type: 'Prescription',
+                title: pres.fileName || 'Prescription upload',
+                date: pres.createdAt,
+                details: `Status: ${pres.status || 'pending'}`,
+            });
+        });
+
+        trackers.forEach((tracker) => {
+            (tracker.intakeLogs || []).forEach((log) => {
+                events.push({
+                    type: 'Dosage',
+                    title: `Dose taken: ${tracker.medicineName}`,
+                    date: log.takenAt,
+                    details: log.dose || tracker.dosage,
+                });
+            });
+        });
+
+        events.sort((a, b) => new Date(b.date) - new Date(a.date));
+        return res.status(StatusCodes.OK).json({ events: events.slice(0, 300) });
+    } catch (error) {
+        console.error('getMedicalTimeline error:', error.message);
+        return res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({ message: 'Failed to fetch medical timeline' });
+    }
+};
+
+const exportHealthRecordsPdf = async (req, res) => {
+    try {
+        const userId = req.user?._id;
+        if (!userId) {
+            return res.status(StatusCodes.UNAUTHORIZED).json({ message: 'Unauthorized' });
+        }
+
+        const PDFDocument = require('pdfkit');
+        const MedicineTracker = require('../models/medicineTracker');
+        const UserVaccination = require('../models/userVaccination');
+        const VaccinationMaster = require('../models/vaccinationMaster');
+        const PrescriptionRequest = require('../models/prescriptionRequest');
+
+        const [user, orders, trackers, prescriptions, vaccinations] = await Promise.all([
+            User.findById(userId).select('name email mobile').lean(),
+            Order.find({ userId }).sort({ createdAt: -1 }).limit(50).lean(),
+            MedicineTracker.find({ userId }).sort({ createdAt: -1 }).limit(100).lean(),
+            PrescriptionRequest.find({ userId }).sort({ createdAt: -1 }).limit(50).lean(),
+            UserVaccination.find({ userId }).populate('vaccinationMasterId', 'name').lean(),
+        ]);
+
+        const filename = `health-records-${Date.now()}.pdf`;
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+
+        const doc = new PDFDocument({ margin: 40 });
+        doc.pipe(res);
+
+        doc.fontSize(18).text('Health Records Report', { underline: true });
+        doc.moveDown(0.6);
+        doc.fontSize(11).text(`Generated: ${new Date().toLocaleString()}`);
+        doc.text(`Patient: ${user?.name || 'Unknown'}`);
+        doc.text(`Email: ${user?.email || 'N/A'}`);
+        doc.text(`Mobile: ${user?.mobile || 'N/A'}`);
+        doc.moveDown();
+
+        doc.fontSize(14).text('Medicine Trackers');
+        doc.moveDown(0.4);
+        if (!trackers.length) {
+            doc.fontSize(10).text('No medicine trackers found.');
+        } else {
+            trackers.forEach((item, index) => {
+                doc.fontSize(10).text(`${index + 1}. ${item.medicineName} | ${item.dosage} | ${item.frequency}`);
+                doc.text(`   Start: ${item.startDate ? new Date(item.startDate).toLocaleDateString() : 'N/A'} | Expiry: ${item.expiryDate ? new Date(item.expiryDate).toLocaleDateString() : 'N/A'}`);
+                doc.text(`   Last intake: ${item.lastTakenAt ? new Date(item.lastTakenAt).toLocaleString() : 'N/A'}`);
+            });
+        }
+        doc.moveDown();
+
+        doc.fontSize(14).text('Vaccinations');
+        doc.moveDown(0.4);
+        if (!vaccinations.length) {
+            doc.fontSize(10).text('No vaccination records found.');
+        } else {
+            vaccinations.forEach((vac, index) => {
+                doc.fontSize(10).text(`${index + 1}. ${vac.vaccinationMasterId?.name || 'Vaccine'} | ${vac.status || 'N/A'} | ${vac.vaccinationDate ? new Date(vac.vaccinationDate).toLocaleDateString() : 'N/A'}`);
+            });
+        }
+        doc.moveDown();
+
+        doc.fontSize(14).text('Prescription History');
+        doc.moveDown(0.4);
+        if (!prescriptions.length) {
+            doc.fontSize(10).text('No prescriptions found.');
+        } else {
+            prescriptions.forEach((pres, index) => {
+                doc.fontSize(10).text(`${index + 1}. ${pres.fileName || 'Prescription'} | ${pres.status || 'pending'} | ${pres.createdAt ? new Date(pres.createdAt).toLocaleDateString() : 'N/A'}`);
+            });
+        }
+        doc.moveDown();
+
+        doc.fontSize(14).text('Order History');
+        doc.moveDown(0.4);
+        if (!orders.length) {
+            doc.fontSize(10).text('No orders found.');
+        } else {
+            orders.forEach((order, index) => {
+                doc.fontSize(10).text(`${index + 1}. ${order.orderId || 'Order'} | ${order.status || 'N/A'} | ${order.createdAt ? new Date(order.createdAt).toLocaleDateString() : 'N/A'} | Total: ${order.totalPrice || 0}`);
+            });
+        }
+
+        doc.end();
+    } catch (error) {
+        console.error('exportHealthRecordsPdf error:', error.message);
+        return res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({ message: 'Failed to export health records PDF' });
+    }
+};
+
+// Wishlist Feature (Patient)
+const getWishlist = async (req, res) => {
+    try {
+        const userId = req.user?._id;
+        if (!userId) {
+            return res.status(StatusCodes.UNAUTHORIZED).json({ message: 'Unauthorized' });
+        }
+
+        const user = await User.findById(userId)
+            .select('wishlist')
+            .populate('wishlist.medicineId', 'name manufacturer dosage type price stock storeId')
+            .lean();
+
+        if (!user) {
+            return res.status(StatusCodes.NOT_FOUND).json({ message: 'User not found' });
+        }
+
+        const wishlistItems = (user.wishlist || [])
+            .filter((item) => item?.medicineId)
+            .map((item) => ({
+                medicine: item.medicineId,
+                addedAt: item.addedAt,
+            }));
+
+        return res.status(StatusCodes.OK).json({
+            success: true,
+            wishlist: wishlistItems,
+            wishlistMedicineIds: wishlistItems.map((entry) => String(entry.medicine._id)),
+        });
+    } catch (error) {
+        console.error('getWishlist error:', error.message);
+        return res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({ message: 'Failed to load wishlist' });
+    }
+};
+
+const addToWishlist = async (req, res) => {
+    try {
+        const userId = req.user?._id;
+        const { medicineId } = req.body;
+
+        if (!userId) {
+            return res.status(StatusCodes.UNAUTHORIZED).json({ message: 'Unauthorized' });
+        }
+
+        if (!medicineId) {
+            return res.status(StatusCodes.BAD_REQUEST).json({ message: 'medicineId is required' });
+        }
+
+        const [user, medicine] = await Promise.all([
+            User.findById(userId),
+            Pharmacy.findById(medicineId).select('_id'),
+        ]);
+
+        if (!user) {
+            return res.status(StatusCodes.NOT_FOUND).json({ message: 'User not found' });
+        }
+        if (!medicine) {
+            return res.status(StatusCodes.NOT_FOUND).json({ message: 'Medicine not found' });
+        }
+
+        const alreadyExists = (user.wishlist || []).some(
+            (item) => String(item.medicineId) === String(medicineId)
+        );
+
+        if (alreadyExists) {
+            return res.status(StatusCodes.OK).json({
+                success: true,
+                message: 'Medicine already in wishlist',
+                wishlistCount: user.wishlist.length,
+            });
+        }
+
+        user.wishlist.push({ medicineId });
+        await user.save();
+
+        return res.status(StatusCodes.CREATED).json({
+            success: true,
+            message: 'Medicine added to wishlist',
+            wishlistCount: user.wishlist.length,
+        });
+    } catch (error) {
+        console.error('addToWishlist error:', error.message);
+        return res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({ message: 'Failed to add to wishlist' });
+    }
+};
+
+const removeFromWishlist = async (req, res) => {
+    try {
+        const userId = req.user?._id;
+        const { medicineId } = req.params;
+
+        if (!userId) {
+            return res.status(StatusCodes.UNAUTHORIZED).json({ message: 'Unauthorized' });
+        }
+
+        if (!medicineId) {
+            return res.status(StatusCodes.BAD_REQUEST).json({ message: 'medicineId is required' });
+        }
+
+        const user = await User.findById(userId);
+        if (!user) {
+            return res.status(StatusCodes.NOT_FOUND).json({ message: 'User not found' });
+        }
+
+        const initialCount = user.wishlist.length;
+        user.wishlist = (user.wishlist || []).filter(
+            (item) => String(item.medicineId) !== String(medicineId)
+        );
+
+        if (user.wishlist.length === initialCount) {
+            return res.status(StatusCodes.NOT_FOUND).json({ message: 'Medicine not found in wishlist' });
+        }
+
+        await user.save();
+
+        return res.status(StatusCodes.OK).json({
+            success: true,
+            message: 'Medicine removed from wishlist',
+            wishlistCount: user.wishlist.length,
+        });
+    } catch (error) {
+        console.error('removeFromWishlist error:', error.message);
+        return res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({ message: 'Failed to remove from wishlist' });
+    }
+};
+
+const getStoreRolePermissions = async (req, res) => {
+    try {
+        const storeId = req.user?._id;
+        const { role, staffId } = req.query;
+
+        if (staffId) {
+            const staffMember = await StoreStaff.findOne({ _id: staffId, storeId }).select("role firstName lastName");
+            if (!staffMember) {
+                return res.status(StatusCodes.NOT_FOUND).json({ message: "Staff member not found" });
+            }
+            return res.status(StatusCodes.OK).json({
+                role: staffMember.role,
+                staffName: `${staffMember.firstName || ""} ${staffMember.lastName || ""}`.trim(),
+                permissions: getRolePermissions(staffMember.role),
+            });
+        }
+
+        const normalizedRole = normalizeStaffRole(role || "Pharmacist");
+        return res.status(StatusCodes.OK).json({
+            role: normalizedRole,
+            permissions: getRolePermissions(normalizedRole),
+            availableRoles: Object.keys(STAFF_ROLE_PERMISSIONS),
+        });
+    } catch (error) {
+        console.error("getStoreRolePermissions error:", error);
+        return res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({ message: "Failed to load role permissions" });
+    }
+};
+
+const createStaffPerformanceRecord = async (req, res) => {
+    try {
+        const storeId = req.user?._id;
+        const permissionCheck = await enforceRolePermission({ req, storeId, requiredPermission: "performance.manage" });
+        if (!permissionCheck.allowed) {
+            return res.status(permissionCheck.statusCode).json({ message: permissionCheck.message });
+        }
+
+        const {
+            staffId,
+            periodStart,
+            periodEnd,
+            ordersProcessed = 0,
+            prescriptionsReviewed = 0,
+            avgFulfillmentMinutes = 0,
+            attendanceScore = 0,
+            customerRating = 0,
+            efficiencyScore,
+            notes = "",
+        } = req.body;
+
+        if (!staffId || !periodStart || !periodEnd) {
+            return res.status(StatusCodes.BAD_REQUEST).json({ message: "staffId, periodStart and periodEnd are required" });
+        }
+
+        const staff = await StoreStaff.findOne({ _id: staffId, storeId }).select("_id");
+        if (!staff) {
+            return res.status(StatusCodes.NOT_FOUND).json({ message: "Staff member not found" });
+        }
+
+        const normalizedAttendance = Math.min(100, Math.max(0, Number(attendanceScore) || 0));
+        const normalizedRating = Math.min(5, Math.max(0, Number(customerRating) || 0));
+        const throughputScore = Math.min(100, (Number(ordersProcessed) || 0) * 2);
+        const speedScore = Math.max(0, 100 - (Number(avgFulfillmentMinutes) || 0));
+        const computedEfficiency = Math.round((normalizedAttendance * 0.35) + (normalizedRating * 20 * 0.35) + (throughputScore * 0.2) + (speedScore * 0.1));
+
+        const performance = await StaffPerformance.findOneAndUpdate(
+            { storeId, staffId, periodStart: new Date(periodStart), periodEnd: new Date(periodEnd) },
+            {
+                $set: {
+                    ordersProcessed: Math.max(0, Number(ordersProcessed) || 0),
+                    prescriptionsReviewed: Math.max(0, Number(prescriptionsReviewed) || 0),
+                    avgFulfillmentMinutes: Math.max(0, Number(avgFulfillmentMinutes) || 0),
+                    attendanceScore: normalizedAttendance,
+                    customerRating: normalizedRating,
+                    efficiencyScore: Math.min(100, Math.max(0, Number(efficiencyScore ?? computedEfficiency) || 0)),
+                    notes,
+                },
+            },
+            { new: true, upsert: true, runValidators: true },
+        ).populate("staffId", "firstName lastName role email contact");
+
+        return res.status(StatusCodes.OK).json({ message: "Performance record saved", performance });
+    } catch (error) {
+        console.error("createStaffPerformanceRecord error:", error);
+        return res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({ message: "Failed to save performance record" });
+    }
+};
+
+const getStaffPerformanceRecords = async (req, res) => {
+    try {
+        const storeId = req.user?._id;
+        const permissionCheck = await enforceRolePermission({ req, storeId, requiredPermission: "performance.view" });
+        if (!permissionCheck.allowed) {
+            return res.status(permissionCheck.statusCode).json({ message: permissionCheck.message });
+        }
+
+        const { staffId, from, to } = req.query;
+        const query = { storeId };
+
+        if (staffId) {
+            query.staffId = staffId;
+        }
+        if (from || to) {
+            query.periodStart = {};
+            if (from) query.periodStart.$gte = new Date(from);
+            if (to) query.periodStart.$lte = new Date(to);
+        }
+
+        const records = await StaffPerformance.find(query)
+            .populate("staffId", "firstName lastName role email contact")
+            .sort({ periodStart: -1, createdAt: -1 });
+
+        const avgEfficiency = records.length
+            ? Math.round(records.reduce((sum, item) => sum + (Number(item.efficiencyScore) || 0), 0) / records.length)
+            : 0;
+
+        return res.status(StatusCodes.OK).json({
+            records,
+            summary: {
+                totalRecords: records.length,
+                avgEfficiency,
+            },
+        });
+    } catch (error) {
+        console.error("getStaffPerformanceRecords error:", error);
+        return res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({ message: "Failed to fetch performance records" });
+    }
+};
+
+const createStaffAttendanceRecord = async (req, res) => {
+    try {
+        const storeId = req.user?._id;
+        const permissionCheck = await enforceRolePermission({ req, storeId, requiredPermission: "attendance.manage" });
+        if (!permissionCheck.allowed) {
+            return res.status(permissionCheck.statusCode).json({ message: permissionCheck.message });
+        }
+
+        const {
+            staffId,
+            date,
+            shiftType = "Morning",
+            shiftStart,
+            shiftEnd,
+            status = "Present",
+            notes = "",
+        } = req.body;
+
+        if (!staffId || !date || !shiftStart || !shiftEnd) {
+            return res.status(StatusCodes.BAD_REQUEST).json({ message: "staffId, date, shiftStart and shiftEnd are required" });
+        }
+
+        const staff = await StoreStaff.findOne({ _id: staffId, storeId }).select("_id");
+        if (!staff) {
+            return res.status(StatusCodes.NOT_FOUND).json({ message: "Staff member not found" });
+        }
+
+        const record = await StaffAttendance.findOneAndUpdate(
+            {
+                storeId,
+                staffId,
+                date: new Date(date),
+            },
+            {
+                $set: {
+                    shiftType,
+                    shiftStart: new Date(shiftStart),
+                    shiftEnd: new Date(shiftEnd),
+                    status,
+                    notes,
+                },
+            },
+            { new: true, upsert: true, runValidators: true },
+        ).populate("staffId", "firstName lastName role");
+
+        return res.status(StatusCodes.OK).json({ message: "Attendance record saved", attendance: record });
+    } catch (error) {
+        console.error("createStaffAttendanceRecord error:", error);
+        return res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({ message: "Failed to save attendance record" });
+    }
+};
+
+const getStaffAttendanceRecords = async (req, res) => {
+    try {
+        const storeId = req.user?._id;
+        const permissionCheck = await enforceRolePermission({ req, storeId, requiredPermission: "attendance.view" });
+        if (!permissionCheck.allowed) {
+            return res.status(permissionCheck.statusCode).json({ message: permissionCheck.message });
+        }
+
+        const { staffId, from, to } = req.query;
+        const query = { storeId };
+        if (staffId) query.staffId = staffId;
+        if (from || to) {
+            query.date = {};
+            if (from) query.date.$gte = new Date(from);
+            if (to) query.date.$lte = new Date(to);
+        }
+
+        const records = await StaffAttendance.find(query)
+            .populate("staffId", "firstName lastName role")
+            .sort({ date: -1, createdAt: -1 });
+
+        const presentCount = records.filter((record) => record.status === "Present").length;
+
+        return res.status(StatusCodes.OK).json({
+            records,
+            summary: {
+                totalRecords: records.length,
+                presentCount,
+                attendanceRate: records.length ? Math.round((presentCount / records.length) * 100) : 0,
+            },
+        });
+    } catch (error) {
+        console.error("getStaffAttendanceRecords error:", error);
+        return res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({ message: "Failed to fetch attendance records" });
+    }
+};
+
+const checkInStaffAttendance = async (req, res) => {
+    try {
+        const storeId = req.user?._id;
+        const permissionCheck = await enforceRolePermission({ req, storeId, requiredPermission: "attendance.manage" });
+        if (!permissionCheck.allowed) {
+            return res.status(permissionCheck.statusCode).json({ message: permissionCheck.message });
+        }
+
+        const { id } = req.params;
+        const attendance = await StaffAttendance.findOneAndUpdate(
+            { _id: id, storeId },
+            { $set: { checkInAt: new Date(), status: "Present" } },
+            { new: true },
+        ).populate("staffId", "firstName lastName role");
+
+        if (!attendance) {
+            return res.status(StatusCodes.NOT_FOUND).json({ message: "Attendance record not found" });
+        }
+
+        return res.status(StatusCodes.OK).json({ message: "Check-in recorded", attendance });
+    } catch (error) {
+        console.error("checkInStaffAttendance error:", error);
+        return res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({ message: "Failed to check in attendance" });
+    }
+};
+
+const checkOutStaffAttendance = async (req, res) => {
+    try {
+        const storeId = req.user?._id;
+        const permissionCheck = await enforceRolePermission({ req, storeId, requiredPermission: "attendance.manage" });
+        if (!permissionCheck.allowed) {
+            return res.status(permissionCheck.statusCode).json({ message: permissionCheck.message });
+        }
+
+        const { id } = req.params;
+        const attendance = await StaffAttendance.findOneAndUpdate(
+            { _id: id, storeId },
+            { $set: { checkOutAt: new Date() } },
+            { new: true },
+        ).populate("staffId", "firstName lastName role");
+
+        if (!attendance) {
+            return res.status(StatusCodes.NOT_FOUND).json({ message: "Attendance record not found" });
+        }
+
+        return res.status(StatusCodes.OK).json({ message: "Check-out recorded", attendance });
+    } catch (error) {
+        console.error("checkOutStaffAttendance error:", error);
+        return res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({ message: "Failed to check out attendance" });
+    }
+};
+
+const createStaffTrainingRecord = async (req, res) => {
+    try {
+        const storeId = req.user?._id;
+        const permissionCheck = await enforceRolePermission({ req, storeId, requiredPermission: "training.manage" });
+        if (!permissionCheck.allowed) {
+            return res.status(permissionCheck.statusCode).json({ message: permissionCheck.message });
+        }
+
+        const {
+            staffId,
+            title,
+            moduleType = "Product Knowledge",
+            score = 0,
+            maxScore = 100,
+            passed,
+            completedAt,
+            validTill,
+            certificateId = "",
+            notes = "",
+        } = req.body;
+
+        if (!staffId || !title) {
+            return res.status(StatusCodes.BAD_REQUEST).json({ message: "staffId and title are required" });
+        }
+
+        const staff = await StoreStaff.findOne({ _id: staffId, storeId }).select("_id");
+        if (!staff) {
+            return res.status(StatusCodes.NOT_FOUND).json({ message: "Staff member not found" });
+        }
+
+        const training = await StaffTraining.create({
+            storeId,
+            staffId,
+            title,
+            moduleType,
+            score: Math.max(0, Number(score) || 0),
+            maxScore: Math.max(1, Number(maxScore) || 100),
+            passed: typeof passed === "boolean" ? passed : (Number(score) || 0) >= 0.6 * (Number(maxScore) || 100),
+            completedAt: completedAt ? new Date(completedAt) : new Date(),
+            validTill: validTill ? new Date(validTill) : null,
+            certificateId,
+            notes,
+        });
+
+        return res.status(StatusCodes.CREATED).json({ message: "Training record added", training });
+    } catch (error) {
+        console.error("createStaffTrainingRecord error:", error);
+        return res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({ message: "Failed to add training record" });
+    }
+};
+
+const getStaffTrainingRecords = async (req, res) => {
+    try {
+        const storeId = req.user?._id;
+        const permissionCheck = await enforceRolePermission({ req, storeId, requiredPermission: "training.view" });
+        if (!permissionCheck.allowed) {
+            return res.status(permissionCheck.statusCode).json({ message: permissionCheck.message });
+        }
+
+        const { staffId, moduleType } = req.query;
+        const query = { storeId };
+        if (staffId) query.staffId = staffId;
+        if (moduleType) query.moduleType = moduleType;
+
+        const records = await StaffTraining.find(query)
+            .populate("staffId", "firstName lastName role")
+            .sort({ completedAt: -1, createdAt: -1 });
+
+        const passedCount = records.filter((record) => record.passed).length;
+
+        return res.status(StatusCodes.OK).json({
+            records,
+            summary: {
+                totalRecords: records.length,
+                passedCount,
+                completionRate: records.length ? Math.round((passedCount / records.length) * 100) : 0,
+            },
+        });
+    } catch (error) {
+        console.error("getStaffTrainingRecords error:", error);
+        return res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({ message: "Failed to fetch training records" });
+    }
+};
+
+const createComplianceChecklistItem = async (req, res) => {
+    try {
+        const storeId = req.user?._id;
+        const permissionCheck = await enforceRolePermission({ req, storeId, requiredPermission: "compliance.manage" });
+        if (!permissionCheck.allowed) {
+            return res.status(permissionCheck.statusCode).json({ message: permissionCheck.message });
+        }
+
+        const {
+            itemType = "Other",
+            title,
+            dueDate,
+            status = "Pending",
+            priority = "Medium",
+            reminderDaysBefore = 7,
+            notes = "",
+            lastCompletedAt,
+        } = req.body;
+
+        if (!title || !dueDate) {
+            return res.status(StatusCodes.BAD_REQUEST).json({ message: "title and dueDate are required" });
+        }
+
+        const item = await ComplianceChecklist.create({
+            storeId,
+            itemType,
+            title,
+            dueDate: new Date(dueDate),
+            status,
+            priority,
+            reminderDaysBefore: Math.max(0, Number(reminderDaysBefore) || 0),
+            notes,
+            lastCompletedAt: lastCompletedAt ? new Date(lastCompletedAt) : null,
+        });
+
+        return res.status(StatusCodes.CREATED).json({ message: "Compliance item created", item });
+    } catch (error) {
+        console.error("createComplianceChecklistItem error:", error);
+        return res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({ message: "Failed to create compliance item" });
+    }
+};
+
+const getComplianceChecklistItems = async (req, res) => {
+    try {
+        const storeId = req.user?._id;
+        const permissionCheck = await enforceRolePermission({ req, storeId, requiredPermission: "compliance.view" });
+        if (!permissionCheck.allowed) {
+            return res.status(permissionCheck.statusCode).json({ message: permissionCheck.message });
+        }
+
+        const { status, itemType } = req.query;
+        const query = { storeId };
+        if (status) query.status = status;
+        if (itemType) query.itemType = itemType;
+
+        const today = new Date();
+        await ComplianceChecklist.updateMany(
+            { storeId, status: { $ne: "Completed" }, dueDate: { $lt: today } },
+            { $set: { status: "Overdue" } },
+        );
+
+        const items = await ComplianceChecklist.find(query).sort({ dueDate: 1, createdAt: -1 });
+        return res.status(StatusCodes.OK).json({ items, total: items.length });
+    } catch (error) {
+        console.error("getComplianceChecklistItems error:", error);
+        return res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({ message: "Failed to fetch compliance checklist" });
+    }
+};
+
+const updateComplianceChecklistItem = async (req, res) => {
+    try {
+        const storeId = req.user?._id;
+        const permissionCheck = await enforceRolePermission({ req, storeId, requiredPermission: "compliance.manage" });
+        if (!permissionCheck.allowed) {
+            return res.status(permissionCheck.statusCode).json({ message: permissionCheck.message });
+        }
+
+        const { id } = req.params;
+        const updates = { ...req.body };
+        if (updates.dueDate) updates.dueDate = new Date(updates.dueDate);
+        if (updates.lastCompletedAt) updates.lastCompletedAt = new Date(updates.lastCompletedAt);
+
+        const item = await ComplianceChecklist.findOneAndUpdate(
+            { _id: id, storeId },
+            { $set: updates },
+            { new: true, runValidators: true },
+        );
+
+        if (!item) {
+            return res.status(StatusCodes.NOT_FOUND).json({ message: "Compliance item not found" });
+        }
+
+        return res.status(StatusCodes.OK).json({ message: "Compliance item updated", item });
+    } catch (error) {
+        console.error("updateComplianceChecklistItem error:", error);
+        return res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({ message: "Failed to update compliance item" });
+    }
+};
+
+const getComplianceReminders = async (req, res) => {
+    try {
+        const storeId = req.user?._id;
+        const permissionCheck = await enforceRolePermission({ req, storeId, requiredPermission: "compliance.view" });
+        if (!permissionCheck.allowed) {
+            return res.status(permissionCheck.statusCode).json({ message: permissionCheck.message });
+        }
+
+        const nextDays = Math.max(1, Number(req.query.nextDays) || 15);
+        const now = new Date();
+        const future = new Date();
+        future.setDate(future.getDate() + nextDays);
+
+        const [overdue, upcoming] = await Promise.all([
+            ComplianceChecklist.find({
+                storeId,
+                status: { $ne: "Completed" },
+                dueDate: { $lt: now },
+            }).sort({ dueDate: 1 }),
+            ComplianceChecklist.find({
+                storeId,
+                status: { $ne: "Completed" },
+                dueDate: { $gte: now, $lte: future },
+            }).sort({ dueDate: 1 }),
+        ]);
+
+        return res.status(StatusCodes.OK).json({
+            nextDays,
+            overdue,
+            upcoming,
+        });
+    } catch (error) {
+        console.error("getComplianceReminders error:", error);
+        return res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({ message: "Failed to fetch compliance reminders" });
+    }
+};
+
+const createInvoice = async (req, res) => {
+    try {
+        const storeId = req.user?._id;
+        const permissionCheck = await enforceRolePermission({ req, storeId, requiredPermission: "finance.invoices.generate" });
+        if (!permissionCheck.allowed) {
+            return res.status(permissionCheck.statusCode).json({ message: permissionCheck.message });
+        }
+
+        const {
+            orderId = "",
+            customerName = "Walk-in Customer",
+            customerGstNumber = "",
+            items = [],
+            gstRateDefault = 0,
+            discount = 0,
+            paymentMethod = "Other",
+            initialPaidAmount = 0,
+            paymentReference = "",
+        } = req.body;
+
+        let invoiceItemsInput = items;
+        if ((!Array.isArray(invoiceItemsInput) || !invoiceItemsInput.length) && orderId) {
+            const order = await Order.findOne({ orderId, storeId }).lean();
+            if (!order) {
+                return res.status(StatusCodes.NOT_FOUND).json({ message: "Order not found for invoice generation" });
+            }
+            invoiceItemsInput = (order.items || []).map((item) => ({
+                medicineId: item.id,
+                name: item.name,
+                quantity: item.quantity,
+                unitPrice: item.price,
+                gstRate: gstRateDefault,
+                costPrice: 0,
+                category: "General",
+            }));
+        }
+
+        if (!Array.isArray(invoiceItemsInput) || !invoiceItemsInput.length) {
+            return res.status(StatusCodes.BAD_REQUEST).json({ message: "At least one invoice item is required" });
+        }
+
+        const lineItems = buildInvoiceItems({ items: invoiceItemsInput, gstRateDefault });
+        const totals = summarizeInvoiceTotals(lineItems, discount);
+
+        const paidAmount = Math.max(0, Math.min(totals.grandTotal, toCurrency(initialPaidAmount)));
+        const balanceAmount = toCurrency(totals.grandTotal - paidAmount);
+        const paymentStatus = paidAmount <= 0 ? "Pending" : (balanceAmount > 0 ? "Partial" : "Paid");
+
+        const payments = [];
+        if (paidAmount > 0) {
+            payments.push({
+                amount: paidAmount,
+                method: paymentMethod,
+                reference: paymentReference,
+                status: "Success",
+                paidAt: new Date(),
+            });
+        }
+
+        const invoice = await Invoice.create({
+            storeId,
+            orderId,
+            invoiceNumber: makeInvoiceNumber(),
+            customerName,
+            customerGstNumber,
+            lineItems,
+            subtotal: totals.subtotal,
+            totalGst: totals.totalGst,
+            discount: totals.discount,
+            grandTotal: totals.grandTotal,
+            paymentStatus,
+            paymentMethod,
+            paidAmount,
+            balanceAmount,
+            payments,
+        });
+
+        return res.status(StatusCodes.CREATED).json({ message: "Invoice generated", invoice });
+    } catch (error) {
+        console.error("createInvoice error:", error);
+        return res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({ message: "Failed to generate invoice" });
+    }
+};
+
+const getStoreInvoices = async (req, res) => {
+    try {
+        const storeId = req.user?._id;
+        const permissionCheck = await enforceRolePermission({ req, storeId, requiredPermission: "finance.invoices.view" });
+        if (!permissionCheck.allowed) {
+            return res.status(permissionCheck.statusCode).json({ message: permissionCheck.message });
+        }
+
+        const { paymentStatus, from, to } = req.query;
+        const query = { storeId };
+        if (paymentStatus) query.paymentStatus = paymentStatus;
+        if (from || to) {
+            query.createdAt = {};
+            if (from) query.createdAt.$gte = new Date(from);
+            if (to) query.createdAt.$lte = new Date(to);
+        }
+
+        const invoices = await Invoice.find(query).sort({ createdAt: -1 });
+
+        return res.status(StatusCodes.OK).json({
+            invoices,
+            summary: {
+                totalInvoices: invoices.length,
+                grossSales: toCurrency(invoices.reduce((sum, item) => sum + (Number(item.grandTotal) || 0), 0)),
+                outstanding: toCurrency(invoices.reduce((sum, item) => sum + (Number(item.balanceAmount) || 0), 0)),
+            },
+        });
+    } catch (error) {
+        console.error("getStoreInvoices error:", error);
+        return res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({ message: "Failed to fetch invoices" });
+    }
+};
+
+const reconcileInvoicePayment = async (req, res) => {
+    try {
+        const storeId = req.user?._id;
+        const permissionCheck = await enforceRolePermission({ req, storeId, requiredPermission: "finance.reconciliation.view" });
+        if (!permissionCheck.allowed) {
+            return res.status(permissionCheck.statusCode).json({ message: permissionCheck.message });
+        }
+
+        const { invoiceId } = req.params;
+        const {
+            amount,
+            method = "Other",
+            reference = "",
+            status = "Success",
+            paidAt,
+        } = req.body;
+
+        if (!amount || Number(amount) <= 0) {
+            return res.status(StatusCodes.BAD_REQUEST).json({ message: "Valid payment amount is required" });
+        }
+
+        const invoice = await Invoice.findOne({ _id: invoiceId, storeId });
+        if (!invoice) {
+            return res.status(StatusCodes.NOT_FOUND).json({ message: "Invoice not found" });
+        }
+
+        const paymentAmount = toCurrency(amount);
+        invoice.payments.push({
+            amount: paymentAmount,
+            method,
+            reference,
+            status,
+            paidAt: paidAt ? new Date(paidAt) : new Date(),
+        });
+
+        if (status === "Success") {
+            invoice.paidAmount = toCurrency(Math.min(invoice.grandTotal, (Number(invoice.paidAmount) || 0) + paymentAmount));
+            invoice.balanceAmount = toCurrency(Math.max(0, invoice.grandTotal - invoice.paidAmount));
+            invoice.paymentStatus = invoice.balanceAmount <= 0 ? "Paid" : "Partial";
+        }
+
+        await invoice.save();
+
+        return res.status(StatusCodes.OK).json({ message: "Payment reconciled", invoice });
+    } catch (error) {
+        console.error("reconcileInvoicePayment error:", error);
+        return res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({ message: "Failed to reconcile payment" });
+    }
+};
+
+const getPaymentReconciliationReport = async (req, res) => {
+    try {
+        const storeId = req.user?._id;
+        const permissionCheck = await enforceRolePermission({ req, storeId, requiredPermission: "finance.reconciliation.view" });
+        if (!permissionCheck.allowed) {
+            return res.status(permissionCheck.statusCode).json({ message: permissionCheck.message });
+        }
+
+        const { from, to } = req.query;
+        const query = { storeId };
+        if (from || to) {
+            query.createdAt = {};
+            if (from) query.createdAt.$gte = new Date(from);
+            if (to) query.createdAt.$lte = new Date(to);
+        }
+
+        const invoices = await Invoice.find(query).lean();
+
+        const statusSummary = { Pending: 0, Partial: 0, Paid: 0 };
+        const methodSummary = {};
+        let totalBilled = 0;
+        let totalCollected = 0;
+        let totalOutstanding = 0;
+
+        invoices.forEach((invoice) => {
+            statusSummary[invoice.paymentStatus] = (statusSummary[invoice.paymentStatus] || 0) + 1;
+            totalBilled += Number(invoice.grandTotal) || 0;
+            totalCollected += Number(invoice.paidAmount) || 0;
+            totalOutstanding += Number(invoice.balanceAmount) || 0;
+
+            (invoice.payments || []).forEach((payment) => {
+                if (payment.status !== "Success") return;
+                methodSummary[payment.method] = toCurrency((methodSummary[payment.method] || 0) + (Number(payment.amount) || 0));
+            });
+        });
+
+        return res.status(StatusCodes.OK).json({
+            summary: {
+                totalInvoices: invoices.length,
+                totalBilled: toCurrency(totalBilled),
+                totalCollected: toCurrency(totalCollected),
+                totalOutstanding: toCurrency(totalOutstanding),
+                statusSummary,
+                methodSummary,
+            },
+            invoices,
+        });
+    } catch (error) {
+        console.error("getPaymentReconciliationReport error:", error);
+        return res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({ message: "Failed to generate reconciliation report" });
+    }
+};
+
+const createSupplier = async (req, res) => {
+    try {
+        const storeId = req.user?._id;
+        const permissionCheck = await enforceRolePermission({ req, storeId, requiredPermission: "finance.suppliers.manage" });
+        if (!permissionCheck.allowed) {
+            return res.status(permissionCheck.statusCode).json({ message: permissionCheck.message });
+        }
+
+        const {
+            name,
+            contactPerson = "",
+            mobile = "",
+            email = "",
+            gstNumber = "",
+            address = "",
+            paymentTermsDays = 30,
+            creditLimit = 0,
+            outstandingAmount = 0,
+            status = "Active",
+            notes = "",
+        } = req.body;
+
+        if (!name) {
+            return res.status(StatusCodes.BAD_REQUEST).json({ message: "Supplier name is required" });
+        }
+
+        const supplier = await Supplier.create({
+            storeId,
+            name,
+            contactPerson,
+            mobile,
+            email,
+            gstNumber,
+            address,
+            paymentTermsDays: Math.max(0, Number(paymentTermsDays) || 0),
+            creditLimit: Math.max(0, Number(creditLimit) || 0),
+            outstandingAmount: Math.max(0, Number(outstandingAmount) || 0),
+            status,
+            notes,
+        });
+
+        return res.status(StatusCodes.CREATED).json({ message: "Supplier created", supplier });
+    } catch (error) {
+        if (error?.code === 11000) {
+            return res.status(StatusCodes.BAD_REQUEST).json({ message: "Supplier with this name already exists" });
+        }
+        console.error("createSupplier error:", error);
+        return res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({ message: "Failed to create supplier" });
+    }
+};
+
+const getSuppliers = async (req, res) => {
+    try {
+        const storeId = req.user?._id;
+        const permissionCheck = await enforceRolePermission({ req, storeId, requiredPermission: "finance.suppliers.manage" });
+        if (!permissionCheck.allowed) {
+            return res.status(permissionCheck.statusCode).json({ message: permissionCheck.message });
+        }
+
+        const suppliers = await Supplier.find({ storeId }).sort({ createdAt: -1 });
+        return res.status(StatusCodes.OK).json({ suppliers, total: suppliers.length });
+    } catch (error) {
+        console.error("getSuppliers error:", error);
+        return res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({ message: "Failed to fetch suppliers" });
+    }
+};
+
+const updateSupplier = async (req, res) => {
+    try {
+        const storeId = req.user?._id;
+        const permissionCheck = await enforceRolePermission({ req, storeId, requiredPermission: "finance.suppliers.manage" });
+        if (!permissionCheck.allowed) {
+            return res.status(permissionCheck.statusCode).json({ message: permissionCheck.message });
+        }
+
+        const { supplierId } = req.params;
+        const updates = { ...req.body };
+
+        const supplier = await Supplier.findOneAndUpdate(
+            { _id: supplierId, storeId },
+            { $set: updates },
+            { new: true, runValidators: true },
+        );
+
+        if (!supplier) {
+            return res.status(StatusCodes.NOT_FOUND).json({ message: "Supplier not found" });
+        }
+
+        return res.status(StatusCodes.OK).json({ message: "Supplier updated", supplier });
+    } catch (error) {
+        console.error("updateSupplier error:", error);
+        return res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({ message: "Failed to update supplier" });
+    }
+};
+
+const deleteSupplier = async (req, res) => {
+    try {
+        const storeId = req.user?._id;
+        const permissionCheck = await enforceRolePermission({ req, storeId, requiredPermission: "finance.suppliers.manage" });
+        if (!permissionCheck.allowed) {
+            return res.status(permissionCheck.statusCode).json({ message: permissionCheck.message });
+        }
+
+        const { supplierId } = req.params;
+        const deleted = await Supplier.findOneAndDelete({ _id: supplierId, storeId });
+        if (!deleted) {
+            return res.status(StatusCodes.NOT_FOUND).json({ message: "Supplier not found" });
+        }
+
+        return res.status(StatusCodes.OK).json({ message: "Supplier deleted" });
+    } catch (error) {
+        console.error("deleteSupplier error:", error);
+        return res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({ message: "Failed to delete supplier" });
+    }
+};
+
+const addSupplierPayment = async (req, res) => {
+    try {
+        const storeId = req.user?._id;
+        const permissionCheck = await enforceRolePermission({ req, storeId, requiredPermission: "finance.suppliers.manage" });
+        if (!permissionCheck.allowed) {
+            return res.status(permissionCheck.statusCode).json({ message: permissionCheck.message });
+        }
+
+        const { supplierId } = req.params;
+        const { amount, method = "Other", reference = "", paidAt, note = "" } = req.body;
+
+        if (!amount || Number(amount) <= 0) {
+            return res.status(StatusCodes.BAD_REQUEST).json({ message: "Valid payment amount is required" });
+        }
+
+        const supplier = await Supplier.findOne({ _id: supplierId, storeId });
+        if (!supplier) {
+            return res.status(StatusCodes.NOT_FOUND).json({ message: "Supplier not found" });
+        }
+
+        const paymentAmount = toCurrency(amount);
+        supplier.paymentHistory.push({
+            amount: paymentAmount,
+            method,
+            reference,
+            paidAt: paidAt ? new Date(paidAt) : new Date(),
+            note,
+        });
+        supplier.outstandingAmount = toCurrency(Math.max(0, (Number(supplier.outstandingAmount) || 0) - paymentAmount));
+
+        await supplier.save();
+
+        return res.status(StatusCodes.OK).json({ message: "Supplier payment added", supplier });
+    } catch (error) {
+        console.error("addSupplierPayment error:", error);
+        return res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({ message: "Failed to add supplier payment" });
+    }
+};
+
+const getProfitMarginReport = async (req, res) => {
+    try {
+        const storeId = req.user?._id;
+        const permissionCheck = await enforceRolePermission({ req, storeId, requiredPermission: "finance.profit.view" });
+        if (!permissionCheck.allowed) {
+            return res.status(permissionCheck.statusCode).json({ message: permissionCheck.message });
+        }
+
+        const { from, to } = req.query;
+        const query = { storeId };
+        if (from || to) {
+            query.createdAt = {};
+            if (from) query.createdAt.$gte = new Date(from);
+            if (to) query.createdAt.$lte = new Date(to);
+        }
+
+        const invoices = await Invoice.find(query).lean();
+
+        const byCategoryMap = {};
+        let totalRevenue = 0;
+        let totalCost = 0;
+
+        invoices.forEach((invoice) => {
+            (invoice.lineItems || []).forEach((item) => {
+                const category = item.category || "General";
+                const revenue = toCurrency((Number(item.quantity) || 0) * (Number(item.unitPrice) || 0));
+                const cost = toCurrency((Number(item.quantity) || 0) * (Number(item.costPrice) || 0));
+                const profit = toCurrency(revenue - cost);
+
+                if (!byCategoryMap[category]) {
+                    byCategoryMap[category] = { category, revenue: 0, cost: 0, profit: 0, marginPercent: 0 };
+                }
+
+                byCategoryMap[category].revenue = toCurrency(byCategoryMap[category].revenue + revenue);
+                byCategoryMap[category].cost = toCurrency(byCategoryMap[category].cost + cost);
+                byCategoryMap[category].profit = toCurrency(byCategoryMap[category].profit + profit);
+
+                totalRevenue = toCurrency(totalRevenue + revenue);
+                totalCost = toCurrency(totalCost + cost);
+            });
+        });
+
+        const byCategory = Object.values(byCategoryMap)
+            .map((row) => ({
+                ...row,
+                marginPercent: row.revenue > 0 ? toCurrency((row.profit / row.revenue) * 100) : 0,
+            }))
+            .sort((a, b) => b.profit - a.profit);
+
+        const totalProfit = toCurrency(totalRevenue - totalCost);
+
+        return res.status(StatusCodes.OK).json({
+            summary: {
+                totalRevenue,
+                totalCost,
+                totalProfit,
+                overallMarginPercent: totalRevenue > 0 ? toCurrency((totalProfit / totalRevenue) * 100) : 0,
+            },
+            byCategory,
+        });
+    } catch (error) {
+        console.error("getProfitMarginReport error:", error);
+        return res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({ message: "Failed to generate profit margin report" });
+    }
+};
+
+const getTaxReport = async (req, res) => {
+    try {
+        const storeId = req.user?._id;
+        const permissionCheck = await enforceRolePermission({ req, storeId, requiredPermission: "finance.tax.view" });
+        if (!permissionCheck.allowed) {
+            return res.status(permissionCheck.statusCode).json({ message: permissionCheck.message });
+        }
+
+        const { from, to } = req.query;
+        const query = { storeId };
+        if (from || to) {
+            query.createdAt = {};
+            if (from) query.createdAt.$gte = new Date(from);
+            if (to) query.createdAt.$lte = new Date(to);
+        }
+
+        const invoices = await Invoice.find(query).lean();
+        const gstBreakdownMap = {};
+        let taxableSales = 0;
+        let gstCollected = 0;
+        let totalRevenueExcludingGst = 0;
+        let totalCost = 0;
+
+        invoices.forEach((invoice) => {
+            (invoice.lineItems || []).forEach((item) => {
+                const taxableValue = toCurrency((Number(item.quantity) || 0) * (Number(item.unitPrice) || 0));
+                const gstAmount = toCurrency(Number(item.gstAmount) || 0);
+                const rate = Number(item.gstRate) || 0;
+                const costValue = toCurrency((Number(item.quantity) || 0) * (Number(item.costPrice) || 0));
+
+                taxableSales = toCurrency(taxableSales + taxableValue);
+                gstCollected = toCurrency(gstCollected + gstAmount);
+                totalRevenueExcludingGst = toCurrency(totalRevenueExcludingGst + taxableValue);
+                totalCost = toCurrency(totalCost + costValue);
+
+                if (!gstBreakdownMap[rate]) {
+                    gstBreakdownMap[rate] = {
+                        gstRate: rate,
+                        taxableSales: 0,
+                        gstCollected: 0,
+                    };
+                }
+                gstBreakdownMap[rate].taxableSales = toCurrency(gstBreakdownMap[rate].taxableSales + taxableValue);
+                gstBreakdownMap[rate].gstCollected = toCurrency(gstBreakdownMap[rate].gstCollected + gstAmount);
+            });
+        });
+
+        const estimatedNetIncome = toCurrency(totalRevenueExcludingGst - totalCost);
+
+        return res.status(StatusCodes.OK).json({
+            summary: {
+                taxableSales,
+                gstCollected,
+                estimatedNetIncome,
+                incomeTaxBase: estimatedNetIncome,
+            },
+            gstBreakdown: Object.values(gstBreakdownMap).sort((a, b) => a.gstRate - b.gstRate),
+            invoicesCount: invoices.length,
+        });
+    } catch (error) {
+        console.error("getTaxReport error:", error);
+        return res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({ message: "Failed to generate tax report" });
+    }
+};
+
+const createPromotionalCampaign = async (req, res) => {
+    try {
+        const storeId = req.user?._id;
+        const permissionCheck = await enforceRolePermission({ req, storeId, requiredPermission: "marketing.manage" });
+        if (!permissionCheck.allowed) {
+            return res.status(permissionCheck.statusCode).json({ message: permissionCheck.message });
+        }
+
+        const {
+            campaignType = "Offer",
+            title,
+            description = "",
+            couponCode = "",
+            discountType = "Percentage",
+            discountValue = 0,
+            minOrderAmount = 0,
+            maxDiscountAmount = 0,
+            autoApply = false,
+            usageLimit = 0,
+            validFrom,
+            validTill,
+            status = "Active",
+            targetScope = "All",
+            targetValue = "",
+            bulkDiscount = {},
+        } = req.body || {};
+
+        if (!String(title || "").trim()) {
+            return res.status(StatusCodes.BAD_REQUEST).json({ message: "Campaign title is required" });
+        }
+
+        const campaign = await PromotionalCampaign.create({
+            storeId,
+            campaignType,
+            title: String(title).trim(),
+            description: String(description || "").trim(),
+            couponCode: String(couponCode || "").trim().toUpperCase(),
+            discountType,
+            discountValue: Number(discountValue) || 0,
+            minOrderAmount: Number(minOrderAmount) || 0,
+            maxDiscountAmount: Number(maxDiscountAmount) || 0,
+            autoApply: Boolean(autoApply),
+            usageLimit: Number(usageLimit) || 0,
+            validFrom: validFrom ? new Date(validFrom) : new Date(),
+            validTill: validTill ? new Date(validTill) : undefined,
+            status,
+            targetScope,
+            targetValue: String(targetValue || "").trim(),
+            bulkDiscount: {
+                minQuantity: Number(bulkDiscount?.minQuantity) || 0,
+                buyQuantity: Number(bulkDiscount?.buyQuantity) || 0,
+                getQuantity: Number(bulkDiscount?.getQuantity) || 0,
+            },
+        });
+
+        return res.status(StatusCodes.CREATED).json({
+            success: true,
+            message: "Promotional campaign created",
+            campaign,
+        });
+    } catch (error) {
+        if (error?.code === 11000) {
+            return res.status(StatusCodes.CONFLICT).json({ message: "Coupon code already exists for this store" });
+        }
+        console.error("createPromotionalCampaign error:", error);
+        return res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({ message: "Failed to create promotional campaign" });
+    }
+};
+
+const getPromotionalCampaigns = async (req, res) => {
+    try {
+        const storeId = req.user?._id;
+        const permissionCheck = await enforceRolePermission({ req, storeId, requiredPermission: "marketing.view" });
+        if (!permissionCheck.allowed) {
+            return res.status(permissionCheck.statusCode).json({ message: permissionCheck.message });
+        }
+
+        const { status, campaignType } = req.query;
+        const query = { storeId };
+        if (status) query.status = status;
+        if (campaignType) query.campaignType = campaignType;
+
+        const campaigns = await PromotionalCampaign.find(query).sort({ createdAt: -1 }).lean();
+
+        return res.status(StatusCodes.OK).json({
+            success: true,
+            campaigns,
+        });
+    } catch (error) {
+        console.error("getPromotionalCampaigns error:", error);
+        return res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({ message: "Failed to fetch promotional campaigns" });
+    }
+};
+
+const updatePromotionalCampaignStatus = async (req, res) => {
+    try {
+        const storeId = req.user?._id;
+        const permissionCheck = await enforceRolePermission({ req, storeId, requiredPermission: "marketing.manage" });
+        if (!permissionCheck.allowed) {
+            return res.status(permissionCheck.statusCode).json({ message: permissionCheck.message });
+        }
+
+        const { campaignId } = req.params;
+        const { status } = req.body || {};
+        const allowedStatuses = ["Active", "Inactive", "Scheduled", "Expired"];
+        if (!allowedStatuses.includes(String(status || ""))) {
+            return res.status(StatusCodes.BAD_REQUEST).json({ message: "Invalid campaign status" });
+        }
+
+        const campaign = await PromotionalCampaign.findOneAndUpdate(
+            { _id: campaignId, storeId },
+            { $set: { status } },
+            { new: true }
+        );
+
+        if (!campaign) {
+            return res.status(StatusCodes.NOT_FOUND).json({ message: "Campaign not found" });
+        }
+
+        return res.status(StatusCodes.OK).json({
+            success: true,
+            message: "Campaign status updated",
+            campaign,
+        });
+    } catch (error) {
+        console.error("updatePromotionalCampaignStatus error:", error);
+        return res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({ message: "Failed to update campaign status" });
+    }
+};
+
+const deletePromotionalCampaign = async (req, res) => {
+    try {
+        const storeId = req.user?._id;
+        const permissionCheck = await enforceRolePermission({ req, storeId, requiredPermission: "marketing.manage" });
+        if (!permissionCheck.allowed) {
+            return res.status(permissionCheck.statusCode).json({ message: permissionCheck.message });
+        }
+
+        const { campaignId } = req.params;
+        const deleted = await PromotionalCampaign.findOneAndDelete({ _id: campaignId, storeId });
+
+        if (!deleted) {
+            return res.status(StatusCodes.NOT_FOUND).json({ message: "Campaign not found" });
+        }
+
+        return res.status(StatusCodes.OK).json({
+            success: true,
+            message: "Campaign deleted",
+        });
+    } catch (error) {
+        console.error("deletePromotionalCampaign error:", error);
+        return res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({ message: "Failed to delete campaign" });
+    }
+};
+
+const getPublicPromotionalCampaigns = async (req, res) => {
+    try {
+        const limit = Math.min(Math.max(Number(req.query?.limit) || 8, 1), 20);
+        const now = new Date();
+
+        const campaigns = await PromotionalCampaign.find({
+            status: "Active",
+            validFrom: { $lte: now },
+            $or: [{ validTill: { $exists: false } }, { validTill: null }, { validTill: { $gte: now } }],
+        })
+            .select("campaignType title description couponCode discountType discountValue minOrderAmount maxDiscountAmount autoApply targetScope targetValue bulkDiscount validFrom validTill storeId")
+            .sort({ createdAt: -1 })
+            .limit(limit)
+            .populate({ path: "storeId", select: "storeName name city" })
+            .lean();
+
+        return res.status(StatusCodes.OK).json({
+            success: true,
+            campaigns: campaigns.map((campaign) => ({
+                ...campaign,
+                storeName: campaign?.storeId?.storeName || campaign?.storeId?.name || "Partner Store",
+                storeCity: campaign?.storeId?.city || "",
+            })),
+        });
+    } catch (error) {
+        console.error("getPublicPromotionalCampaigns error:", error);
+        return res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({ message: "Failed to fetch public promotional campaigns" });
+    }
+};
+
+const validatePublicCoupon = async (req, res) => {
+    try {
+        const couponCode = String(req.body?.couponCode || '').trim().toUpperCase();
+        const subtotal = Number(req.body?.subtotal || 0);
+        const storeId = req.body?.storeId;
+
+        if (!couponCode) {
+            return res.status(StatusCodes.BAD_REQUEST).json({ valid: false, message: "Coupon code is required" });
+        }
+
+        const now = new Date();
+        const baseQuery = {
+            couponCode,
+            status: "Active",
+            validFrom: { $lte: now },
+            $or: [{ validTill: { $exists: false } }, { validTill: null }, { validTill: { $gte: now } }],
+        };
+
+        let campaign = null;
+
+        if (storeId) {
+            campaign = await PromotionalCampaign.findOne({ ...baseQuery, storeId })
+                .select("campaignType title couponCode discountType discountValue minOrderAmount maxDiscountAmount usageLimit usedCount storeId validFrom validTill status")
+                .lean();
+        }
+
+        if (!campaign) {
+            campaign = await PromotionalCampaign.findOne(baseQuery)
+                .select("campaignType title couponCode discountType discountValue minOrderAmount maxDiscountAmount usageLimit usedCount storeId validFrom validTill status")
+                .lean();
+        }
+
+        if (!campaign) {
+            return res.status(StatusCodes.OK).json({ valid: false, message: "Coupon is invalid or inactive" });
+        }
+
+        const usageLimit = Number(campaign.usageLimit) || 0;
+        const usedCount = Number(campaign.usedCount) || 0;
+        if (usageLimit > 0 && usedCount >= usageLimit) {
+            return res.status(StatusCodes.OK).json({ valid: false, message: "Coupon usage limit reached" });
+        }
+
+        const minOrderAmount = Number(campaign.minOrderAmount) || 0;
+        if (subtotal > 0 && minOrderAmount > 0 && subtotal < minOrderAmount) {
+            return res.status(StatusCodes.OK).json({
+                valid: false,
+                message: `Minimum order amount ${minOrderAmount} required for this coupon`,
+                campaign,
+            });
+        }
+
+        const discountType = String(campaign.discountType || "").toLowerCase();
+        const discountValue = Number(campaign.discountValue) || 0;
+        let discountAmount = 0;
+
+        if (subtotal > 0) {
+            discountAmount = discountType === "percentage" ? (subtotal * discountValue) / 100 : discountValue;
+            const maxDiscountAmount = Number(campaign.maxDiscountAmount) || 0;
+            if (maxDiscountAmount > 0) {
+                discountAmount = Math.min(discountAmount, maxDiscountAmount);
+            }
+            discountAmount = Math.max(0, Math.min(subtotal, discountAmount));
+        }
+
+        return res.status(StatusCodes.OK).json({
+            valid: true,
+            message: "Coupon applied successfully",
+            discountAmount,
+            finalAmount: Math.max(0, subtotal - discountAmount),
+            campaign,
+        });
+    } catch (error) {
+        console.error("validatePublicCoupon error:", error);
+        return res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({ valid: false, message: "Failed to validate coupon" });
+    }
+};
+
 module.exports = {
     signUp, signIn, fetchData, adminsignIn, AdminfetchData, uploadPrescriptionFile, UpdatePatientProfile, fetchpharmacymedicines, updateorderedmedicines, updatecartquantity, addmedicinetodb, decreaseupdatecartquantity, deletemedicine, finalitems, finaladdress, finalpayment, deletecartItems, createStoreApprovalRequest, getStoreApprovalRequests, reviewStoreApprovalRequest, getAllStores, updateStoreStatus, addStore, getUserNotificationPreferences, updateUserNotificationPreferences,
     uploadPrescriptionRequest, reuploadPrescriptionRequest, getMyPrescriptionRequests, getStorePrescriptionRequests, reviewPrescriptionRequest,
     getStoreOrders, updateOrderTrackingStatus, getMyOrders, getOrderById, getStoreStaffMembers, createStoreStaffMember, updateStoreStaffMember, updateStoreStaffStatus, deleteStoreStaffMember, getCart, seedVaccinationMasterIfEmpty, upsertUserVaccination, getUserVaccinations, getVaccinationMaster, getUserVaccinationsForDashboard, updateUserVaccinationByMasterId, createUserQuery, getUserQueries, getStoreQueries, answerStoreQuery, importPatientsFromCsv,
     getMedicinesByStore,
     getStoreInventory, createStoreInventoryMedicine, updateStoreInventoryMedicine, deleteStoreInventoryMedicine,
-    createReview, updateReview, deleteReview, getPublicReviews, getStoreReviews, getMyReviews
+    createReview, updateReview, deleteReview, getPublicReviews, getStoreReviews, getMyReviews, getMyStoreReviews, replyToReview,
+    uploadPrescriptionForAutoFill, extractMedicinesFromUploadedPrescription, getUserPrescriptionUploads, addExtractedMedicinesToCart,
+    getWishlist, addToWishlist, removeFromWishlist,
+    createMedicineTracker, getMedicineTrackers, logMedicineIntake, checkDrugInteractions, getMedicalTimeline, exportHealthRecordsPdf,
+    getStoreRolePermissions,
+    createStaffPerformanceRecord, getStaffPerformanceRecords,
+    createStaffAttendanceRecord, getStaffAttendanceRecords, checkInStaffAttendance, checkOutStaffAttendance,
+    createStaffTrainingRecord, getStaffTrainingRecords,
+    createComplianceChecklistItem, getComplianceChecklistItems, updateComplianceChecklistItem, getComplianceReminders,
+    createInvoice, getStoreInvoices, reconcileInvoicePayment, getPaymentReconciliationReport,
+    createSupplier, getSuppliers, updateSupplier, deleteSupplier, addSupplierPayment,
+    getProfitMarginReport, getTaxReport,
+    createPromotionalCampaign, getPromotionalCampaigns, updatePromotionalCampaignStatus, deletePromotionalCampaign,
+    getPublicPromotionalCampaigns, validatePublicCoupon
+};
+
+const STAFF_ROLE_PERMISSIONS = {
+    Manager: [
+        "staff.manage",
+        "attendance.manage",
+        "attendance.view",
+        "performance.manage",
+        "performance.view",
+        "training.manage",
+        "training.view",
+        "compliance.manage",
+        "compliance.view",
+        "finance.invoices.generate",
+        "finance.invoices.view",
+        "finance.reconciliation.view",
+        "finance.suppliers.manage",
+        "finance.profit.view",
+        "finance.tax.view",
+        "marketing.manage",
+        "marketing.view",
+    ],
+    Pharmacist: [
+        "attendance.view",
+        "performance.view",
+        "training.view",
+        "training.manage",
+        "compliance.view",
+        "compliance.manage",
+        "finance.invoices.generate",
+        "finance.invoices.view",
+        "finance.profit.view",
+        "marketing.view",
+    ],
+    Technician: [
+        "attendance.view",
+        "training.view",
+        "compliance.view",
+        "finance.invoices.view",
+        "marketing.view",
+    ],
+};
+
+const normalizeStaffRole = (role = "") => {
+    const normalized = String(role || "").trim().toLowerCase();
+    if (normalized === "manager") return "Manager";
+    if (normalized === "technician") return "Technician";
+    return "Pharmacist";
+};
+
+const getRolePermissions = (role = "") => {
+    const normalizedRole = normalizeStaffRole(role);
+    return STAFF_ROLE_PERMISSIONS[normalizedRole] || [];
+};
+
+const hasPermission = (permissions = [], requiredPermission) => {
+    if (!requiredPermission) return true;
+    return permissions.includes(requiredPermission);
+};
+
+const enforceRolePermission = async ({ req, storeId, requiredPermission }) => {
+    const delegatedStaffId = req.headers["x-staff-id"];
+
+    // Store owners are granted full access to store operations.
+    if (!delegatedStaffId) {
+        return { allowed: true, isOwner: true, staffMember: null, permissions: [] };
+    }
+
+    const staffMember = await StoreStaff.findOne({
+        _id: delegatedStaffId,
+        storeId,
+        status: "Active",
+    }).select("_id role firstName lastName status");
+
+    if (!staffMember) {
+        return {
+            allowed: false,
+            statusCode: StatusCodes.UNAUTHORIZED,
+            message: "Invalid or inactive delegated staff profile",
+        };
+    }
+
+    const permissions = getRolePermissions(staffMember.role);
+    if (!hasPermission(permissions, requiredPermission)) {
+        return {
+            allowed: false,
+            statusCode: StatusCodes.FORBIDDEN,
+            message: `Role ${staffMember.role} does not have permission: ${requiredPermission}`,
+        };
+    }
+
+    return { allowed: true, isOwner: false, staffMember, permissions };
+};
+
+const toCurrency = (value) => {
+    const parsed = Number(value);
+    if (!Number.isFinite(parsed)) return 0;
+    return Math.round(parsed * 100) / 100;
+};
+
+const makeInvoiceNumber = () => `INV-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+
+const buildInvoiceItems = ({ items = [], gstRateDefault = 0 }) => {
+    return items.map((item) => {
+        const quantity = Math.max(1, Number(item.quantity) || 1);
+        const unitPrice = Math.max(0, Number(item.unitPrice ?? item.price) || 0);
+        const gstRate = Math.max(0, Number(item.gstRate ?? gstRateDefault) || 0);
+        const costPrice = Math.max(0, Number(item.costPrice) || 0);
+        const taxableValue = toCurrency(quantity * unitPrice);
+        const gstAmount = toCurrency((taxableValue * gstRate) / 100);
+        const lineTotal = toCurrency(taxableValue + gstAmount);
+
+        return {
+            medicineId: String(item.medicineId || item.id || ""),
+            name: String(item.name || item.medicine || "Unknown Medicine"),
+            category: String(item.category || item.type || "General"),
+            quantity,
+            unitPrice,
+            costPrice,
+            gstRate,
+            gstAmount,
+            lineTotal,
+        };
+    });
+};
+
+const summarizeInvoiceTotals = (lineItems = [], discount = 0) => {
+    const subtotal = toCurrency(
+        lineItems.reduce((sum, item) => sum + (Number(item.quantity) || 0) * (Number(item.unitPrice) || 0), 0),
+    );
+    const totalGst = toCurrency(lineItems.reduce((sum, item) => sum + (Number(item.gstAmount) || 0), 0));
+    const discountAmount = Math.max(0, toCurrency(discount));
+    const grandTotal = Math.max(0, toCurrency(subtotal + totalGst - discountAmount));
+
+    return {
+        subtotal,
+        totalGst,
+        discount: discountAmount,
+        grandTotal,
+    };
 };

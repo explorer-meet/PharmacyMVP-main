@@ -18,6 +18,18 @@ import {
   ChevronRight,
   MessageSquare,
   Send,
+  Star,
+  ShieldCheck,
+  Receipt,
+  Building2,
+  CalendarCheck2,
+  UserCheck,
+  GraduationCap,
+  Landmark,
+  ScanLine,
+  Camera,
+  CameraOff,
+  BadgePercent,
 } from 'lucide-react';
 
 const StoreDashboard = () => {
@@ -62,6 +74,14 @@ const StoreDashboard = () => {
     price: '',
     stock: '',
   });
+  const [barcodeInput, setBarcodeInput] = useState('');
+  const [barcodeScanning, setBarcodeScanning] = useState(false);
+  const [barcodeLastCode, setBarcodeLastCode] = useState('');
+  const [barcodeMatchedItemId, setBarcodeMatchedItemId] = useState('');
+  const [barcodeActionQty, setBarcodeActionQty] = useState('1');
+  const barcodeVideoRef = useRef(null);
+  const barcodeStreamRef = useRef(null);
+  const barcodeRafRef = useRef(null);
   const [orders, setOrders] = useState([]);
   const [ordersLoading, setOrdersLoading] = useState(false);
   const [selectedOrderId, setSelectedOrderId] = useState(null);
@@ -190,12 +210,598 @@ const StoreDashboard = () => {
   const [selectedQueryId, setSelectedQueryId] = useState(null);
   const [answerText, setAnswerText] = useState('');
   const selectedQuery = queries.find((item) => item._id === selectedQueryId);
+  const [storeReviews, setStoreReviews] = useState([]);
+  const [storeReviewsLoading, setStoreReviewsLoading] = useState(false);
+  const [selectedReviewId, setSelectedReviewId] = useState(null);
+  const [reviewReplyText, setReviewReplyText] = useState('');
+  const [reviewReplySubmitting, setReviewReplySubmitting] = useState(false);
+  const selectedStoreReview = storeReviews.find((item) => item._id === selectedReviewId);
+
+  const [staffPermissions, setStaffPermissions] = useState([]);
+  const [staffOpsLoading, setStaffOpsLoading] = useState(false);
+  const [performanceRecords, setPerformanceRecords] = useState([]);
+  const [attendanceRecords, setAttendanceRecords] = useState([]);
+  const [trainingRecords, setTrainingRecords] = useState([]);
+  const [newPerformance, setNewPerformance] = useState({
+    staffId: '',
+    periodStart: '',
+    periodEnd: '',
+    ordersProcessed: '',
+    prescriptionsReviewed: '',
+    avgFulfillmentMinutes: '',
+    attendanceScore: '',
+    customerRating: '',
+    notes: '',
+  });
+  const [newAttendance, setNewAttendance] = useState({
+    staffId: '',
+    date: '',
+    shiftType: 'Morning',
+    shiftStart: '',
+    shiftEnd: '',
+    status: 'Present',
+    notes: '',
+  });
+  const [newTraining, setNewTraining] = useState({
+    staffId: '',
+    title: '',
+    moduleType: 'Certification',
+    score: '',
+    maxScore: '100',
+    validTill: '',
+    notes: '',
+  });
+
+  const [complianceLoading, setComplianceLoading] = useState(false);
+  const [complianceItems, setComplianceItems] = useState([]);
+  const [complianceReminders, setComplianceReminders] = useState({ overdue: [], upcoming: [] });
+  const [newComplianceItem, setNewComplianceItem] = useState({
+    itemType: 'Drug License',
+    title: '',
+    dueDate: '',
+    priority: 'Medium',
+    reminderDaysBefore: '7',
+    notes: '',
+  });
+
+  const [financeLoading, setFinanceLoading] = useState(false);
+  const [invoices, setInvoices] = useState([]);
+  const [invoiceSummary, setInvoiceSummary] = useState({ totalInvoices: 0, grossSales: 0, outstanding: 0 });
+  const [reconciliationSummary, setReconciliationSummary] = useState(null);
+  const [profitSummary, setProfitSummary] = useState(null);
+  const [profitByCategory, setProfitByCategory] = useState([]);
+  const [taxSummary, setTaxSummary] = useState(null);
+  const [taxBreakdown, setTaxBreakdown] = useState([]);
+  const [newInvoice, setNewInvoice] = useState({
+    customerName: '',
+    customerGstNumber: '',
+    gstRateDefault: '5',
+    discount: '0',
+    paymentMethod: 'UPI',
+    initialPaidAmount: '0',
+    paymentReference: '',
+    itemsText: '',
+  });
+  const [paymentUpdate, setPaymentUpdate] = useState({
+    invoiceId: '',
+    amount: '',
+    method: 'UPI',
+    reference: '',
+  });
+  const [suppliers, setSuppliers] = useState([]);
+  const [supplierLoading, setSupplierLoading] = useState(false);
+  const [newSupplier, setNewSupplier] = useState({
+    name: '',
+    contactPerson: '',
+    mobile: '',
+    email: '',
+    gstNumber: '',
+    paymentTermsDays: '30',
+    creditLimit: '0',
+    outstandingAmount: '0',
+    notes: '',
+  });
+  const [supplierPaymentDraft, setSupplierPaymentDraft] = useState({});
+  const [campaignsLoading, setCampaignsLoading] = useState(false);
+  const [campaigns, setCampaigns] = useState([]);
+  const [newCampaign, setNewCampaign] = useState({
+    campaignType: 'Offer',
+    title: '',
+    description: '',
+    couponCode: '',
+    discountType: 'Percentage',
+    discountValue: '',
+    minOrderAmount: '',
+    maxDiscountAmount: '',
+    autoApply: false,
+    usageLimit: '',
+    validFrom: '',
+    validTill: '',
+    status: 'Active',
+    targetScope: 'All',
+    targetValue: '',
+    bulkMinQuantity: '',
+    bulkBuyQuantity: '',
+    bulkGetQuantity: '',
+  });
 
   const formatShortDate = (value) => {
     if (!value) return 'N/A';
     const parsed = new Date(value);
     if (Number.isNaN(parsed.getTime())) return 'N/A';
     return parsed.toLocaleDateString('en-US', { month: 'short', day: '2-digit' });
+  };
+
+  const authConfig = () => {
+    const token = localStorage.getItem('medVisionToken');
+    if (!token) return null;
+    return { headers: { Authorization: `Bearer ${token}` } };
+  };
+
+  const parseInvoiceItems = (itemsText) => {
+    return String(itemsText || '')
+      .split('\n')
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .map((line) => {
+        const [name, quantity, unitPrice, gstRate, costPrice, category] = line.split(',').map((item) => item?.trim() || '');
+        return {
+          name,
+          quantity: Number(quantity) || 1,
+          unitPrice: Number(unitPrice) || 0,
+          gstRate: Number(gstRate) || 0,
+          costPrice: Number(costPrice) || 0,
+          category: category || 'General',
+        };
+      })
+      .filter((item) => item.name && item.unitPrice >= 0);
+  };
+
+  const loadStaffPermissions = async () => {
+    const config = authConfig();
+    if (!config) return;
+    try {
+      const response = await axios.get(`${baseURL}/store-staff/permissions?role=Manager`, config);
+      setStaffPermissions(response.data?.permissions || []);
+    } catch (error) {
+      console.error('Failed to load staff permissions:', error.message);
+      setStaffPermissions([]);
+    }
+  };
+
+  const loadStaffOperations = async () => {
+    const config = authConfig();
+    if (!config) return;
+    try {
+      setStaffOpsLoading(true);
+      const [performanceRes, attendanceRes, trainingRes] = await Promise.all([
+        axios.get(`${baseURL}/staff/performance`, config),
+        axios.get(`${baseURL}/staff/attendance`, config),
+        axios.get(`${baseURL}/staff/training`, config),
+      ]);
+      setPerformanceRecords(performanceRes.data?.records || []);
+      setAttendanceRecords(attendanceRes.data?.records || []);
+      setTrainingRecords(trainingRes.data?.records || []);
+    } catch (error) {
+      console.error('Failed to load staff operations:', error.message);
+      setPerformanceRecords([]);
+      setAttendanceRecords([]);
+      setTrainingRecords([]);
+    } finally {
+      setStaffOpsLoading(false);
+    }
+  };
+
+  const loadCompliance = async () => {
+    const config = authConfig();
+    if (!config) return;
+    try {
+      setComplianceLoading(true);
+      const [itemsRes, remindersRes] = await Promise.all([
+        axios.get(`${baseURL}/compliance/checklist`, config),
+        axios.get(`${baseURL}/compliance/reminders?nextDays=30`, config),
+      ]);
+      setComplianceItems(itemsRes.data?.items || []);
+      setComplianceReminders({
+        overdue: remindersRes.data?.overdue || [],
+        upcoming: remindersRes.data?.upcoming || [],
+      });
+    } catch (error) {
+      console.error('Failed to load compliance data:', error.message);
+      setComplianceItems([]);
+      setComplianceReminders({ overdue: [], upcoming: [] });
+    } finally {
+      setComplianceLoading(false);
+    }
+  };
+
+  const loadFinance = async () => {
+    const config = authConfig();
+    if (!config) return;
+    try {
+      setFinanceLoading(true);
+      const [invoiceRes, reconciliationRes, profitRes, taxRes] = await Promise.all([
+        axios.get(`${baseURL}/finance/invoices`, config),
+        axios.get(`${baseURL}/finance/reconciliation`, config),
+        axios.get(`${baseURL}/finance/profit-margin`, config),
+        axios.get(`${baseURL}/finance/tax-report`, config),
+      ]);
+      setInvoices(invoiceRes.data?.invoices || []);
+      setInvoiceSummary(invoiceRes.data?.summary || { totalInvoices: 0, grossSales: 0, outstanding: 0 });
+      setReconciliationSummary(reconciliationRes.data?.summary || null);
+      setProfitSummary(profitRes.data?.summary || null);
+      setProfitByCategory(profitRes.data?.byCategory || []);
+      setTaxSummary(taxRes.data?.summary || null);
+      setTaxBreakdown(taxRes.data?.gstBreakdown || []);
+    } catch (error) {
+      console.error('Failed to load finance data:', error.message);
+      setInvoices([]);
+      setInvoiceSummary({ totalInvoices: 0, grossSales: 0, outstanding: 0 });
+      setReconciliationSummary(null);
+      setProfitSummary(null);
+      setProfitByCategory([]);
+      setTaxSummary(null);
+      setTaxBreakdown([]);
+    } finally {
+      setFinanceLoading(false);
+    }
+  };
+
+  const loadSuppliers = async () => {
+    const config = authConfig();
+    if (!config) return;
+    try {
+      setSupplierLoading(true);
+      const response = await axios.get(`${baseURL}/suppliers`, config);
+      setSuppliers(response.data?.suppliers || []);
+    } catch (error) {
+      console.error('Failed to load suppliers:', error.message);
+      setSuppliers([]);
+    } finally {
+      setSupplierLoading(false);
+    }
+  };
+
+  const loadPromotionalCampaigns = async () => {
+    const config = authConfig();
+    if (!config) return;
+    try {
+      setCampaignsLoading(true);
+      const response = await axios.get(`${baseURL}/marketing/campaigns`, config);
+      setCampaigns(response.data?.campaigns || []);
+    } catch (error) {
+      console.error('Failed to load campaigns:', error.message);
+      setCampaigns([]);
+    } finally {
+      setCampaignsLoading(false);
+    }
+  };
+
+  const submitPromotionalCampaign = async (event) => {
+    event.preventDefault();
+    const config = authConfig();
+    if (!config) return;
+
+    try {
+      await axios.post(`${baseURL}/marketing/campaigns`, {
+        campaignType: newCampaign.campaignType,
+        title: newCampaign.title,
+        description: newCampaign.description,
+        couponCode: newCampaign.campaignType === 'Coupon' ? newCampaign.couponCode : '',
+        discountType: newCampaign.discountType,
+        discountValue: Number(newCampaign.discountValue) || 0,
+        minOrderAmount: Number(newCampaign.minOrderAmount) || 0,
+        maxDiscountAmount: Number(newCampaign.maxDiscountAmount) || 0,
+        autoApply: Boolean(newCampaign.autoApply),
+        usageLimit: Number(newCampaign.usageLimit) || 0,
+        validFrom: newCampaign.validFrom || undefined,
+        validTill: newCampaign.validTill || undefined,
+        status: newCampaign.status,
+        targetScope: newCampaign.targetScope,
+        targetValue: newCampaign.targetValue,
+        bulkDiscount: {
+          minQuantity: Number(newCampaign.bulkMinQuantity) || 0,
+          buyQuantity: Number(newCampaign.bulkBuyQuantity) || 0,
+          getQuantity: Number(newCampaign.bulkGetQuantity) || 0,
+        },
+      }, config);
+
+      toast.success('Promotional campaign created');
+      setNewCampaign({
+        campaignType: 'Offer',
+        title: '',
+        description: '',
+        couponCode: '',
+        discountType: 'Percentage',
+        discountValue: '',
+        minOrderAmount: '',
+        maxDiscountAmount: '',
+        autoApply: false,
+        usageLimit: '',
+        validFrom: '',
+        validTill: '',
+        status: 'Active',
+        targetScope: 'All',
+        targetValue: '',
+        bulkMinQuantity: '',
+        bulkBuyQuantity: '',
+        bulkGetQuantity: '',
+      });
+      loadPromotionalCampaigns();
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Failed to create promotional campaign');
+    }
+  };
+
+  const updateCampaignStatus = async (campaignId, status) => {
+    const config = authConfig();
+    if (!config) return;
+    try {
+      await axios.patch(`${baseURL}/marketing/campaigns/${campaignId}/status`, { status }, config);
+      toast.success('Campaign status updated');
+      loadPromotionalCampaigns();
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Failed to update campaign status');
+    }
+  };
+
+  const deleteCampaign = async (campaignId) => {
+    const config = authConfig();
+    if (!config) return;
+    try {
+      await axios.delete(`${baseURL}/marketing/campaigns/${campaignId}`, config);
+      toast.success('Campaign deleted');
+      loadPromotionalCampaigns();
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Failed to delete campaign');
+    }
+  };
+
+  const submitPerformanceRecord = async (event) => {
+    event.preventDefault();
+    const config = authConfig();
+    if (!config) return;
+
+    try {
+      await axios.post(`${baseURL}/staff/performance`, {
+        ...newPerformance,
+        ordersProcessed: Number(newPerformance.ordersProcessed) || 0,
+        prescriptionsReviewed: Number(newPerformance.prescriptionsReviewed) || 0,
+        avgFulfillmentMinutes: Number(newPerformance.avgFulfillmentMinutes) || 0,
+        attendanceScore: Number(newPerformance.attendanceScore) || 0,
+        customerRating: Number(newPerformance.customerRating) || 0,
+      }, config);
+      toast.success('Performance record saved');
+      setNewPerformance({
+        staffId: '',
+        periodStart: '',
+        periodEnd: '',
+        ordersProcessed: '',
+        prescriptionsReviewed: '',
+        avgFulfillmentMinutes: '',
+        attendanceScore: '',
+        customerRating: '',
+        notes: '',
+      });
+      loadStaffOperations();
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Failed to save performance record');
+    }
+  };
+
+  const submitAttendanceRecord = async (event) => {
+    event.preventDefault();
+    const config = authConfig();
+    if (!config) return;
+
+    try {
+      await axios.post(`${baseURL}/staff/attendance`, newAttendance, config);
+      toast.success('Attendance record saved');
+      setNewAttendance({
+        staffId: '',
+        date: '',
+        shiftType: 'Morning',
+        shiftStart: '',
+        shiftEnd: '',
+        status: 'Present',
+        notes: '',
+      });
+      loadStaffOperations();
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Failed to save attendance record');
+    }
+  };
+
+  const markAttendance = async (attendanceId, action) => {
+    const config = authConfig();
+    if (!config) return;
+    try {
+      await axios.patch(`${baseURL}/staff/attendance/${attendanceId}/${action}`, {}, config);
+      toast.success(action === 'check-in' ? 'Check-in recorded' : 'Check-out recorded');
+      loadStaffOperations();
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Failed to update attendance');
+    }
+  };
+
+  const submitTrainingRecord = async (event) => {
+    event.preventDefault();
+    const config = authConfig();
+    if (!config) return;
+    try {
+      await axios.post(`${baseURL}/staff/training`, {
+        ...newTraining,
+        score: Number(newTraining.score) || 0,
+        maxScore: Number(newTraining.maxScore) || 100,
+      }, config);
+      toast.success('Training record added');
+      setNewTraining({
+        staffId: '',
+        title: '',
+        moduleType: 'Certification',
+        score: '',
+        maxScore: '100',
+        validTill: '',
+        notes: '',
+      });
+      loadStaffOperations();
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Failed to add training record');
+    }
+  };
+
+  const submitComplianceItem = async (event) => {
+    event.preventDefault();
+    const config = authConfig();
+    if (!config) return;
+    try {
+      await axios.post(`${baseURL}/compliance/checklist`, {
+        ...newComplianceItem,
+        reminderDaysBefore: Number(newComplianceItem.reminderDaysBefore) || 0,
+      }, config);
+      toast.success('Compliance item created');
+      setNewComplianceItem({
+        itemType: 'Drug License',
+        title: '',
+        dueDate: '',
+        priority: 'Medium',
+        reminderDaysBefore: '7',
+        notes: '',
+      });
+      loadCompliance();
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Failed to create compliance item');
+    }
+  };
+
+  const markComplianceCompleted = async (itemId) => {
+    const config = authConfig();
+    if (!config) return;
+    try {
+      await axios.put(`${baseURL}/compliance/checklist/${itemId}`, {
+        status: 'Completed',
+        lastCompletedAt: new Date().toISOString(),
+      }, config);
+      toast.success('Compliance item marked completed');
+      loadCompliance();
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Failed to update compliance item');
+    }
+  };
+
+  const submitInvoice = async (event) => {
+    event.preventDefault();
+    const config = authConfig();
+    if (!config) return;
+    try {
+      const items = parseInvoiceItems(newInvoice.itemsText);
+      if (!items.length) {
+        toast.error('Add at least one invoice line in items');
+        return;
+      }
+      await axios.post(`${baseURL}/finance/invoices`, {
+        ...newInvoice,
+        gstRateDefault: Number(newInvoice.gstRateDefault) || 0,
+        discount: Number(newInvoice.discount) || 0,
+        initialPaidAmount: Number(newInvoice.initialPaidAmount) || 0,
+        items,
+      }, config);
+      toast.success('Invoice generated');
+      setNewInvoice({
+        customerName: '',
+        customerGstNumber: '',
+        gstRateDefault: '5',
+        discount: '0',
+        paymentMethod: 'UPI',
+        initialPaidAmount: '0',
+        paymentReference: '',
+        itemsText: '',
+      });
+      loadFinance();
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Failed to generate invoice');
+    }
+  };
+
+  const submitInvoicePayment = async (event) => {
+    event.preventDefault();
+    const config = authConfig();
+    if (!config || !paymentUpdate.invoiceId) return;
+    try {
+      await axios.patch(`${baseURL}/finance/invoices/${paymentUpdate.invoiceId}/payments`, {
+        amount: Number(paymentUpdate.amount) || 0,
+        method: paymentUpdate.method,
+        reference: paymentUpdate.reference,
+      }, config);
+      toast.success('Payment reconciled');
+      setPaymentUpdate({ invoiceId: '', amount: '', method: 'UPI', reference: '' });
+      loadFinance();
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Failed to reconcile payment');
+    }
+  };
+
+  const submitSupplier = async (event) => {
+    event.preventDefault();
+    const config = authConfig();
+    if (!config) return;
+    try {
+      await axios.post(`${baseURL}/suppliers`, {
+        ...newSupplier,
+        paymentTermsDays: Number(newSupplier.paymentTermsDays) || 0,
+        creditLimit: Number(newSupplier.creditLimit) || 0,
+        outstandingAmount: Number(newSupplier.outstandingAmount) || 0,
+      }, config);
+      toast.success('Supplier added');
+      setNewSupplier({
+        name: '',
+        contactPerson: '',
+        mobile: '',
+        email: '',
+        gstNumber: '',
+        paymentTermsDays: '30',
+        creditLimit: '0',
+        outstandingAmount: '0',
+        notes: '',
+      });
+      loadSuppliers();
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Failed to add supplier');
+    }
+  };
+
+  const removeSupplier = async (supplierId) => {
+    const config = authConfig();
+    if (!config) return;
+    try {
+      await axios.delete(`${baseURL}/suppliers/${supplierId}`, config);
+      toast.success('Supplier deleted');
+      loadSuppliers();
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Failed to delete supplier');
+    }
+  };
+
+  const submitSupplierPayment = async (supplierId) => {
+    const config = authConfig();
+    if (!config) return;
+    const draft = supplierPaymentDraft[supplierId] || {};
+    if (!draft.amount) {
+      toast.error('Enter payment amount');
+      return;
+    }
+    try {
+      await axios.patch(`${baseURL}/suppliers/${supplierId}/payments`, {
+        amount: Number(draft.amount) || 0,
+        method: draft.method || 'UPI',
+        reference: draft.reference || '',
+      }, config);
+      toast.success('Supplier payment added');
+      setSupplierPaymentDraft((prev) => ({ ...prev, [supplierId]: { amount: '', method: 'UPI', reference: '' } }));
+      loadSuppliers();
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Failed to add supplier payment');
+    }
   };
 
   const loadStoreData = async () => {
@@ -331,6 +937,27 @@ const StoreDashboard = () => {
     }
   };
 
+  const loadStoreReviews = async () => {
+    const token = localStorage.getItem('medVisionToken');
+    if (!token) return;
+
+    try {
+      setStoreReviewsLoading(true);
+      const response = await axios.get(`${baseURL}/reviews/store/me?limit=100`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const rows = response.data.reviews || [];
+      setStoreReviews(rows);
+      setSelectedReviewId((prev) => (rows.some((r) => r._id === prev) ? prev : rows[0]?._id || null));
+    } catch (error) {
+      console.error('Failed to load store reviews:', error.message);
+      setStoreReviews([]);
+      setSelectedReviewId(null);
+    } finally {
+      setStoreReviewsLoading(false);
+    }
+  };
+
   const loadStoreStaffMembers = async () => {
     const token = localStorage.getItem('medVisionToken');
     if (!token) return;
@@ -367,11 +994,15 @@ const StoreDashboard = () => {
 
   const sectionConfig = [
     { key: 'staff', label: 'Staff Members', icon: Users },
+    { key: 'staffCompliance', label: 'Staff & Compliance', icon: ShieldCheck },
+    { key: 'promotions', label: 'Promotions', icon: BadgePercent },
     { key: 'importPatients', label: 'Import Patients', icon: FileUp },
     { key: 'inventory', label: 'Inventory', icon: Package },
     { key: 'orders', label: 'Orders', icon: ShoppingBag },
+    { key: 'financialManagement', label: 'Financial Management', icon: Landmark },
     { key: 'prescription', label: 'Prescription', icon: ClipboardList },
     { key: 'queries', label: 'Queries', icon: MessageSquare },
+    { key: 'reviews', label: 'Reviews', icon: Star },
     { key: 'reports', label: 'Reports', icon: BarChart3 },
   ];
 
@@ -643,6 +1274,125 @@ const StoreDashboard = () => {
     }
   };
 
+  const normalizeBarcodeToken = (value) => String(value || '').trim().toLowerCase();
+
+  const findInventoryItemByCode = (rawCode) => {
+    const code = normalizeBarcodeToken(rawCode);
+    if (!code) return null;
+
+    return inventoryItems.find((item) => {
+      const candidates = [
+        item._id,
+        item.id,
+        item.barcode,
+        item.qrCode,
+        item.sku,
+        item.name,
+      ]
+        .filter(Boolean)
+        .map(normalizeBarcodeToken);
+
+      return candidates.includes(code);
+    }) || null;
+  };
+
+  const stopBarcodeScanner = () => {
+    if (barcodeRafRef.current) {
+      cancelAnimationFrame(barcodeRafRef.current);
+      barcodeRafRef.current = null;
+    }
+    if (barcodeStreamRef.current) {
+      barcodeStreamRef.current.getTracks().forEach((track) => track.stop());
+      barcodeStreamRef.current = null;
+    }
+    if (barcodeVideoRef.current) {
+      barcodeVideoRef.current.srcObject = null;
+    }
+    setBarcodeScanning(false);
+  };
+
+  const startBarcodeScanner = async () => {
+    if (barcodeScanning) return;
+    if (!window.isSecureContext) {
+      toast.error('Camera scan requires HTTPS or localhost.');
+      return;
+    }
+    if (!('BarcodeDetector' in window)) {
+      toast.error('Barcode detector not supported in this browser. Use manual code input.');
+      return;
+    }
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { ideal: 'environment' } },
+        audio: false,
+      });
+
+      barcodeStreamRef.current = stream;
+      if (barcodeVideoRef.current) {
+        barcodeVideoRef.current.srcObject = stream;
+        await barcodeVideoRef.current.play();
+      }
+      setBarcodeScanning(true);
+
+      const detector = new window.BarcodeDetector({ formats: ['qr_code', 'code_128', 'ean_13', 'ean_8', 'upc_a', 'upc_e'] });
+      const scanLoop = async () => {
+        try {
+          if (barcodeVideoRef.current?.readyState >= 2) {
+            const barcodes = await detector.detect(barcodeVideoRef.current);
+            if (barcodes?.length) {
+              const value = barcodes[0]?.rawValue || '';
+              if (value) {
+                setBarcodeInput(value);
+                setBarcodeLastCode(value);
+                const matched = findInventoryItemByCode(value);
+                if (matched) {
+                  setBarcodeMatchedItemId(matched._id);
+                  toast.success(`Scanned: ${matched.name}`);
+                } else {
+                  setBarcodeMatchedItemId('');
+                  toast.error('Scanned code not found in inventory.');
+                }
+                stopBarcodeScanner();
+                return;
+              }
+            }
+          }
+        } catch (error) {
+          console.error('Barcode scan failed:', error.message);
+        }
+        barcodeRafRef.current = requestAnimationFrame(scanLoop);
+      };
+
+      barcodeRafRef.current = requestAnimationFrame(scanLoop);
+    } catch (error) {
+      console.error('Unable to start barcode scanner:', error.message);
+      toast.error('Unable to access camera for barcode scan.');
+      stopBarcodeScanner();
+    }
+  };
+
+  const handleBarcodeAction = async (action) => {
+    const code = barcodeInput.trim();
+    if (!code) {
+      toast.error('Enter or scan a barcode/QR code first.');
+      return;
+    }
+
+    const matched = findInventoryItemByCode(code);
+    if (!matched) {
+      toast.error('No matching inventory item for this code.');
+      setBarcodeMatchedItemId('');
+      return;
+    }
+
+    const qty = Math.max(1, Number(barcodeActionQty) || 1);
+    const delta = action === 'in' ? qty : -qty;
+    await updateMedicineStock(matched, delta);
+    setBarcodeMatchedItemId(matched._id);
+    toast.success(`${action === 'in' ? 'Check-in' : 'Check-out'} applied for ${matched.name} (${qty}).`);
+  };
+
   useEffect(() => {
     loadStoreData();
   }, []);
@@ -651,8 +1401,21 @@ const StoreDashboard = () => {
     if (selectedSection === 'staff') {
       loadStoreStaffMembers();
     }
+    if (selectedSection === 'staffCompliance') {
+      loadStoreStaffMembers();
+      loadStaffPermissions();
+      loadStaffOperations();
+      loadCompliance();
+    }
     if (selectedSection === 'inventory') {
       loadStoreInventory();
+    }
+    if (selectedSection === 'financialManagement') {
+      loadFinance();
+      loadSuppliers();
+    }
+    if (selectedSection === 'promotions') {
+      loadPromotionalCampaigns();
     }
     if (selectedSection === 'orders' || selectedSection === 'reports') {
       loadStoreOrders();
@@ -663,7 +1426,20 @@ const StoreDashboard = () => {
     if (selectedSection === 'queries') {
       loadStoreQueries();
     }
+    if (selectedSection === 'reviews') {
+      loadStoreReviews();
+    }
+
+    if (selectedSection !== 'inventory') {
+      stopBarcodeScanner();
+    }
   }, [selectedSection]);
+
+  useEffect(() => {
+    return () => {
+      stopBarcodeScanner();
+    };
+  }, []);
 
   const handleSubmitAnswer = async (queryId) => {
     const answer = answerText.trim();
@@ -689,6 +1465,33 @@ const StoreDashboard = () => {
       toast.error(error.response?.data?.message || 'Failed to send answer');
     } finally {
       setAnswerSubmitting(false);
+    }
+  };
+
+  const handleSubmitReviewReply = async (reviewId) => {
+    const message = reviewReplyText.trim();
+    if (!message) return;
+
+    const token = localStorage.getItem('medVisionToken');
+    if (!token) return;
+
+    try {
+      setReviewReplySubmitting(true);
+      const response = await axios.patch(
+        `${baseURL}/reviews/${reviewId}/reply`,
+        { message },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      const updated = response.data.review;
+      setStoreReviews((prev) => prev.map((item) => (item._id === updated._id ? updated : item)));
+      setReviewReplyText('');
+      toast.success('Review reply posted');
+    } catch (error) {
+      console.error('Failed to post review reply:', error.message);
+      toast.error(error.response?.data?.message || 'Failed to post reply');
+    } finally {
+      setReviewReplySubmitting(false);
     }
   };
 
@@ -754,6 +1557,11 @@ const StoreDashboard = () => {
 
     return firstNameMatch && lastNameMatch && contactMatch && emailMatch;
   });
+
+  const staffCompliancePermissionPrefixes = ['staff.', 'attendance.', 'performance.', 'training.', 'compliance.'];
+  const staffCompliancePermissions = staffPermissions.filter((permission) =>
+    staffCompliancePermissionPrefixes.some((prefix) => String(permission || '').startsWith(prefix))
+  );
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -1079,9 +1887,9 @@ const StoreDashboard = () => {
                             onChange={handleStaffChange}
                             className="mt-1 block w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-blue-500"
                           >
+                            <option value="Manager">Manager</option>
                             <option value="Pharmacist">Pharmacist</option>
-                            <option value="Store Assistant">Store Assistant</option>
-                            <option value="Inventory Manager">Inventory Manager</option>
+                            <option value="Technician">Technician</option>
                           </select>
                         </div>
                       </div>
@@ -1116,6 +1924,519 @@ const StoreDashboard = () => {
               </div>
             )}
 
+            {selectedSection === 'staffCompliance' && (
+              <div className="space-y-6">
+                <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+                  <div className="flex items-center gap-3 mb-4">
+                    <ShieldCheck className="text-indigo-600" size={24} />
+                    <div>
+                      <h2 className="text-xl font-semibold text-slate-900">Staff & Compliance</h2>
+                      <p className="text-sm text-slate-500">Performance, attendance, role permissions, training, and compliance checklist.</p>
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {staffCompliancePermissions.map((permission) => (
+                      <span key={permission} className="rounded-full bg-indigo-50 px-3 py-1 text-xs font-medium text-indigo-700">
+                        {permission}
+                      </span>
+                    ))}
+                    {!staffCompliancePermissions.length && (
+                      <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600">
+                        No staff/compliance permissions available
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                <div className="grid gap-6 xl:grid-cols-2">
+                  <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+                    <div className="flex items-center gap-2 mb-4">
+                      <UserCheck className="text-blue-600" size={20} />
+                      <h3 className="text-lg font-semibold text-slate-900">Performance Tracker</h3>
+                    </div>
+                    <form className="grid gap-3" onSubmit={submitPerformanceRecord}>
+                      <select className="rounded-xl border border-slate-200 px-3 py-2 text-sm" value={newPerformance.staffId} onChange={(event) => setNewPerformance((prev) => ({ ...prev, staffId: event.target.value }))} required>
+                        <option value="">Select staff</option>
+                        {staffMembers.map((member) => (
+                          <option key={member._id} value={member._id}>{member.firstName} {member.lastName} ({member.role})</option>
+                        ))}
+                      </select>
+                      <div className="grid grid-cols-2 gap-2">
+                        <input type="date" className="rounded-xl border border-slate-200 px-3 py-2 text-sm" value={newPerformance.periodStart} onChange={(event) => setNewPerformance((prev) => ({ ...prev, periodStart: event.target.value }))} required />
+                        <input type="date" className="rounded-xl border border-slate-200 px-3 py-2 text-sm" value={newPerformance.periodEnd} onChange={(event) => setNewPerformance((prev) => ({ ...prev, periodEnd: event.target.value }))} required />
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <input type="number" min="0" placeholder="Orders processed" className="rounded-xl border border-slate-200 px-3 py-2 text-sm" value={newPerformance.ordersProcessed} onChange={(event) => setNewPerformance((prev) => ({ ...prev, ordersProcessed: event.target.value }))} />
+                        <input type="number" min="0" placeholder="Prescriptions reviewed" className="rounded-xl border border-slate-200 px-3 py-2 text-sm" value={newPerformance.prescriptionsReviewed} onChange={(event) => setNewPerformance((prev) => ({ ...prev, prescriptionsReviewed: event.target.value }))} />
+                      </div>
+                      <div className="grid grid-cols-3 gap-2">
+                        <input type="number" min="0" placeholder="Avg mins" className="rounded-xl border border-slate-200 px-3 py-2 text-sm" value={newPerformance.avgFulfillmentMinutes} onChange={(event) => setNewPerformance((prev) => ({ ...prev, avgFulfillmentMinutes: event.target.value }))} />
+                        <input type="number" min="0" max="100" placeholder="Attendance %" className="rounded-xl border border-slate-200 px-3 py-2 text-sm" value={newPerformance.attendanceScore} onChange={(event) => setNewPerformance((prev) => ({ ...prev, attendanceScore: event.target.value }))} />
+                        <input type="number" min="0" max="5" step="0.1" placeholder="Rating" className="rounded-xl border border-slate-200 px-3 py-2 text-sm" value={newPerformance.customerRating} onChange={(event) => setNewPerformance((prev) => ({ ...prev, customerRating: event.target.value }))} />
+                      </div>
+                      <textarea rows={2} placeholder="Notes" className="rounded-xl border border-slate-200 px-3 py-2 text-sm" value={newPerformance.notes} onChange={(event) => setNewPerformance((prev) => ({ ...prev, notes: event.target.value }))} />
+                      <button type="submit" className="rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700">Save Performance</button>
+                    </form>
+                    <div className="mt-4 max-h-56 space-y-2 overflow-y-auto">
+                      {staffOpsLoading ? <p className="text-sm text-slate-500">Loading performance...</p> : performanceRecords.slice(0, 10).map((record) => (
+                        <div key={record._id} className="rounded-xl border border-slate-200 p-3 text-sm">
+                          <p className="font-semibold text-slate-900">{record.staffId?.firstName} {record.staffId?.lastName} • Score {record.efficiencyScore}</p>
+                          <p className="text-slate-600">Orders {record.ordersProcessed} • Rating {record.customerRating}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+                    <div className="flex items-center gap-2 mb-4">
+                      <CalendarCheck2 className="text-emerald-600" size={20} />
+                      <h3 className="text-lg font-semibold text-slate-900">Attendance & Shifts</h3>
+                    </div>
+                    <form className="grid gap-3" onSubmit={submitAttendanceRecord}>
+                      <select className="rounded-xl border border-slate-200 px-3 py-2 text-sm" value={newAttendance.staffId} onChange={(event) => setNewAttendance((prev) => ({ ...prev, staffId: event.target.value }))} required>
+                        <option value="">Select staff</option>
+                        {staffMembers.map((member) => (
+                          <option key={member._id} value={member._id}>{member.firstName} {member.lastName} ({member.role})</option>
+                        ))}
+                      </select>
+                      <input type="date" className="rounded-xl border border-slate-200 px-3 py-2 text-sm" value={newAttendance.date} onChange={(event) => setNewAttendance((prev) => ({ ...prev, date: event.target.value }))} required />
+                      <div className="grid grid-cols-2 gap-2">
+                        <select className="rounded-xl border border-slate-200 px-3 py-2 text-sm" value={newAttendance.shiftType} onChange={(event) => setNewAttendance((prev) => ({ ...prev, shiftType: event.target.value }))}>
+                          <option>Morning</option>
+                          <option>Evening</option>
+                          <option>Night</option>
+                          <option>Custom</option>
+                        </select>
+                        <select className="rounded-xl border border-slate-200 px-3 py-2 text-sm" value={newAttendance.status} onChange={(event) => setNewAttendance((prev) => ({ ...prev, status: event.target.value }))}>
+                          <option>Present</option>
+                          <option>Absent</option>
+                          <option>Half Day</option>
+                          <option>Leave</option>
+                        </select>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <input type="datetime-local" className="rounded-xl border border-slate-200 px-3 py-2 text-sm" value={newAttendance.shiftStart} onChange={(event) => setNewAttendance((prev) => ({ ...prev, shiftStart: event.target.value }))} required />
+                        <input type="datetime-local" className="rounded-xl border border-slate-200 px-3 py-2 text-sm" value={newAttendance.shiftEnd} onChange={(event) => setNewAttendance((prev) => ({ ...prev, shiftEnd: event.target.value }))} required />
+                      </div>
+                      <button type="submit" className="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700">Save Attendance</button>
+                    </form>
+                    <div className="mt-4 max-h-56 space-y-2 overflow-y-auto">
+                      {staffOpsLoading ? <p className="text-sm text-slate-500">Loading attendance...</p> : attendanceRecords.slice(0, 10).map((record) => (
+                        <div key={record._id} className="rounded-xl border border-slate-200 p-3 text-sm">
+                          <p className="font-semibold text-slate-900">{record.staffId?.firstName} {record.staffId?.lastName} • {record.status}</p>
+                          <p className="text-slate-600">Shift {record.shiftType} • {new Date(record.date).toLocaleDateString()}</p>
+                          <div className="mt-2 flex gap-2">
+                            <button type="button" onClick={() => markAttendance(record._id, 'check-in')} className="rounded-lg bg-sky-100 px-2 py-1 text-xs font-semibold text-sky-700 hover:bg-sky-200">Check-in</button>
+                            <button type="button" onClick={() => markAttendance(record._id, 'check-out')} className="rounded-lg bg-violet-100 px-2 py-1 text-xs font-semibold text-violet-700 hover:bg-violet-200">Check-out</button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid gap-6 xl:grid-cols-2">
+                  <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+                    <div className="flex items-center gap-2 mb-4">
+                      <GraduationCap className="text-amber-600" size={20} />
+                      <h3 className="text-lg font-semibold text-slate-900">Staff Training Module</h3>
+                    </div>
+                    <form className="grid gap-3" onSubmit={submitTrainingRecord}>
+                      <select className="rounded-xl border border-slate-200 px-3 py-2 text-sm" value={newTraining.staffId} onChange={(event) => setNewTraining((prev) => ({ ...prev, staffId: event.target.value }))} required>
+                        <option value="">Select staff</option>
+                        {staffMembers.map((member) => (
+                          <option key={member._id} value={member._id}>{member.firstName} {member.lastName}</option>
+                        ))}
+                      </select>
+                      <input type="text" placeholder="Training title" className="rounded-xl border border-slate-200 px-3 py-2 text-sm" value={newTraining.title} onChange={(event) => setNewTraining((prev) => ({ ...prev, title: event.target.value }))} required />
+                      <div className="grid grid-cols-2 gap-2">
+                        <select className="rounded-xl border border-slate-200 px-3 py-2 text-sm" value={newTraining.moduleType} onChange={(event) => setNewTraining((prev) => ({ ...prev, moduleType: event.target.value }))}>
+                          <option>Certification</option>
+                          <option>Product Knowledge</option>
+                        </select>
+                        <input type="date" className="rounded-xl border border-slate-200 px-3 py-2 text-sm" value={newTraining.validTill} onChange={(event) => setNewTraining((prev) => ({ ...prev, validTill: event.target.value }))} />
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <input type="number" min="0" placeholder="Score" className="rounded-xl border border-slate-200 px-3 py-2 text-sm" value={newTraining.score} onChange={(event) => setNewTraining((prev) => ({ ...prev, score: event.target.value }))} />
+                        <input type="number" min="1" placeholder="Max score" className="rounded-xl border border-slate-200 px-3 py-2 text-sm" value={newTraining.maxScore} onChange={(event) => setNewTraining((prev) => ({ ...prev, maxScore: event.target.value }))} />
+                      </div>
+                      <textarea rows={2} placeholder="Notes" className="rounded-xl border border-slate-200 px-3 py-2 text-sm" value={newTraining.notes} onChange={(event) => setNewTraining((prev) => ({ ...prev, notes: event.target.value }))} />
+                      <button type="submit" className="rounded-xl bg-amber-600 px-4 py-2 text-sm font-semibold text-white hover:bg-amber-700">Save Training</button>
+                    </form>
+                    <div className="mt-4 max-h-56 space-y-2 overflow-y-auto">
+                      {staffOpsLoading ? <p className="text-sm text-slate-500">Loading training...</p> : trainingRecords.slice(0, 10).map((record) => (
+                        <div key={record._id} className="rounded-xl border border-slate-200 p-3 text-sm">
+                          <p className="font-semibold text-slate-900">{record.title} • {record.moduleType}</p>
+                          <p className="text-slate-600">{record.staffId?.firstName} {record.staffId?.lastName} • {record.score}/{record.maxScore}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+                    <div className="flex items-center gap-2 mb-4">
+                      <ShieldCheck className="text-rose-600" size={20} />
+                      <h3 className="text-lg font-semibold text-slate-900">Compliance Checklist</h3>
+                    </div>
+                    <form className="grid gap-3" onSubmit={submitComplianceItem}>
+                      <select className="rounded-xl border border-slate-200 px-3 py-2 text-sm" value={newComplianceItem.itemType} onChange={(event) => setNewComplianceItem((prev) => ({ ...prev, itemType: event.target.value }))}>
+                        <option>Drug License</option>
+                        <option>GST Return</option>
+                        <option>Regulatory Audit</option>
+                        <option>Fire Safety</option>
+                        <option>Narcotics Register</option>
+                        <option>Cold Chain Log</option>
+                        <option>Other</option>
+                      </select>
+                      <input type="text" placeholder="Checklist title" className="rounded-xl border border-slate-200 px-3 py-2 text-sm" value={newComplianceItem.title} onChange={(event) => setNewComplianceItem((prev) => ({ ...prev, title: event.target.value }))} required />
+                      <div className="grid grid-cols-3 gap-2">
+                        <input type="date" className="rounded-xl border border-slate-200 px-3 py-2 text-sm" value={newComplianceItem.dueDate} onChange={(event) => setNewComplianceItem((prev) => ({ ...prev, dueDate: event.target.value }))} required />
+                        <select className="rounded-xl border border-slate-200 px-3 py-2 text-sm" value={newComplianceItem.priority} onChange={(event) => setNewComplianceItem((prev) => ({ ...prev, priority: event.target.value }))}>
+                          <option>Low</option>
+                          <option>Medium</option>
+                          <option>High</option>
+                        </select>
+                        <input type="number" min="0" placeholder="Reminder days" className="rounded-xl border border-slate-200 px-3 py-2 text-sm" value={newComplianceItem.reminderDaysBefore} onChange={(event) => setNewComplianceItem((prev) => ({ ...prev, reminderDaysBefore: event.target.value }))} />
+                      </div>
+                      <textarea rows={2} placeholder="Notes" className="rounded-xl border border-slate-200 px-3 py-2 text-sm" value={newComplianceItem.notes} onChange={(event) => setNewComplianceItem((prev) => ({ ...prev, notes: event.target.value }))} />
+                      <button type="submit" className="rounded-xl bg-rose-600 px-4 py-2 text-sm font-semibold text-white hover:bg-rose-700">Add Compliance Item</button>
+                    </form>
+
+                    <div className="mt-4 grid grid-cols-2 gap-3 text-xs">
+                      <div className="rounded-xl bg-rose-50 p-3 text-rose-700">Overdue: <span className="font-bold">{complianceReminders.overdue.length}</span></div>
+                      <div className="rounded-xl bg-amber-50 p-3 text-amber-700">Upcoming: <span className="font-bold">{complianceReminders.upcoming.length}</span></div>
+                    </div>
+
+                    <div className="mt-4 max-h-56 space-y-2 overflow-y-auto">
+                      {complianceLoading ? <p className="text-sm text-slate-500">Loading checklist...</p> : complianceItems.slice(0, 12).map((item) => (
+                        <div key={item._id} className="rounded-xl border border-slate-200 p-3 text-sm">
+                          <p className="font-semibold text-slate-900">{item.title}</p>
+                          <p className="text-slate-600">{item.itemType} • Due {new Date(item.dueDate).toLocaleDateString()} • {item.status}</p>
+                          {item.status !== 'Completed' && (
+                            <button type="button" onClick={() => markComplianceCompleted(item._id)} className="mt-2 rounded-lg bg-emerald-100 px-2 py-1 text-xs font-semibold text-emerald-700 hover:bg-emerald-200">
+                              Mark Completed
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {selectedSection === 'financialManagement' && (
+              <div className="space-y-6">
+                <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+                  <div className="flex items-center gap-3 mb-4">
+                    <Landmark className="text-teal-600" size={24} />
+                    <div>
+                      <h2 className="text-xl font-semibold text-slate-900">Financial Management</h2>
+                      <p className="text-sm text-slate-500">Invoices, reconciliation, suppliers, profit margins, and tax reporting.</p>
+                    </div>
+                  </div>
+                  <div className="grid gap-3 sm:grid-cols-3">
+                    <div className="rounded-2xl bg-teal-50 p-4">
+                      <p className="text-xs text-teal-700">Invoices</p>
+                      <p className="text-2xl font-bold text-teal-900">{invoiceSummary.totalInvoices || 0}</p>
+                    </div>
+                    <div className="rounded-2xl bg-blue-50 p-4">
+                      <p className="text-xs text-blue-700">Gross Sales</p>
+                      <p className="text-2xl font-bold text-blue-900">${Number(invoiceSummary.grossSales || 0).toFixed(2)}</p>
+                    </div>
+                    <div className="rounded-2xl bg-rose-50 p-4">
+                      <p className="text-xs text-rose-700">Outstanding</p>
+                      <p className="text-2xl font-bold text-rose-900">${Number(invoiceSummary.outstanding || 0).toFixed(2)}</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid gap-6 xl:grid-cols-2">
+                  <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+                    <div className="flex items-center gap-2 mb-4">
+                      <Receipt className="text-sky-600" size={20} />
+                      <h3 className="text-lg font-semibold text-slate-900">Invoice Generation</h3>
+                    </div>
+                    <form className="grid gap-3" onSubmit={submitInvoice}>
+                      <input type="text" placeholder="Customer name" className="rounded-xl border border-slate-200 px-3 py-2 text-sm" value={newInvoice.customerName} onChange={(event) => setNewInvoice((prev) => ({ ...prev, customerName: event.target.value }))} />
+                      <input type="text" placeholder="Customer GST number" className="rounded-xl border border-slate-200 px-3 py-2 text-sm" value={newInvoice.customerGstNumber} onChange={(event) => setNewInvoice((prev) => ({ ...prev, customerGstNumber: event.target.value }))} />
+                      <div className="grid grid-cols-3 gap-2">
+                        <input type="number" min="0" step="0.01" placeholder="GST % default" className="rounded-xl border border-slate-200 px-3 py-2 text-sm" value={newInvoice.gstRateDefault} onChange={(event) => setNewInvoice((prev) => ({ ...prev, gstRateDefault: event.target.value }))} />
+                        <input type="number" min="0" step="0.01" placeholder="Discount" className="rounded-xl border border-slate-200 px-3 py-2 text-sm" value={newInvoice.discount} onChange={(event) => setNewInvoice((prev) => ({ ...prev, discount: event.target.value }))} />
+                        <input type="number" min="0" step="0.01" placeholder="Initial paid" className="rounded-xl border border-slate-200 px-3 py-2 text-sm" value={newInvoice.initialPaidAmount} onChange={(event) => setNewInvoice((prev) => ({ ...prev, initialPaidAmount: event.target.value }))} />
+                      </div>
+                      <select className="rounded-xl border border-slate-200 px-3 py-2 text-sm" value={newInvoice.paymentMethod} onChange={(event) => setNewInvoice((prev) => ({ ...prev, paymentMethod: event.target.value }))}>
+                        <option>UPI</option>
+                        <option>COD</option>
+                        <option>Card</option>
+                        <option>Net Banking</option>
+                        <option>Wallet</option>
+                        <option>Cash</option>
+                        <option>Other</option>
+                      </select>
+                      <input type="text" placeholder="Payment reference" className="rounded-xl border border-slate-200 px-3 py-2 text-sm" value={newInvoice.paymentReference} onChange={(event) => setNewInvoice((prev) => ({ ...prev, paymentReference: event.target.value }))} />
+                      <textarea rows={4} placeholder="Items: name,qty,unitPrice,gstRate,costPrice,category (one item per line)" className="rounded-xl border border-slate-200 px-3 py-2 text-sm" value={newInvoice.itemsText} onChange={(event) => setNewInvoice((prev) => ({ ...prev, itemsText: event.target.value }))} required />
+                      <button type="submit" className="rounded-xl bg-sky-600 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-700">Generate Invoice</button>
+                    </form>
+                    <div className="mt-4 max-h-52 space-y-2 overflow-y-auto">
+                      {financeLoading ? <p className="text-sm text-slate-500">Loading invoices...</p> : invoices.slice(0, 8).map((invoice) => (
+                        <div key={invoice._id} className="rounded-xl border border-slate-200 p-3 text-sm">
+                          <p className="font-semibold text-slate-900">{invoice.invoiceNumber} • {invoice.customerName || 'Walk-in Customer'}</p>
+                          <p className="text-slate-600">Total ${Number(invoice.grandTotal || 0).toFixed(2)} • Paid ${Number(invoice.paidAmount || 0).toFixed(2)} • {invoice.paymentStatus}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+                    <div className="flex items-center gap-2 mb-4">
+                      <Receipt className="text-violet-600" size={20} />
+                      <h3 className="text-lg font-semibold text-slate-900">Payment Reconciliation</h3>
+                    </div>
+                    <form className="grid gap-3" onSubmit={submitInvoicePayment}>
+                      <select className="rounded-xl border border-slate-200 px-3 py-2 text-sm" value={paymentUpdate.invoiceId} onChange={(event) => setPaymentUpdate((prev) => ({ ...prev, invoiceId: event.target.value }))} required>
+                        <option value="">Select invoice</option>
+                        {invoices.map((invoice) => (
+                          <option key={invoice._id} value={invoice._id}>{invoice.invoiceNumber} ({invoice.paymentStatus})</option>
+                        ))}
+                      </select>
+                      <div className="grid grid-cols-3 gap-2">
+                        <input type="number" min="0" step="0.01" placeholder="Amount" className="rounded-xl border border-slate-200 px-3 py-2 text-sm" value={paymentUpdate.amount} onChange={(event) => setPaymentUpdate((prev) => ({ ...prev, amount: event.target.value }))} required />
+                        <select className="rounded-xl border border-slate-200 px-3 py-2 text-sm" value={paymentUpdate.method} onChange={(event) => setPaymentUpdate((prev) => ({ ...prev, method: event.target.value }))}>
+                          <option>UPI</option>
+                          <option>COD</option>
+                          <option>Card</option>
+                          <option>Net Banking</option>
+                          <option>Wallet</option>
+                          <option>Cash</option>
+                          <option>Other</option>
+                        </select>
+                        <input type="text" placeholder="Reference" className="rounded-xl border border-slate-200 px-3 py-2 text-sm" value={paymentUpdate.reference} onChange={(event) => setPaymentUpdate((prev) => ({ ...prev, reference: event.target.value }))} />
+                      </div>
+                      <button type="submit" className="rounded-xl bg-violet-600 px-4 py-2 text-sm font-semibold text-white hover:bg-violet-700">Reconcile Payment</button>
+                    </form>
+
+                    {reconciliationSummary && (
+                      <div className="mt-4 grid grid-cols-2 gap-2 text-xs">
+                        <div className="rounded-xl bg-slate-50 p-3 text-slate-700">Billed: <span className="font-bold">${Number(reconciliationSummary.totalBilled || 0).toFixed(2)}</span></div>
+                        <div className="rounded-xl bg-emerald-50 p-3 text-emerald-700">Collected: <span className="font-bold">${Number(reconciliationSummary.totalCollected || 0).toFixed(2)}</span></div>
+                        <div className="rounded-xl bg-rose-50 p-3 text-rose-700">Outstanding: <span className="font-bold">${Number(reconciliationSummary.totalOutstanding || 0).toFixed(2)}</span></div>
+                        <div className="rounded-xl bg-blue-50 p-3 text-blue-700">Paid invoices: <span className="font-bold">{Number(reconciliationSummary.statusSummary?.Paid || 0)}</span></div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="grid gap-6 xl:grid-cols-2">
+                  <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+                    <div className="flex items-center gap-2 mb-4">
+                      <Building2 className="text-emerald-700" size={20} />
+                      <h3 className="text-lg font-semibold text-slate-900">Supplier Management</h3>
+                    </div>
+                    <form className="grid gap-3" onSubmit={submitSupplier}>
+                      <input type="text" placeholder="Supplier name" className="rounded-xl border border-slate-200 px-3 py-2 text-sm" value={newSupplier.name} onChange={(event) => setNewSupplier((prev) => ({ ...prev, name: event.target.value }))} required />
+                      <div className="grid grid-cols-2 gap-2">
+                        <input type="text" placeholder="Contact person" className="rounded-xl border border-slate-200 px-3 py-2 text-sm" value={newSupplier.contactPerson} onChange={(event) => setNewSupplier((prev) => ({ ...prev, contactPerson: event.target.value }))} />
+                        <input type="text" placeholder="Mobile" className="rounded-xl border border-slate-200 px-3 py-2 text-sm" value={newSupplier.mobile} onChange={(event) => setNewSupplier((prev) => ({ ...prev, mobile: event.target.value }))} />
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <input type="email" placeholder="Email" className="rounded-xl border border-slate-200 px-3 py-2 text-sm" value={newSupplier.email} onChange={(event) => setNewSupplier((prev) => ({ ...prev, email: event.target.value }))} />
+                        <input type="text" placeholder="GST number" className="rounded-xl border border-slate-200 px-3 py-2 text-sm" value={newSupplier.gstNumber} onChange={(event) => setNewSupplier((prev) => ({ ...prev, gstNumber: event.target.value }))} />
+                      </div>
+                      <div className="grid grid-cols-3 gap-2">
+                        <input type="number" min="0" placeholder="Terms days" className="rounded-xl border border-slate-200 px-3 py-2 text-sm" value={newSupplier.paymentTermsDays} onChange={(event) => setNewSupplier((prev) => ({ ...prev, paymentTermsDays: event.target.value }))} />
+                        <input type="number" min="0" placeholder="Credit limit" className="rounded-xl border border-slate-200 px-3 py-2 text-sm" value={newSupplier.creditLimit} onChange={(event) => setNewSupplier((prev) => ({ ...prev, creditLimit: event.target.value }))} />
+                        <input type="number" min="0" placeholder="Outstanding" className="rounded-xl border border-slate-200 px-3 py-2 text-sm" value={newSupplier.outstandingAmount} onChange={(event) => setNewSupplier((prev) => ({ ...prev, outstandingAmount: event.target.value }))} />
+                      </div>
+                      <textarea rows={2} placeholder="Notes" className="rounded-xl border border-slate-200 px-3 py-2 text-sm" value={newSupplier.notes} onChange={(event) => setNewSupplier((prev) => ({ ...prev, notes: event.target.value }))} />
+                      <button type="submit" className="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700">Add Supplier</button>
+                    </form>
+                    <div className="mt-4 max-h-56 space-y-2 overflow-y-auto">
+                      {supplierLoading ? <p className="text-sm text-slate-500">Loading suppliers...</p> : suppliers.map((supplier) => (
+                        <div key={supplier._id} className="rounded-xl border border-slate-200 p-3 text-sm">
+                          <p className="font-semibold text-slate-900">{supplier.name}</p>
+                          <p className="text-slate-600">Outstanding ${Number(supplier.outstandingAmount || 0).toFixed(2)} • Terms {supplier.paymentTermsDays} days</p>
+                          <div className="mt-2 grid grid-cols-3 gap-2">
+                            <input type="number" min="0" step="0.01" placeholder="Payment" className="rounded-lg border border-slate-200 px-2 py-1 text-xs" value={supplierPaymentDraft[supplier._id]?.amount || ''} onChange={(event) => setSupplierPaymentDraft((prev) => ({ ...prev, [supplier._id]: { ...(prev[supplier._id] || {}), amount: event.target.value } }))} />
+                            <select className="rounded-lg border border-slate-200 px-2 py-1 text-xs" value={supplierPaymentDraft[supplier._id]?.method || 'UPI'} onChange={(event) => setSupplierPaymentDraft((prev) => ({ ...prev, [supplier._id]: { ...(prev[supplier._id] || {}), method: event.target.value } }))}>
+                              <option>UPI</option>
+                              <option>Bank Transfer</option>
+                              <option>Cash</option>
+                              <option>Card</option>
+                              <option>Cheque</option>
+                              <option>Other</option>
+                            </select>
+                            <button type="button" onClick={() => submitSupplierPayment(supplier._id)} className="rounded-lg bg-blue-100 px-2 py-1 text-xs font-semibold text-blue-700 hover:bg-blue-200">Add Payment</button>
+                          </div>
+                          <div className="mt-2 flex justify-end">
+                            <button type="button" onClick={() => removeSupplier(supplier._id)} className="rounded-lg bg-rose-100 px-2 py-1 text-xs font-semibold text-rose-700 hover:bg-rose-200">Delete</button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+                    <div className="flex items-center gap-2 mb-4">
+                      <BarChart3 className="text-cyan-700" size={20} />
+                      <h3 className="text-lg font-semibold text-slate-900">Profit & Tax Reporting</h3>
+                    </div>
+
+                    <div className="grid gap-2 sm:grid-cols-2 text-xs">
+                      <div className="rounded-xl bg-cyan-50 p-3 text-cyan-700">Revenue: <span className="font-bold">${Number(profitSummary?.totalRevenue || 0).toFixed(2)}</span></div>
+                      <div className="rounded-xl bg-emerald-50 p-3 text-emerald-700">Profit: <span className="font-bold">${Number(profitSummary?.totalProfit || 0).toFixed(2)}</span></div>
+                      <div className="rounded-xl bg-violet-50 p-3 text-violet-700">Margin: <span className="font-bold">{Number(profitSummary?.overallMarginPercent || 0).toFixed(2)}%</span></div>
+                      <div className="rounded-xl bg-amber-50 p-3 text-amber-700">GST collected: <span className="font-bold">${Number(taxSummary?.gstCollected || 0).toFixed(2)}</span></div>
+                    </div>
+
+                    <div className="mt-4">
+                      <p className="text-sm font-semibold text-slate-900">Profit by category</p>
+                      <div className="mt-2 max-h-36 space-y-2 overflow-y-auto">
+                        {profitByCategory.slice(0, 10).map((row) => (
+                          <div key={row.category} className="rounded-lg border border-slate-200 p-2 text-xs text-slate-700">
+                            {row.category}: Profit ${Number(row.profit || 0).toFixed(2)} ({Number(row.marginPercent || 0).toFixed(2)}%)
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="mt-4">
+                      <p className="text-sm font-semibold text-slate-900">GST breakdown</p>
+                      <div className="mt-2 max-h-36 space-y-2 overflow-y-auto">
+                        {taxBreakdown.map((row) => (
+                          <div key={String(row.gstRate)} className="rounded-lg border border-slate-200 p-2 text-xs text-slate-700">
+                            GST {row.gstRate}%: Taxable ${Number(row.taxableSales || 0).toFixed(2)} • Collected ${Number(row.gstCollected || 0).toFixed(2)}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {selectedSection === 'promotions' && (
+              <div className="grid gap-6 xl:grid-cols-[1.1fr_1fr]">
+                <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+                  <div className="flex items-center gap-3 mb-6">
+                    <BadgePercent className="text-fuchsia-600" size={24} />
+                    <div>
+                      <h2 className="text-xl font-semibold text-slate-900">Promotional Campaign Management</h2>
+                      <p className="text-sm text-slate-500">Create offers, coupon codes, and bulk discounts for your store.</p>
+                    </div>
+                  </div>
+
+                  <form className="grid gap-3" onSubmit={submitPromotionalCampaign}>
+                    <div className="grid grid-cols-2 gap-2">
+                      <select className="rounded-xl border border-slate-200 px-3 py-2 text-sm" value={newCampaign.campaignType} onChange={(event) => setNewCampaign((prev) => ({ ...prev, campaignType: event.target.value }))}>
+                        <option>Offer</option>
+                        <option>Coupon</option>
+                        <option>Bulk Discount</option>
+                      </select>
+                      <select className="rounded-xl border border-slate-200 px-3 py-2 text-sm" value={newCampaign.status} onChange={(event) => setNewCampaign((prev) => ({ ...prev, status: event.target.value }))}>
+                        <option>Active</option>
+                        <option>Inactive</option>
+                        <option>Scheduled</option>
+                      </select>
+                    </div>
+
+                    <input type="text" placeholder="Campaign title" className="rounded-xl border border-slate-200 px-3 py-2 text-sm" value={newCampaign.title} onChange={(event) => setNewCampaign((prev) => ({ ...prev, title: event.target.value }))} required />
+                    <textarea rows={2} placeholder="Description" className="rounded-xl border border-slate-200 px-3 py-2 text-sm" value={newCampaign.description} onChange={(event) => setNewCampaign((prev) => ({ ...prev, description: event.target.value }))} />
+
+                    {newCampaign.campaignType === 'Coupon' && (
+                      <input type="text" placeholder="Coupon code (e.g. SAVE20)" className="rounded-xl border border-slate-200 px-3 py-2 text-sm uppercase" value={newCampaign.couponCode} onChange={(event) => setNewCampaign((prev) => ({ ...prev, couponCode: event.target.value.toUpperCase() }))} required />
+                    )}
+
+                    <div className="grid grid-cols-2 gap-2">
+                      <select className="rounded-xl border border-slate-200 px-3 py-2 text-sm" value={newCampaign.discountType} onChange={(event) => setNewCampaign((prev) => ({ ...prev, discountType: event.target.value }))}>
+                        <option>Percentage</option>
+                        <option>Flat</option>
+                      </select>
+                      <input type="number" min="0" step="0.01" placeholder="Discount value" className="rounded-xl border border-slate-200 px-3 py-2 text-sm" value={newCampaign.discountValue} onChange={(event) => setNewCampaign((prev) => ({ ...prev, discountValue: event.target.value }))} required />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2">
+                      <input type="number" min="0" step="0.01" placeholder="Min order amount" className="rounded-xl border border-slate-200 px-3 py-2 text-sm" value={newCampaign.minOrderAmount} onChange={(event) => setNewCampaign((prev) => ({ ...prev, minOrderAmount: event.target.value }))} />
+                      <input type="number" min="0" step="0.01" placeholder="Max discount cap" className="rounded-xl border border-slate-200 px-3 py-2 text-sm" value={newCampaign.maxDiscountAmount} onChange={(event) => setNewCampaign((prev) => ({ ...prev, maxDiscountAmount: event.target.value }))} />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2">
+                      <input type="date" className="rounded-xl border border-slate-200 px-3 py-2 text-sm" value={newCampaign.validFrom} onChange={(event) => setNewCampaign((prev) => ({ ...prev, validFrom: event.target.value }))} />
+                      <input type="date" className="rounded-xl border border-slate-200 px-3 py-2 text-sm" value={newCampaign.validTill} onChange={(event) => setNewCampaign((prev) => ({ ...prev, validTill: event.target.value }))} />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2">
+                      <select className="rounded-xl border border-slate-200 px-3 py-2 text-sm" value={newCampaign.targetScope} onChange={(event) => setNewCampaign((prev) => ({ ...prev, targetScope: event.target.value }))}>
+                        <option>All</option>
+                        <option>Category</option>
+                        <option>Medicine</option>
+                      </select>
+                      <input type="text" placeholder="Target value (optional)" className="rounded-xl border border-slate-200 px-3 py-2 text-sm" value={newCampaign.targetValue} onChange={(event) => setNewCampaign((prev) => ({ ...prev, targetValue: event.target.value }))} />
+                    </div>
+
+                    {newCampaign.campaignType === 'Bulk Discount' && (
+                      <div className="grid grid-cols-3 gap-2">
+                        <input type="number" min="0" placeholder="Min Qty" className="rounded-xl border border-slate-200 px-3 py-2 text-sm" value={newCampaign.bulkMinQuantity} onChange={(event) => setNewCampaign((prev) => ({ ...prev, bulkMinQuantity: event.target.value }))} />
+                        <input type="number" min="0" placeholder="Buy Qty" className="rounded-xl border border-slate-200 px-3 py-2 text-sm" value={newCampaign.bulkBuyQuantity} onChange={(event) => setNewCampaign((prev) => ({ ...prev, bulkBuyQuantity: event.target.value }))} />
+                        <input type="number" min="0" placeholder="Get Qty" className="rounded-xl border border-slate-200 px-3 py-2 text-sm" value={newCampaign.bulkGetQuantity} onChange={(event) => setNewCampaign((prev) => ({ ...prev, bulkGetQuantity: event.target.value }))} />
+                      </div>
+                    )}
+
+                    <div className="grid grid-cols-2 gap-2">
+                      <input type="number" min="0" placeholder="Usage limit (0 = unlimited)" className="rounded-xl border border-slate-200 px-3 py-2 text-sm" value={newCampaign.usageLimit} onChange={(event) => setNewCampaign((prev) => ({ ...prev, usageLimit: event.target.value }))} />
+                      <label className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-700">
+                        <input type="checkbox" checked={newCampaign.autoApply} onChange={(event) => setNewCampaign((prev) => ({ ...prev, autoApply: event.target.checked }))} />
+                        Auto apply
+                      </label>
+                    </div>
+
+                    <button type="submit" className="rounded-xl bg-fuchsia-600 px-4 py-2 text-sm font-semibold text-white hover:bg-fuchsia-700">
+                      Create Campaign
+                    </button>
+                  </form>
+                </div>
+
+                <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-lg font-semibold text-slate-900">Active & Scheduled Campaigns</h3>
+                    <button type="button" onClick={loadPromotionalCampaigns} className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50">Refresh</button>
+                  </div>
+
+                  <div className="max-h-[560px] space-y-3 overflow-y-auto pr-1">
+                    {campaignsLoading ? (
+                      <p className="text-sm text-slate-500">Loading campaigns...</p>
+                    ) : campaigns.length === 0 ? (
+                      <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-6 text-center text-sm text-slate-500">No campaigns created yet.</div>
+                    ) : campaigns.map((campaign) => (
+                      <div key={campaign._id} className="rounded-2xl border border-slate-200 p-4">
+                        <div className="flex items-start justify-between gap-2">
+                          <div>
+                            <p className="font-semibold text-slate-900">{campaign.title}</p>
+                            <p className="text-xs text-slate-500">{campaign.campaignType} • {campaign.discountType} {campaign.discountValue}</p>
+                            {campaign.couponCode ? <p className="text-xs font-semibold text-fuchsia-700 mt-1">Code: {campaign.couponCode}</p> : null}
+                            {campaign.description ? <p className="text-xs text-slate-600 mt-1">{campaign.description}</p> : null}
+                          </div>
+                          <span className={`rounded-full px-2 py-1 text-[11px] font-semibold ${campaign.status === 'Active' ? 'bg-emerald-100 text-emerald-700' : campaign.status === 'Scheduled' ? 'bg-blue-100 text-blue-700' : campaign.status === 'Inactive' ? 'bg-slate-100 text-slate-700' : 'bg-amber-100 text-amber-700'}`}>
+                            {campaign.status}
+                          </span>
+                        </div>
+
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          {campaign.status !== 'Active' && (
+                            <button type="button" onClick={() => updateCampaignStatus(campaign._id, 'Active')} className="rounded-lg bg-emerald-100 px-2.5 py-1 text-xs font-semibold text-emerald-700 hover:bg-emerald-200">Activate</button>
+                          )}
+                          {campaign.status !== 'Inactive' && (
+                            <button type="button" onClick={() => updateCampaignStatus(campaign._id, 'Inactive')} className="rounded-lg bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-200">Deactivate</button>
+                          )}
+                          <button type="button" onClick={() => deleteCampaign(campaign._id)} className="rounded-lg bg-rose-100 px-2.5 py-1 text-xs font-semibold text-rose-700 hover:bg-rose-200">Delete</button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
             {selectedSection === 'inventory' && (
               <div className="grid gap-6 xl:grid-cols-[1fr_420px]">
                 <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
@@ -1126,6 +2447,86 @@ const StoreDashboard = () => {
                       <p className="text-sm text-slate-500">Track stock, update quantities, and manage products mapped to your store only.</p>
                     </div>
                   </div>
+
+                  <div className="mb-6 rounded-2xl border border-cyan-200 bg-cyan-50 p-4">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <div className="flex items-center gap-2">
+                        <ScanLine className="text-cyan-700" size={18} />
+                        <p className="text-sm font-semibold text-cyan-900">Barcode / QR Quick Check-in & Check-out</p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {!barcodeScanning ? (
+                          <button
+                            type="button"
+                            onClick={startBarcodeScanner}
+                            className="inline-flex items-center gap-1 rounded-lg bg-cyan-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-cyan-700"
+                          >
+                            <Camera size={14} /> Scan with Camera
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={stopBarcodeScanner}
+                            className="inline-flex items-center gap-1 rounded-lg bg-rose-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-rose-700"
+                          >
+                            <CameraOff size={14} /> Stop Scan
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="mt-3 grid gap-2 sm:grid-cols-[1fr_92px_auto_auto]">
+                      <input
+                        type="text"
+                        value={barcodeInput}
+                        onChange={(event) => {
+                          const code = event.target.value;
+                          setBarcodeInput(code);
+                          const matched = findInventoryItemByCode(code);
+                          setBarcodeMatchedItemId(matched?._id || '');
+                        }}
+                        placeholder="Scan or enter barcode / QR value"
+                        className="rounded-xl border border-cyan-200 bg-white px-3 py-2 text-sm text-slate-900"
+                      />
+                      <input
+                        type="number"
+                        min="1"
+                        value={barcodeActionQty}
+                        onChange={(event) => setBarcodeActionQty(event.target.value)}
+                        className="rounded-xl border border-cyan-200 bg-white px-3 py-2 text-sm text-slate-900"
+                        title="Quantity"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => handleBarcodeAction('in')}
+                        className="rounded-xl bg-emerald-600 px-3 py-2 text-xs font-semibold text-white hover:bg-emerald-700"
+                      >
+                        Check-in +
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleBarcodeAction('out')}
+                        className="rounded-xl bg-amber-600 px-3 py-2 text-xs font-semibold text-white hover:bg-amber-700"
+                      >
+                        Check-out -
+                      </button>
+                    </div>
+
+                    {barcodeScanning && (
+                      <div className="mt-3 overflow-hidden rounded-xl border border-cyan-200 bg-black">
+                        <video ref={barcodeVideoRef} className="h-44 w-full object-cover" muted playsInline />
+                      </div>
+                    )}
+
+                    {(barcodeMatchedItemId || barcodeLastCode) && (
+                      <p className="mt-3 text-xs text-cyan-800">
+                        {barcodeMatchedItemId
+                          ? `Matched item ID: ${barcodeMatchedItemId}`
+                          : `Last scanned code: ${barcodeLastCode}`}
+                      </p>
+                    )}
+                  </div>
+
                   {inventoryLoading ? (
                     <div className="rounded-2xl border border-slate-200 bg-slate-50 p-8 text-center text-sm text-slate-500">
                       Loading store inventory...
@@ -1743,6 +3144,105 @@ const StoreDashboard = () => {
                     ) : (
                       <div className="flex items-center justify-center h-64">
                         <p className="text-sm text-slate-500">Select a query from the left to view and respond.</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {selectedSection === 'reviews' && (
+              <div className="rounded-3xl border border-slate-200 bg-white shadow-sm">
+                <div className="grid gap-6 lg:grid-cols-[350px_1fr]">
+                  <div className="border-r border-slate-200 p-6 max-h-[640px] overflow-y-auto">
+                    <p className="mb-4 text-sm font-medium text-slate-500">Store Reviews ({storeReviews.length})</p>
+                    {storeReviewsLoading ? (
+                      <div className="rounded-2xl border border-slate-200 bg-slate-50 p-6 text-center text-sm text-slate-500">
+                        Loading reviews...
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        {storeReviews.map((review) => {
+                          const active = selectedReviewId === review._id;
+                          const hasReply = Boolean(String(review?.storeResponse?.message || '').trim());
+                          return (
+                            <button
+                              key={review._id}
+                              onClick={() => {
+                                setSelectedReviewId(review._id);
+                                setReviewReplyText(review?.storeResponse?.message || '');
+                              }}
+                              className={`w-full rounded-2xl border p-3.5 text-left transition ${
+                                active ? 'border-blue-600 bg-blue-50' : 'border-slate-200 bg-white hover:bg-slate-50'
+                              }`}
+                            >
+                              <div className="flex items-start justify-between gap-2 mb-1.5">
+                                <p className="text-sm font-semibold text-slate-800 truncate">{review.name || 'Patient'}</p>
+                                <span className={`inline-flex shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${
+                                  hasReply ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
+                                }`}>
+                                  {hasReply ? 'Replied' : 'Pending Reply'}
+                                </span>
+                              </div>
+                              <p className="text-xs text-amber-500">{'★'.repeat(Math.max(1, Number(review.rating) || 1))}</p>
+                              <p className="mt-1 text-xs text-slate-600 line-clamp-2">{review.comment}</p>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="p-6">
+                    {selectedStoreReview ? (
+                      <div>
+                        <div className="mb-6 flex items-start justify-between">
+                          <div>
+                            <h3 className="text-xl font-semibold text-slate-900">{selectedStoreReview.name || 'Patient'}</h3>
+                            <p className="text-sm text-slate-500">{selectedStoreReview.role || 'Patient'}</p>
+                            <p className="mt-2 text-xs text-slate-400">Review Date: {formatShortDate(selectedStoreReview.createdAt)}</p>
+                          </div>
+                          <span className="inline-flex rounded-full px-3 py-1 text-sm font-semibold bg-amber-100 text-amber-700">
+                            {Number(selectedStoreReview.rating) || 0} / 5
+                          </span>
+                        </div>
+
+                        <div className="mb-6 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                          <p className="text-sm font-semibold text-slate-700 mb-2">Patient Feedback</p>
+                          <p className="text-sm text-slate-700 leading-relaxed">{selectedStoreReview.comment}</p>
+                        </div>
+
+                        {selectedStoreReview?.storeResponse?.message ? (
+                          <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 mb-6">
+                            <p className="text-sm font-semibold text-emerald-900 mb-2">Your Reply</p>
+                            <p className="text-sm text-emerald-800">{selectedStoreReview.storeResponse.message}</p>
+                          </div>
+                        ) : null}
+
+                        <div className="mb-6">
+                          <label className="block text-sm font-semibold text-slate-700 mb-2">
+                            {selectedStoreReview?.storeResponse?.message ? 'Update Reply' : 'Write Reply'}
+                          </label>
+                          <textarea
+                            value={reviewReplyText}
+                            onChange={(e) => setReviewReplyText(e.target.value)}
+                            rows={5}
+                            placeholder="Thank the patient and share a helpful response..."
+                            className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-blue-500 resize-none"
+                          />
+                        </div>
+
+                        <button
+                          onClick={() => handleSubmitReviewReply(selectedStoreReview._id)}
+                          disabled={!reviewReplyText.trim() || reviewReplySubmitting}
+                          className="inline-flex items-center gap-2 rounded-2xl bg-emerald-600 px-5 py-3 text-sm font-semibold text-white hover:bg-emerald-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          <Send size={18} /> {reviewReplySubmitting ? 'Posting...' : (selectedStoreReview?.storeResponse?.message ? 'Update Reply' : 'Post Reply')}
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="flex items-center justify-center h-64">
+                        <p className="text-sm text-slate-500">Select a review from the left to view and respond.</p>
                       </div>
                     )}
                   </div>

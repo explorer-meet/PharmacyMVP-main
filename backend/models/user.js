@@ -93,6 +93,21 @@ const userSchema = new mongoose.Schema({
    gstNumber: {
       type: String,
    },
+
+   // Patient Wishlist
+   wishlist: [
+      {
+         medicineId: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'Pharmacy',
+            required: true,
+         },
+         addedAt: {
+            type: Date,
+            default: Date.now,
+         },
+      },
+   ],
 }, { timestamps: true });
 //For get fullName from when we get data from database
 

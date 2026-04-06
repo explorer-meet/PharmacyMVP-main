@@ -6,6 +6,89 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ===================== DARK MODE GLOBAL ===================== */
+.dark body {
+  background-color: #0f172a;
+  color: #e2e8f0;
+}
+
+.dark .bg-white {
+  background-color: #1e293b !important;
+}
+
+.dark .bg-\[\#f7fbff\] {
+  background-color: #0f172a !important;
+}
+
+.dark .bg-slate-50 {
+  background-color: #1e293b !important;
+}
+
+.dark .text-slate-900,
+.dark .text-slate-800,
+.dark .text-gray-900,
+.dark .text-gray-800 {
+  color: #f1f5f9 !important;
+}
+
+.dark .text-slate-700,
+.dark .text-gray-700 {
+  color: #cbd5e1 !important;
+}
+
+.dark .text-slate-600,
+.dark .text-gray-600 {
+  color: #94a3b8 !important;
+}
+
+.dark .text-slate-500,
+.dark .text-gray-500 {
+  color: #64748b !important;
+}
+
+.dark .border-slate-200,
+.dark .border-gray-200,
+.dark .border-cyan-100 {
+  border-color: #334155 !important;
+}
+
+.dark .border-slate-100 {
+  border-color: #1e293b !important;
+}
+
+.dark .shadow-sm,
+.dark .shadow,
+.dark .shadow-md,
+.dark .shadow-lg {
+  --tw-shadow: 0 1px 3px 0 rgba(0,0,0,0.4);
+}
+
+/* Navbar override in dark mode */
+.dark .bg-white.shadow-lg.border-b {
+  background-color: #0f172a !important;
+  border-color: #1e293b !important;
+}
+
+.dark .border-b.border-slate-200.bg-white {
+  background-color: #0f172a !important;
+  border-color: #1e293b !important;
+}
+
+/* Input overrides */
+.dark input:not([type="checkbox"]),
+.dark select,
+.dark textarea {
+  background-color: #1e293b;
+  color: #f1f5f9;
+  border-color: #334155;
+}
+
+.dark input::placeholder,
+.dark textarea::placeholder {
+  color: #64748b;
+}
+/* ===================== END DARK MODE ===================== */
+
 .reveal-on-scroll {
 	opacity: 0;
 	transform: translateY(20px);

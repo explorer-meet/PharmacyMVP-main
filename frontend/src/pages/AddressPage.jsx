@@ -10,6 +10,7 @@ import CheckoutFooter from '../components/CheckoutFooter';
 export function AddressPage() {
   const latestOrderStorageKey = 'medVisionLatestOrderId';
   const checkoutCartStorageKey = 'medVisionCheckoutCart';
+  const checkoutSummaryStorageKey = 'medVisionCheckoutSummary';
   const navigate = useNavigate();
   const [userdata, setUserData] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -33,7 +34,17 @@ export function AddressPage() {
     }
   })();
   const cartItems = location.state?.cartItems?.length ? location.state.cartItems : storedCheckoutCart;
-  const totalAmount = cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
+  const computedSubtotal = cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
+  const storedCheckoutSummary = (() => {
+    try {
+      return JSON.parse(localStorage.getItem(checkoutSummaryStorageKey) || 'null');
+    } catch {
+      return null;
+    }
+  })();
+  const checkoutSummary = location.state?.checkoutSummary || storedCheckoutSummary;
+  const discountAmount = Math.max(0, Math.min(computedSubtotal, Number(checkoutSummary?.discountAmount) || 0));
+  const totalAmount = Math.max(0, computedSubtotal - discountAmount);
   const totalItems = cartItems.reduce((sum, item) => sum + item.quantity, 0);
 
   const fetchDataFromApi = async () => {
@@ -96,7 +107,13 @@ export function AddressPage() {
             state: {
               cartItems: cartItems,
               orderId: currentOrderId,
-              deliveryType: deliveryType
+              deliveryType: deliveryType,
+              checkoutSummary: {
+                ...(checkoutSummary || {}),
+                subtotalAmount: computedSubtotal,
+                discountAmount,
+                finalAmount: totalAmount,
+              },
             }
           })
         }, 1000)

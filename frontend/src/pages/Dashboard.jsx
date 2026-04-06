@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import axios from 'axios';
-import { Activity, Calendar, Pill, FileText, Clock, User, Mail, Phone, Menu, X, Home, CircleUser as UserCircle, ShoppingBag, Syringe, Bell, MessageSquare, Mail as MailIcon, Pencil, ClipboardList, DollarSign, Package, Truck, ChevronDown, ChevronUp, CreditCard, Plus, Minus, Trash2, CheckCircle2, Star, AlertTriangle, Info } from 'lucide-react';
+import { Activity, Calendar, Pill, FileText, Clock, User, Mail, Phone, Menu, X, Home, CircleUser as UserCircle, ShoppingBag, Syringe, Bell, MessageSquare, Mail as MailIcon, Pencil, ClipboardList, DollarSign, Package, Truck, ChevronDown, ChevronUp, CreditCard, Plus, Minus, Trash2, CheckCircle2, Star, AlertTriangle, Info, Download } from 'lucide-react';
 import { baseURL } from '../main';
 import Loader from '../components/Loader';
 import PrescriptionDialog from '../components/PrescriptionDialog';
@@ -19,6 +19,7 @@ const Dashboard = () => {
     const [showRaiseQuery, setShowRaiseQuery] = useState(false);
     const [showMyOrders, setShowMyOrders] = useState(false);
     const [showMyVaccinations, setShowMyVaccinations] = useState(false);
+    const [showHealthManagement, setShowHealthManagement] = useState(false);
     const [vaccinationMaster, setVaccinationMaster] = useState([]);
     const [userVaccinationMap, setUserVaccinationMap] = useState({});
     const [vacSaving, setVacSaving] = useState({});
@@ -77,8 +78,69 @@ const Dashboard = () => {
     const [notificationSettingsSaving, setNotificationSettingsSaving] = useState(false);
     const [pendingNotificationChange, setPendingNotificationChange] = useState(null);
     const [notificationToggleSuccess, setNotificationToggleSuccess] = useState(false);
+
+    // Extended notification prefs (push/email/sms categories) — API-backed, user-scoped
+    const NOTIF_PREF_CACHE_PREFIX = 'medVisionNotifPrefs_';
+    const defaultNotifPrefs = {
+        push:  { orderUpdates: true,  prescriptionReminders: true,  offerAlerts: false, healthReminders: true  },
+        email: { orderUpdates: true,  prescriptionReminders: false, offerAlerts: false, healthReminders: false },
+        sms:   { orderUpdates: false, prescriptionReminders: false, offerAlerts: false, healthReminders: false },
+    };
+    const [notifPrefs, setNotifPrefs] = useState(defaultNotifPrefs);
+    const [notifChannel, setNotifChannel] = useState('push');
+    const [notifPrefsSaved, setNotifPrefsSaved] = useState(false);
+    const [notifPrefsSaving, setNotifPrefsSaving] = useState(false);
+
+    const setNotifCategoryPref = (channel, category, value) => {
+        setNotifPrefs((prev) => ({ ...prev, [channel]: { ...prev[channel], [category]: value } }));
+        setNotifPrefsSaved(false);
+    };
+
+    const saveNotifPrefs = async () => {
+        const token = localStorage.getItem('medVisionToken');
+        if (!token) return;
+        setNotifPrefsSaving(true);
+        try {
+            const response = await axios.put(`${baseURL}/user-notifications`, {
+                pushPrefs:  notifPrefs.push,
+                emailPrefs: notifPrefs.email,
+                smsPrefs:   notifPrefs.sms,
+            }, { headers: { Authorization: `Bearer ${token}` } });
+
+            const p = response.data.notificationPreferences;
+            const merged = {
+                push:  { ...defaultNotifPrefs.push,  ...(p?.pushPrefs  || {}) },
+                email: { ...defaultNotifPrefs.email, ...(p?.emailPrefs || {}) },
+                sms:   { ...defaultNotifPrefs.sms,   ...(p?.smsPrefs   || {}) },
+            };
+            setNotifPrefs(merged);
+            // Cache keyed by userId so multiple users on the same browser don't share prefs
+            if (p?.userId) localStorage.setItem(`${NOTIF_PREF_CACHE_PREFIX}${p.userId}`, JSON.stringify(merged));
+            setNotifPrefsSaved(true);
+            window.setTimeout(() => setNotifPrefsSaved(false), 2500);
+        } catch (err) {
+            console.error('Error saving notification prefs:', err.message);
+        } finally {
+            setNotifPrefsSaving(false);
+        }
+    };
     const [isRefillModalOpen, setIsRefillModalOpen] = useState(false);
     const [placingPrescriptionOrder, setPlacingPrescriptionOrder] = useState(false);
+    const [healthTrackers, setHealthTrackers] = useState([]);
+    const [expiryReminders, setExpiryReminders] = useState([]);
+    const [medicalTimeline, setMedicalTimeline] = useState([]);
+    const [healthLoading, setHealthLoading] = useState(false);
+    const [healthExporting, setHealthExporting] = useState(false);
+    const [healthActionMessage, setHealthActionMessage] = useState('');
+    const [healthActionType, setHealthActionType] = useState('success');
+    const [showAddTrackerForm, setShowAddTrackerForm] = useState(false);
+    const [newTracker, setNewTracker] = useState({
+        medicineName: '',
+        dosage: '',
+        frequency: '',
+        startDate: '',
+        expiryDate: '',
+    });
     const [refillDraft, setRefillDraft] = useState({
         prescriptionId: null,
         prescriptionTitle: '',
@@ -668,16 +730,29 @@ const Dashboard = () => {
         try {
             setNotificationSettingsLoading(true);
             const response = await axios.get(`${baseURL}/user-notifications`, {
-                headers: {
-                    Authorization: `Bearer ${token}`,
-                },
+                headers: { Authorization: `Bearer ${token}` },
             });
 
-            const preferences = response.data.notificationPreferences;
+            const p = response.data.notificationPreferences;
+
+            // Seed master SMS / Email toggles (existing behaviour)
             setNotifications({
-                sms: preferences?.isSmsNotificationOn ?? true,
-                email: preferences?.isEmailNotificationOn ?? true,
+                sms:   p?.isSmsNotificationOn   ?? true,
+                email: p?.isEmailNotificationOn ?? true,
             });
+
+            // Seed category prefs from DB, falling back to user-scoped cache, then defaults
+            const userId = p?.userId;
+            let cached = null;
+            if (userId) {
+                try { cached = JSON.parse(localStorage.getItem(`medVisionNotifPrefs_${userId}`) || 'null'); } catch { /* ignore */ }
+            }
+            const merged = {
+                push:  { ...defaultNotifPrefs.push,  ...(p?.pushPrefs  || cached?.push  || {}) },
+                email: { ...defaultNotifPrefs.email, ...(p?.emailPrefs || cached?.email || {}) },
+                sms:   { ...defaultNotifPrefs.sms,   ...(p?.smsPrefs   || cached?.sms   || {}) },
+            };
+            setNotifPrefs(merged);
         } catch (error) {
             console.error('Error fetching notification settings:', error.message);
         } finally {
@@ -685,13 +760,15 @@ const Dashboard = () => {
         }
     };
 
-    const openNotificationToggleDialog = (key, value) => {
+    const openNotificationToggleDialog = (key, value, applyAll = false) => {
         if (notificationSettingsLoading || notificationSettingsSaving) return;
 
+        const label = key === 'sms' ? 'SMS' : key === 'push' ? 'Push' : 'Email';
         setPendingNotificationChange({
             key,
             value,
-            label: key === 'sms' ? 'SMS' : 'Email',
+            label,
+            applyAll,
         });
     };
 
@@ -703,7 +780,7 @@ const Dashboard = () => {
     const confirmNotificationToggle = async () => {
         if (!pendingNotificationChange) return;
 
-        const { key, value, label } = pendingNotificationChange;
+        const { key, value, applyAll } = pendingNotificationChange;
         const token = localStorage.getItem('medVisionToken');
 
         if (!token) {
@@ -714,10 +791,39 @@ const Dashboard = () => {
 
         try {
             setNotificationSettingsSaving(true);
-            const response = await axios.put(`${baseURL}/user-notifications`, {
+            const payload = {
                 isSmsNotificationOn: key === 'sms' ? value : notifications.sms,
                 isEmailNotificationOn: key === 'email' ? value : notifications.email,
-            }, {
+            };
+
+            if (applyAll && key === 'email') {
+                payload.emailPrefs = {
+                    orderUpdates: value,
+                    prescriptionReminders: value,
+                    offerAlerts: value,
+                    healthReminders: value,
+                };
+            }
+
+            if (applyAll && key === 'sms') {
+                payload.smsPrefs = {
+                    orderUpdates: value,
+                    prescriptionReminders: value,
+                    offerAlerts: value,
+                    healthReminders: value,
+                };
+            }
+
+            if (applyAll && key === 'push') {
+                payload.pushPrefs = {
+                    orderUpdates: value,
+                    prescriptionReminders: value,
+                    offerAlerts: value,
+                    healthReminders: value,
+                };
+            }
+
+            const response = await axios.put(`${baseURL}/user-notifications`, payload, {
                 headers: {
                     Authorization: `Bearer ${token}`,
                 },
@@ -728,6 +834,22 @@ const Dashboard = () => {
                 sms: preferences?.isSmsNotificationOn ?? notifications.sms,
                 email: preferences?.isEmailNotificationOn ?? notifications.email,
             });
+
+            // Keep category UI in sync after confirming top-level channel toggle.
+            setNotifPrefs((prev) => ({
+                push: {
+                    ...defaultNotifPrefs.push,
+                    ...(preferences?.pushPrefs || prev.push),
+                },
+                email: {
+                    ...defaultNotifPrefs.email,
+                    ...(preferences?.emailPrefs || prev.email),
+                },
+                sms: {
+                    ...defaultNotifPrefs.sms,
+                    ...(preferences?.smsPrefs || prev.sms),
+                },
+            }));
             setNotificationToggleSuccess(true);
             window.setTimeout(() => {
                 closeNotificationToggleDialog();
@@ -778,6 +900,109 @@ const Dashboard = () => {
         }
     };
 
+    const loadHealthManagementData = async () => {
+        const token = localStorage.getItem('medVisionToken');
+        if (!token) return;
+
+        try {
+            setHealthLoading(true);
+            const [trackersRes, timelineRes] = await Promise.all([
+                axios.get(`${baseURL}/health/trackers`, {
+                    headers: { Authorization: `Bearer ${token}` },
+                }),
+                axios.get(`${baseURL}/health/timeline`, {
+                    headers: { Authorization: `Bearer ${token}` },
+                }),
+            ]);
+
+            setHealthTrackers(trackersRes.data.trackers || []);
+            setExpiryReminders(trackersRes.data.expiryReminders || []);
+            setMedicalTimeline(timelineRes.data.events || []);
+        } catch (error) {
+            console.error('Error loading health data:', error.message);
+            setHealthTrackers([]);
+            setExpiryReminders([]);
+            setMedicalTimeline([]);
+        } finally {
+            setHealthLoading(false);
+        }
+    };
+
+    const handleAddTracker = async (e) => {
+        e.preventDefault();
+        const token = localStorage.getItem('medVisionToken');
+        if (!token) return;
+
+        if (!newTracker.medicineName || !newTracker.dosage || !newTracker.frequency || !newTracker.startDate) {
+            setHealthActionType('error');
+            setHealthActionMessage('Please fill medicine name, dosage, frequency, and start date.');
+            return;
+        }
+
+        try {
+            await axios.post(`${baseURL}/health/trackers`, newTracker, {
+                headers: { Authorization: `Bearer ${token}` },
+            });
+            setNewTracker({ medicineName: '', dosage: '', frequency: '', startDate: '', expiryDate: '' });
+            setShowAddTrackerForm(false);
+            setHealthActionType('success');
+            setHealthActionMessage('Dosage tracker saved successfully.');
+            loadHealthManagementData();
+        } catch (error) {
+            console.error('Error creating tracker:', error.message);
+            setHealthActionType('error');
+            setHealthActionMessage('Failed to create tracker. Please try again.');
+        }
+    };
+
+    const handleLogIntake = async (trackerId) => {
+        const token = localStorage.getItem('medVisionToken');
+        if (!token) return;
+
+        try {
+            await axios.patch(`${baseURL}/health/trackers/${trackerId}/intake`, {
+                takenAt: new Date().toISOString(),
+            }, {
+                headers: { Authorization: `Bearer ${token}` },
+            });
+            setHealthActionType('success');
+            setHealthActionMessage('Intake logged successfully. Great job staying on schedule.');
+            loadHealthManagementData();
+        } catch (error) {
+            console.error('Error logging intake:', error.message);
+            setHealthActionType('error');
+            setHealthActionMessage('Failed to log intake. Please try again.');
+        }
+    };
+
+    const handleExportHealthRecords = async () => {
+        const token = localStorage.getItem('medVisionToken');
+        if (!token) return;
+
+        try {
+            setHealthExporting(true);
+            const response = await axios.get(`${baseURL}/health/export/pdf`, {
+                headers: { Authorization: `Bearer ${token}` },
+                responseType: 'blob',
+            });
+
+            const blob = new Blob([response.data], { type: 'application/pdf' });
+            const url = window.URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `health-records-${new Date().toISOString().slice(0, 10)}.pdf`;
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            window.URL.revokeObjectURL(url);
+        } catch (error) {
+            console.error('Error exporting health records:', error.message);
+            alert('Failed to export health records. Please try again.');
+        } finally {
+            setHealthExporting(false);
+        }
+    };
+
     useEffect(() => {
         fetchDataFromApi();
         fetchMyOrders();
@@ -785,6 +1010,7 @@ const Dashboard = () => {
         fetchMyPrescriptionRequests();
         fetchMyQueries();
         loadVaccinations();
+        loadHealthManagementData();
     }, []);
 
     useEffect(() => {
@@ -810,9 +1036,11 @@ const Dashboard = () => {
         setShowQueryForm(false);
         setShowMyOrders(false);
         setShowMyVaccinations(false);
+        setShowHealthManagement(false);
         setShowProfile(false);
         setShowFeedback(false);
         setShowReviewForm(false);
+        setShowAddTrackerForm(false);
         setFeedbackSuccessMessage('');
         setIsEditingProfile(false);
         setProfileErrors({});
@@ -826,9 +1054,15 @@ const Dashboard = () => {
             fetchMyPrescriptionRequests();
             navigate(location.pathname, { replace: true, state: null });
         }
+        if (location.state?.openSection === 'notifications') {
+            resetDashboardPanels();
+            setShowNotifications(true);
+            fetchNotificationPreferences();
+            navigate(location.pathname, { replace: true, state: null });
+        }
     }, [location, navigate]);
 
-    const hasActivePanel = showPrescriptions || showNotifications || showRaiseQuery || showMyOrders || showMyVaccinations || showProfile || showFeedback;
+    const hasActivePanel = showPrescriptions || showNotifications || showRaiseQuery || showMyOrders || showMyVaccinations || showHealthManagement || showProfile || showFeedback;
     const reviewedStoreIds = new Set(myReviews.map((review) => getReviewStoreId(review)).filter(Boolean));
     const availableStoresForNewReview = storesForReviews.filter((store) => !reviewedStoreIds.has(String(store._id)));
 
@@ -853,6 +1087,19 @@ const Dashboard = () => {
     const formatUsd = (value) => {
         const amount = Number(value) || 0;
         return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
+    };
+
+    const WHATSAPP_SUPPORT_NUMBER = '918758770402';
+    const openWhatsAppOrderChat = (order) => {
+        if (!order) return;
+        const orderId = order.id || 'N/A';
+        const status = order.trackingStatus || order.status || 'Order Placed';
+        const orderDate = formatDashboardOrderDate(order.date);
+
+        const message = `Hello MedVision, I want a tracking update for Order #${orderId}. Current status shown: ${status}. Order date: ${orderDate}.`;
+
+        const waUrl = `https://wa.me/${WHATSAPP_SUPPORT_NUMBER}?text=${encodeURIComponent(message)}`;
+        window.open(waUrl, '_blank', 'noopener,noreferrer');
     };
 
     const getPaymentMeta = (paymentType) => {
@@ -902,8 +1149,9 @@ const Dashboard = () => {
         { icon: Pill,        text: "My Prescriptions", isActive: showPrescriptions,   iconBg: "bg-sky-500/20",     color: "text-sky-400",     onClick: () => { const n = !showPrescriptions;  resetDashboardPanels(); setShowPrescriptions(n); if (n) { fetchMyPrescriptionRequests(); } setSidebarOpen(false); } },
         { icon: ShoppingBag, text: "My Orders",        isActive: showMyOrders,        iconBg: "bg-emerald-500/20", color: "text-emerald-400", onClick: () => { const n = !showMyOrders;        resetDashboardPanels(); setShowMyOrders(n);        setSidebarOpen(false); } },
         { icon: Syringe,     text: "My Vaccinations",  isActive: showMyVaccinations,  iconBg: "bg-teal-500/20",    color: "text-teal-400",    onClick: () => { const n = !showMyVaccinations;  resetDashboardPanels(); setShowMyVaccinations(n); if (n) { loadVaccinations(); } setSidebarOpen(false); } },
+        { icon: Activity,    text: "Health Management", isActive: showHealthManagement, iconBg: "bg-indigo-500/20", color: "text-indigo-400", onClick: () => { const n = !showHealthManagement; resetDashboardPanels(); setShowHealthManagement(n); if (n) { loadHealthManagementData(); } setSidebarOpen(false); } },
         { icon: UserCircle,  text: "Profile",          isActive: showProfile,         iconBg: "bg-slate-500/20",   color: "text-slate-300",   onClick: () => { const n = !showProfile;        resetDashboardPanels(); setShowProfile(n);         setSidebarOpen(false); } },
-        { icon: Bell,        text: "Notifications",    isActive: showNotifications,   iconBg: "bg-amber-500/20",   color: "text-amber-400",   onClick: () => { const n = !showNotifications;   resetDashboardPanels(); setShowNotifications(n);   setSidebarOpen(false); } },
+        { icon: Bell,        text: "Notifications",    isActive: showNotifications,   iconBg: "bg-amber-500/20",   color: "text-amber-400",   onClick: () => { const n = !showNotifications;   resetDashboardPanels(); setShowNotifications(n); if (!showNotifications) fetchNotificationPreferences();   setSidebarOpen(false); } },
         {
             icon: Star,
             text: "Feedback",
@@ -1434,72 +1682,200 @@ const Dashboard = () => {
                             </div>
                         )}
 
-                        {/* Notifications Settings */}
-                        {showNotifications && (
-                            <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-6">
-                                <div className="flex items-center justify-between mb-6">
-                                    <h2 className="text-xl font-bold text-slate-900">Notification Settings</h2>
-                                    <Bell className="text-yellow-500" size={24} />
+                        {/* Notifications Settings — merged Hub */}
+                        {showNotifications && (() => {
+                            const categoryMeta = [
+                                { key: 'orderUpdates',            label: 'Order Updates',             icon: ShoppingBag,   color: 'text-sky-600',    bg: 'bg-sky-50',      desc: 'Delivery status and order confirmations' },
+                                { key: 'prescriptionReminders',   label: 'Prescription Reminders',    icon: Pill,          color: 'text-violet-600', bg: 'bg-violet-50',   desc: 'Refill due dates and expiry alerts' },
+                                { key: 'offerAlerts',             label: 'Offer & Discount Alerts',   icon: DollarSign,    color: 'text-amber-600',  bg: 'bg-amber-50',    desc: 'Promotional offers and coupons' },
+                                { key: 'healthReminders',         label: 'Health Reminders',          icon: Activity,      color: 'text-rose-600',   bg: 'bg-rose-50',     desc: 'Dose trackers and wellness tips' },
+                            ];
+                            const channelMeta = [
+                                { key: 'push',  label: 'Push',  Icon: Bell,         gradient: 'from-cyan-500 to-sky-600' },
+                                { key: 'email', label: 'Email', Icon: MailIcon,     gradient: 'from-violet-500 to-purple-600' },
+                                { key: 'sms',   label: 'SMS',   Icon: MessageSquare, gradient: 'from-emerald-500 to-teal-600' },
+                            ];
+                            const activePrefs = notifPrefs[notifChannel] || {};
+                            const allEnabled = Object.values(activePrefs).every(Boolean);
+                            const activeChannelMeta = channelMeta.find((c) => c.key === notifChannel);
+
+                            // For Email/SMS master, sync with API-backed notifications state
+                            const masterChecked = notifChannel === 'email'
+                                ? notifications.email
+                                : notifChannel === 'sms'
+                                    ? notifications.sms
+                                    : allEnabled;
+
+                            const handleMasterToggle = (val) => {
+                                if (notifChannel === 'email') {
+                                    openNotificationToggleDialog('email', val, true);
+                                } else if (notifChannel === 'sms') {
+                                    openNotificationToggleDialog('sms', val, true);
+                                } else {
+                                    openNotificationToggleDialog('push', val, true);
+                                }
+                            };
+
+                            const totalEnabled = Object.values(notifPrefs).reduce((s, ch) => s + Object.values(ch).filter(Boolean).length, 0);
+
+                            return (
+                            <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
+                                {/* Header */}
+                                <div className="px-6 py-5 border-b border-slate-100 flex items-center justify-between gap-3">
+                                    <div className="flex items-center gap-3">
+                                        <div className="p-2.5 bg-gradient-to-br from-amber-400 to-orange-500 rounded-xl shadow">
+                                            <Bell className="w-5 h-5 text-white" />
+                                        </div>
+                                        <div>
+                                            <h2 className="text-lg font-bold text-slate-900">Notification Settings</h2>
+                                            <p className="text-xs text-slate-500">{totalEnabled} type{totalEnabled !== 1 ? 's' : ''} enabled across all channels</p>
+                                        </div>
+                                    </div>
                                 </div>
 
-                                <div className="space-y-6">
-                                    <div className="flex items-center justify-between p-4 border border-gray-200 rounded-xl">
-                                        <div className="flex items-center space-x-3">
-                                            <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
-                                                <MessageSquare className="text-blue-600" size={20} />
+                                <div className="p-6 space-y-5">
+                                    {/* Channel Tabs */}
+                                    <div className="grid grid-cols-3 gap-3">
+                                        {channelMeta.map(({ key, label, Icon, gradient }) => {
+                                            const count = Object.values(notifPrefs[key] || {}).filter(Boolean).length;
+                                            const isActive = notifChannel === key;
+                                            return (
+                                                <button
+                                                    key={key}
+                                                    type="button"
+                                                    onClick={() => setNotifChannel(key)}
+                                                    className={`text-left p-4 rounded-2xl border-2 transition-all duration-200 ${
+                                                        isActive
+                                                            ? `border-transparent bg-gradient-to-br ${gradient} text-white shadow-lg scale-[1.02]`
+                                                            : 'border-slate-100 bg-slate-50 hover:border-slate-200'
+                                                    }`}
+                                                >
+                                                    <Icon className={`w-5 h-5 mb-2 ${isActive ? 'text-white' : 'text-slate-500'}`} />
+                                                    <p className={`text-sm font-bold ${isActive ? 'text-white' : 'text-slate-800'}`}>{label}</p>
+                                                    <p className={`text-xs mt-0.5 ${isActive ? 'text-white/80' : 'text-slate-500'}`}>{count}/4 active</p>
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+
+                                    {/* Active Channel Panel */}
+                                    <div className="rounded-2xl border border-slate-100 overflow-hidden">
+                                        {/* Channel header with master toggle */}
+                                        <div className={`px-5 py-4 bg-gradient-to-r ${activeChannelMeta?.gradient} flex items-center justify-between`}>
+                                            <div className="flex items-center gap-3">
+                                                {activeChannelMeta && <activeChannelMeta.Icon className="w-5 h-5 text-white" />}
+                                                <div>
+                                                    <p className="text-sm font-bold text-white">
+                                                        {notifChannel === 'push' ? 'Push Notifications' : notifChannel === 'email' ? 'Email Notifications' : 'SMS Notifications'}
+                                                    </p>
+                                                    <p className="text-[11px] text-white/80">
+                                                        {notifChannel === 'push' ? 'In-app & browser alerts' : notifChannel === 'email' ? 'Sent to your registered email' : 'Text messages to your phone'}
+                                                    </p>
+                                                </div>
                                             </div>
-                                            <div>
-                                                <h3 className="font-semibold text-gray-800">SMS Notifications</h3>
-                                                <p className="text-sm text-gray-600">Receive delivery reminders and updates via SMS</p>
+                                            {/* Master toggle — for email/sms uses API confirmation, for push uses local */}
+                                            <label className="relative inline-flex items-center cursor-pointer">
+                                                <input
+                                                    type="checkbox"
+                                                    className="sr-only peer"
+                                                    checked={masterChecked}
+                                                    onChange={(e) => handleMasterToggle(e.target.checked)}
+                                                    disabled={notificationSettingsLoading || notificationSettingsSaving}
+                                                />
+                                                <div className="w-11 h-6 bg-white/30 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-white/50 peer-disabled:opacity-50"></div>
+                                            </label>
+                                        </div>
+
+                                        {/* Category rows */}
+                                        <div className="divide-y divide-slate-50">
+                                            {categoryMeta.map(({ key, label, icon: CatIcon, color, bg, desc }) => {
+                                                const checked = notifChannel === 'push'
+                                                    ? (notifPrefs.push?.[key] ?? false)
+                                                    : notifPrefs[notifChannel]?.[key] ?? false;
+
+                                                const handleChange = (val) => {
+                                                    if (notifChannel === 'push') {
+                                                        setNotifCategoryPref('push', key, val);
+                                                    } else {
+                                                        // category-level for email/sms also stored locally (master uses API)
+                                                        setNotifCategoryPref(notifChannel, key, val);
+                                                    }
+                                                };
+
+                                                return (
+                                                    <div key={key} className="flex items-center px-5 py-4 gap-4 hover:bg-slate-50 transition">
+                                                        <div className={`w-10 h-10 rounded-xl ${bg} flex items-center justify-center flex-shrink-0`}>
+                                                            <CatIcon className={`w-5 h-5 ${color}`} />
+                                                        </div>
+                                                        <div className="flex-1 min-w-0">
+                                                            <p className="text-sm font-semibold text-slate-800">{label}</p>
+                                                            <p className="text-xs text-slate-500 truncate">{desc}</p>
+                                                        </div>
+                                                        <label className="relative inline-flex items-center cursor-pointer">
+                                                            <input type="checkbox" className="sr-only peer" checked={checked} onChange={(e) => handleChange(e.target.checked)} />
+                                                            <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-cyan-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-cyan-600"></div>
+                                                        </label>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+
+                                    {/* All-channels overview matrix */}
+                                    <div className="rounded-2xl border border-slate-100 overflow-hidden">
+                                        <div className="px-5 py-3 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
+                                            <p className="text-xs font-bold uppercase tracking-widest text-slate-400">All Channels Overview</p>
+                                            <div className="flex items-center gap-4 pr-1">
+                                                {channelMeta.map(({ key, Icon }) => (
+                                                    <Icon key={key} className="w-3.5 h-3.5 text-slate-400" />
+                                                ))}
                                             </div>
                                         </div>
-                                        <label className="relative inline-flex items-center cursor-pointer">
-                                            <input
-                                                type="checkbox"
-                                                className="sr-only peer"
-                                                checked={notifications.sms}
-                                                onChange={(e) => openNotificationToggleDialog('sms', e.target.checked)}
-                                                disabled={notificationSettingsLoading || notificationSettingsSaving}
-                                            />
-                                            <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-cyan-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-cyan-600"></div>
-                                        </label>
-                                    </div>
-
-                                    <div className="flex items-center justify-between p-4 border border-gray-200 rounded-xl">
-                                        <div className="flex items-center space-x-3">
-                                            <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
-                                                <MailIcon className="text-green-600" size={20} />
-                                            </div>
-                                            <div>
-                                                <h3 className="font-semibold text-gray-800">Email Notifications</h3>
-                                                <p className="text-sm text-gray-600">Receive prescription updates and health reports via email</p>
-                                            </div>
+                                        <div className="divide-y divide-slate-50">
+                                            {categoryMeta.map(({ key, label, icon: CatIcon, color, bg }) => (
+                                                <div key={key} className="flex items-center px-5 py-3 gap-3">
+                                                    <div className={`w-8 h-8 rounded-xl ${bg} flex items-center justify-center flex-shrink-0`}>
+                                                        <CatIcon className={`w-4 h-4 ${color}`} />
+                                                    </div>
+                                                    <p className="flex-1 text-sm text-slate-700 font-medium">{label}</p>
+                                                    <div className="flex items-center gap-4">
+                                                        {channelMeta.map(({ key: ch }) => (
+                                                            <div key={ch} className={`w-2.5 h-2.5 rounded-full ${notifPrefs[ch]?.[key] ? 'bg-emerald-500' : 'bg-slate-200'}`} />
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            ))}
                                         </div>
-                                        <label className="relative inline-flex items-center cursor-pointer">
-                                            <input
-                                                type="checkbox"
-                                                className="sr-only peer"
-                                                checked={notifications.email}
-                                                onChange={(e) => openNotificationToggleDialog('email', e.target.checked)}
-                                                disabled={notificationSettingsLoading || notificationSettingsSaving}
-                                            />
-                                            <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-cyan-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-cyan-600"></div>
-                                        </label>
                                     </div>
 
-                                    <div className="mt-6 p-4 bg-cyan-50 rounded-xl border border-cyan-100">
-                                        <h4 className="font-semibold text-cyan-900 mb-2">What you'll receive:</h4>
-                                        <ul className="text-sm text-cyan-700 space-y-1">
-                                            <li>• Prescription Refill Notifications</li>
-                                        
-                                            <li>• Health Reports</li>
-                                            <li>• Important updates from your Healthcare Provider</li>
-                                        </ul>
-                                    </div>
-
+                                    {/* Save button */}
+                                    <button
+                                        type="button"
+                                        onClick={saveNotifPrefs}
+                                        disabled={notifPrefsSaving}
+                                        className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl bg-gradient-to-r from-cyan-600 to-emerald-600 text-white font-bold shadow-md hover:shadow-lg hover:scale-[1.01] active:scale-[0.99] transition-all duration-200 disabled:opacity-60 disabled:cursor-not-allowed"
+                                    >
+                                        {notifPrefsSaving ? (
+                                            <>
+                                                <div className="w-5 h-5 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                                                Saving…
+                                            </>
+                                        ) : notifPrefsSaved ? (
+                                            <>
+                                                <CheckCircle2 className="w-5 h-5" />
+                                                Saved to your account!
+                                            </>
+                                        ) : (
+                                            <>
+                                                <Bell className="w-5 h-5" />
+                                                Save Preferences
+                                            </>
+                                        )}
+                                    </button>
                                 </div>
                             </div>
-                        )}
+                            );
+                        })()}
 
                         {/* Feedback / Review Panel */}
                         {showFeedback && (
@@ -1909,7 +2285,7 @@ const Dashboard = () => {
                                             <ul className="text-xs text-amber-700 space-y-1">
                                                 <li>• For order issues, include your Order ID in the message.</li>
                                                 <li>• For prescription help, mention the medicine name.</li>
-                                                <li>• Urgent? Call 1800-000-0000 (Toll Free).</li>
+                                                <li>• Urgent? Call 8758770402.</li>
                                             </ul>
                                         </div>
 
@@ -2205,6 +2581,12 @@ const Dashboard = () => {
                                                             Track Order
                                                         </button>
                                                         <button
+                                                            className="bg-emerald-600 hover:bg-emerald-700 text-white py-2.5 px-4 rounded-xl shadow transition-colors"
+                                                            onClick={() => openWhatsAppOrderChat(order)}
+                                                        >
+                                                            WhatsApp Track
+                                                        </button>
+                                                        <button
                                                             className="bg-gray-100 hover:bg-gray-200 text-gray-800 py-2.5 px-4 rounded-xl shadow transition-colors inline-flex items-center gap-1.5"
                                                             onClick={() => toggleDashboardOrderItems(order.id)}
                                                         >
@@ -2355,6 +2737,158 @@ const Dashboard = () => {
                                 )}
                             </div>
                         )}
+
+                        {/* Health Management Panel */}
+                        {showHealthManagement && (
+                            <div className="bg-white rounded-2xl shadow-lg p-6 space-y-6">
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-10 h-10 rounded-xl bg-indigo-100 flex items-center justify-center">
+                                            <Activity className="text-indigo-600" size={20} />
+                                        </div>
+                                        <div>
+                                            <h2 className="text-xl font-bold text-gray-800">Health Management</h2>
+                                            <p className="text-sm text-gray-500">Expiry reminders, dosage tracking, interactions, timeline, and PDF export.</p>
+                                        </div>
+                                    </div>
+                                    <button
+                                        onClick={handleExportHealthRecords}
+                                        disabled={healthExporting}
+                                        className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-50"
+                                    >
+                                        <Download size={16} /> {healthExporting ? 'Exporting...' : 'Export PDF'}
+                                    </button>
+                                </div>
+
+                                {healthActionMessage ? (
+                                    <div className={`rounded-xl border px-4 py-3 text-sm ${
+                                        healthActionType === 'error'
+                                            ? 'border-rose-200 bg-rose-50 text-rose-800'
+                                            : 'border-emerald-200 bg-emerald-50 text-emerald-800'
+                                    }`}>
+                                        {healthActionMessage}
+                                    </div>
+                                ) : null}
+
+                                {healthLoading ? (
+                                    <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-8 text-center text-sm text-slate-500">
+                                        Loading health data...
+                                    </div>
+                                ) : (
+                                    <>
+                                        {/* Expiry Reminders */}
+                                        <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
+                                            <h3 className="text-sm font-semibold text-amber-900 mb-2">Medicine Expiry Reminders</h3>
+                                            {expiryReminders.length === 0 ? (
+                                                <p className="text-xs text-amber-800">No upcoming expiries in the next 7 days.</p>
+                                            ) : (
+                                                <ul className="space-y-1 text-xs text-amber-900">
+                                                    {expiryReminders.map((reminder) => (
+                                                        <li key={String(reminder.trackerId)}>
+                                                            {reminder.medicineName} expires on {new Date(reminder.expiryDate).toLocaleDateString()} ({reminder.daysLeft} day(s) left)
+                                                        </li>
+                                                    ))}
+                                                </ul>
+                                            )}
+                                        </div>
+
+                                        {/* Dosage Tracker */}
+                                        <div className="rounded-xl border border-slate-200 p-4">
+                                            <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
+                                                <h3 className="text-sm font-semibold text-slate-900">Dosage Tracker</h3>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setShowAddTrackerForm((prev) => !prev)}
+                                                    className="rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-indigo-700"
+                                                >
+                                                    {showAddTrackerForm ? 'Close Add Tracker' : 'Add Dosage Tracker'}
+                                                </button>
+                                            </div>
+
+                                            {showAddTrackerForm && (
+                                                <form onSubmit={handleAddTracker} className="grid gap-3 mb-4 rounded-lg border border-indigo-100 bg-indigo-50/40 p-3">
+                                                    <input
+                                                        value={newTracker.medicineName}
+                                                        onChange={(e) => setNewTracker((prev) => ({ ...prev, medicineName: e.target.value }))}
+                                                        placeholder="Medicine name"
+                                                        className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                                                    />
+                                                    <input
+                                                        value={newTracker.dosage}
+                                                        onChange={(e) => setNewTracker((prev) => ({ ...prev, dosage: e.target.value }))}
+                                                        placeholder="Dosage (e.g. 500mg)"
+                                                        className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                                                    />
+                                                    <input
+                                                        value={newTracker.frequency}
+                                                        onChange={(e) => setNewTracker((prev) => ({ ...prev, frequency: e.target.value }))}
+                                                        placeholder="Frequency (e.g. 2 times/day)"
+                                                        className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                                                    />
+                                                    <div className="grid grid-cols-2 gap-3">
+                                                        <input
+                                                            type="date"
+                                                            value={newTracker.startDate}
+                                                            onChange={(e) => setNewTracker((prev) => ({ ...prev, startDate: e.target.value }))}
+                                                            className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                                                        />
+                                                        <input
+                                                            type="date"
+                                                            value={newTracker.expiryDate}
+                                                            onChange={(e) => setNewTracker((prev) => ({ ...prev, expiryDate: e.target.value }))}
+                                                            className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                                                        />
+                                                    </div>
+                                                    <button
+                                                        type="submit"
+                                                        className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700"
+                                                    >
+                                                        Save Tracker
+                                                    </button>
+                                                </form>
+                                            )}
+
+                                            <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
+                                                {healthTrackers.length === 0 ? (
+                                                    <p className="text-xs text-slate-500">No active trackers yet. Click Add Dosage Tracker to create one.</p>
+                                                ) : healthTrackers.map((tracker) => (
+                                                    <div key={tracker._id} className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                                                        <p className="text-sm font-semibold text-slate-900">{tracker.medicineName}</p>
+                                                        <p className="text-xs text-slate-600">{tracker.dosage} • {tracker.frequency}</p>
+                                                        <p className="text-xs text-slate-500 mt-1">Last intake: {tracker.lastTakenAt ? new Date(tracker.lastTakenAt).toLocaleString() : 'Not logged yet'}</p>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => handleLogIntake(tracker._id)}
+                                                            className="mt-2 rounded-md bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700"
+                                                        >
+                                                            Log Intake Now
+                                                        </button>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+
+                                        {/* Medical Timeline */}
+                                        <div className="rounded-xl border border-slate-200 p-4">
+                                            <h3 className="text-sm font-semibold text-slate-900 mb-3">Medical History Timeline</h3>
+                                            <div className="max-h-72 overflow-y-auto pr-1 space-y-2">
+                                                {medicalTimeline.length === 0 ? (
+                                                    <p className="text-xs text-slate-500">No timeline events found yet.</p>
+                                                ) : medicalTimeline.slice(0, 80).map((event, idx) => (
+                                                    <div key={`${event.type}-${idx}-${event.date}`} className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+                                                        <div className="flex items-center justify-between gap-3">
+                                                            <p className="text-sm font-semibold text-slate-900">{event.title}</p>
+                                                            <span className="text-[11px] text-slate-500">{new Date(event.date).toLocaleString()}</span>
+                                                        </div>
+                                                        <p className="text-xs text-slate-600 mt-0.5">{event.type} • {event.details}</p>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    </>
+                                )}
+                            </div>
+                        )}
                     </div>
                 </main>
             </div>
@@ -2478,6 +3012,8 @@ const Dashboard = () => {
                                 <div className="rounded-xl bg-white/20 p-2.5">
                                     {pendingNotificationChange.key === 'sms' ? (
                                         <MessageSquare size={20} />
+                                    ) : pendingNotificationChange.key === 'push' ? (
+                                        <Bell size={20} />
                                     ) : (
                                         <MailIcon size={20} />
                                     )}
@@ -2507,9 +3043,13 @@ const Dashboard = () => {
                             ) : (
                                 <>
                                     <p className="text-sm leading-relaxed text-slate-600">
-                                        {pendingNotificationChange.value
-                                            ? `Great choice! ${pendingNotificationChange.label} alerts keep you informed about important pharmacy updates.`
-                                            : `You are turning off ${pendingNotificationChange.label} alerts. You may miss important pharmacy updates.`}
+                                        {pendingNotificationChange.applyAll
+                                            ? (pendingNotificationChange.value
+                                                ? `Great choice! Enabling ${pendingNotificationChange.label} will turn on all ${pendingNotificationChange.label} notification options.`
+                                                : `You are turning off ${pendingNotificationChange.label}. This will disable all ${pendingNotificationChange.label} notification options.`)
+                                            : (pendingNotificationChange.value
+                                                ? `Great choice! ${pendingNotificationChange.label} alerts keep you informed about important pharmacy updates.`
+                                                : `You are turning off ${pendingNotificationChange.label} alerts. You may miss important pharmacy updates.`)}
                                     </p>
 
                                     <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs text-slate-600">

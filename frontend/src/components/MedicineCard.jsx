@@ -1,10 +1,23 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Pill, Package, ShoppingCart, FileText, CheckCircle, Upload, X, AlertCircle, Clock, BadgeCheck, Stethoscope, CalendarDays, UserRound, Star, Zap } from 'lucide-react';
+import { Pill, Package, ShoppingCart, FileText, CheckCircle, Upload, X, AlertCircle, Clock, BadgeCheck, Stethoscope, CalendarDays, UserRound, Star, Zap, Heart } from 'lucide-react';
 import CartButton from './CartButton';
 import axios from 'axios';
 import { baseURL } from '../main';
 
-const MedicineCard = ({ id, name, manufacturer, dosage, price, stock, type, requiresPrescription, onAddToCart }) => {
+const MedicineCard = ({
+  id,
+  name,
+  manufacturer,
+  dosage,
+  price,
+  stock,
+  type,
+  requiresPrescription,
+  onAddToCart,
+  isWishlisted = false,
+  onToggleWishlist,
+  wishlistLoading = false,
+}) => {
 
   const formatUsd = (value) => {
     const amount = Number(value) || 0;
@@ -203,6 +216,20 @@ const MedicineCard = ({ id, name, manufacturer, dosage, price, stock, type, requ
       <div className="relative p-4 flex flex-col h-full">
         {/* Medicine Image Section */}
         <div className="relative w-full h-40 bg-gradient-to-br from-cyan-50 to-emerald-50 rounded-xl overflow-hidden mb-4 flex items-center justify-center">
+          <button
+            type="button"
+            onClick={() => onToggleWishlist?.(id)}
+            disabled={!userData?._id || wishlistLoading}
+            className={`absolute top-3 left-3 z-10 inline-flex h-9 w-9 items-center justify-center rounded-full border transition ${
+              isWishlisted
+                ? 'border-rose-300 bg-rose-100 text-rose-600'
+                : 'border-white/80 bg-white/90 text-slate-500 hover:text-rose-500'
+            } ${(!userData?._id || wishlistLoading) ? 'opacity-60 cursor-not-allowed' : ''}`}
+            title={isWishlisted ? 'Remove from Wishlist' : 'Add to Wishlist'}
+          >
+            <Heart className={`w-4 h-4 ${isWishlisted ? 'fill-rose-500' : ''}`} />
+          </button>
+
           <img
             src="/medicine.png"
             alt={name}

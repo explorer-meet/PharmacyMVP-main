@@ -230,11 +230,11 @@ export default function TermsAndConditions() {
               legal@pharmacymvp.com
             </a>
             <a
-              href="tel:+911800000000"
+              href="tel:+918758770402"
               className="flex items-center gap-3 bg-white/20 hover:bg-white/30 transition rounded-xl px-5 py-3 text-sm font-medium"
             >
               <Phone className="w-5 h-5" />
-              1800-000-0000 (Toll Free)
+              8758770402
             </a>
           </div>
         </div>

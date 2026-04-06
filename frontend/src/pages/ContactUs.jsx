@@ -14,7 +14,7 @@ const contactDetails = [
   {
     icon: Phone,
     title: "Phone Support",
-    lines: ["1800-000-0000 (Toll Free)", "+91 98765 43210"],
+    lines: ["8758770402", "+91 87587 70402"],
     color: "blue",
   },
   {
@@ -200,7 +200,7 @@ export default function ContactUs() {
                     name="phone"
                     value={form.phone}
                     onChange={handleChange}
-                    placeholder="+91 98765 43210"
+                    placeholder="+91 87587 70402"
                     className={`w-full px-4 py-3 rounded-xl border text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition ${
                       errors.phone ? "border-red-400 bg-red-50" : "border-gray-200 bg-gray-50 hover:border-gray-300"
                     }`}
@@ -288,11 +288,11 @@ export default function ContactUs() {
             <p className="font-bold text-lg mb-1">Need Urgent Help?</p>
             <p className="text-white/80 text-sm mb-4">For medical emergencies, call our 24/7 emergency line.</p>
             <a
-              href="tel:+911800000000"
+              href="tel:+918758770402"
               className="inline-flex items-center gap-2 bg-white text-red-600 font-semibold text-sm px-5 py-2.5 rounded-xl hover:bg-red-50 transition"
             >
               <Phone className="w-4 h-4" />
-              1800-000-0000
+              8758770402
             </a>
           </div>
         </div>
