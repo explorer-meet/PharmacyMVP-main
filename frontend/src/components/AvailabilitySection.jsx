@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Clock, Calendar } from 'lucide-react';
 import toast from 'react-hot-toast';
 import axios from 'axios';
@@ -29,12 +29,6 @@ const AvailabilitySection = ({ regno }) => {
         hour: '2-digit',
         minute: '2-digit',
         hour12: true,
-    });
-
-    const filteredSlots = timeSlots.filter((slot) => {
-        const slot24 = convertTo24Hour(slot); // Convert the slot to 24-hour format
-        const current24 = convertTo24Hour(formattedTime); // Convert current time to 24-hour format
-        return slot24 > current24; // Compare times
     });
 
     const handleSlotToggle = (slot) => {

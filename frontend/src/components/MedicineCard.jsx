@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Pill, Package, ShoppingCart, FileText, CheckCircle, Upload, X, AlertCircle, Clock, BadgeCheck, Stethoscope, CalendarDays, UserRound, Star, Zap, Heart } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { Pill, ShoppingCart, FileText, CheckCircle, Upload, X, AlertCircle, Clock, BadgeCheck, Stethoscope, CalendarDays, UserRound, Zap, Heart } from 'lucide-react';
 import CartButton from './CartButton';
 import axios from 'axios';
 import { baseURL } from '../main';
@@ -13,23 +13,16 @@ const MedicineCard = ({
   stock,
   type,
   requiresPrescription,
-  onAddToCart,
   isWishlisted = false,
   onToggleWishlist,
   wishlistLoading = false,
 }) => {
 
-  const formatUsd = (value) => {
-    const amount = Number(value) || 0;
-    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'INR' }).format(amount);
-  };
-
   const storageKey = `prescription_${name}`;
 
   const [showadded, setShowAdded] = useState(false);
-  const [addcart, setAddCart] = useState(false);
   const [userData, setUserData] = useState(null);
-  const [cartId, setCartId] = useState(null);
+  const [, setCartId] = useState(null);
   const [showPrescriptionModal, setShowPrescriptionModal] = useState(false);
   const [prescriptionFile, setPrescriptionFile] = useState(null);
   const [prescriptionStatus, setPrescriptionStatus] = useState(() => {

@@ -46,7 +46,7 @@ export function MedicineForm() {
           stock: ''
         });
       }
-    } catch (error) {
+    } catch {
       setMessage({ text: 'Failed to add medicine', type: 'error' });
     } finally {
       setIsLoading(false);

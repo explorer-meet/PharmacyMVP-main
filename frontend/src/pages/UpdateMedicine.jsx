@@ -1,6 +1,4 @@
-import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
 import { Package2 } from 'lucide-react';
 import { MedicineForm } from '../components/medicine-admin/MedicineForm';
 import { FaHome } from 'react-icons/fa';

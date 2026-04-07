@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import toast from 'react-hot-toast';
 import Navbar from '../components/Navbar';
@@ -30,6 +29,7 @@ import {
   Camera,
   CameraOff,
   BadgePercent,
+  Plus,
 } from 'lucide-react';
 
 const StoreDashboard = () => {
@@ -304,6 +304,7 @@ const StoreDashboard = () => {
   const [supplierPaymentDraft, setSupplierPaymentDraft] = useState({});
   const [campaignsLoading, setCampaignsLoading] = useState(false);
   const [campaigns, setCampaigns] = useState([]);
+  const [showCampaignForm, setShowCampaignForm] = useState(false);
   const [newCampaign, setNewCampaign] = useState({
     campaignType: 'Offer',
     title: '',
@@ -355,64 +356,6 @@ const StoreDashboard = () => {
         };
       })
       .filter((item) => item.name && item.unitPrice >= 0);
-  };
-
-  const loadStaffPermissions = async () => {
-    const config = authConfig();
-    if (!config) return;
-    try {
-      const response = await axios.get(`${baseURL}/store-staff/permissions?role=Manager`, config);
-      setStaffPermissions(response.data?.permissions || []);
-    } catch (error) {
-      console.error('Failed to load staff permissions:', error.message);
-      setStaffPermissions([]);
-    }
-  };
-
-  const loadStaffOperations = async () => {
-    const config = authConfig();
-    if (!config) return;
-    try {
-      setStaffOpsLoading(true);
-      const [performanceRes, attendanceRes, trainingRes] = await Promise.all([
-        axios.get(`${baseURL}/staff/performance`, config),
-        axios.get(`${baseURL}/staff/attendance`, config),
-        axios.get(`${baseURL}/staff/training`, config),
-      ]);
-      setPerformanceRecords(performanceRes.data?.records || []);
-      setAttendanceRecords(attendanceRes.data?.records || []);
-      setTrainingRecords(trainingRes.data?.records || []);
-    } catch (error) {
-      console.error('Failed to load staff operations:', error.message);
-      setPerformanceRecords([]);
-      setAttendanceRecords([]);
-      setTrainingRecords([]);
-    } finally {
-      setStaffOpsLoading(false);
-    }
-  };
-
-  const loadCompliance = async () => {
-    const config = authConfig();
-    if (!config) return;
-    try {
-      setComplianceLoading(true);
-      const [itemsRes, remindersRes] = await Promise.all([
-        axios.get(`${baseURL}/compliance/checklist`, config),
-        axios.get(`${baseURL}/compliance/reminders?nextDays=30`, config),
-      ]);
-      setComplianceItems(itemsRes.data?.items || []);
-      setComplianceReminders({
-        overdue: remindersRes.data?.overdue || [],
-        upcoming: remindersRes.data?.upcoming || [],
-      });
-    } catch (error) {
-      console.error('Failed to load compliance data:', error.message);
-      setComplianceItems([]);
-      setComplianceReminders({ overdue: [], upcoming: [] });
-    } finally {
-      setComplianceLoading(false);
-    }
   };
 
   const loadFinance = async () => {
@@ -527,6 +470,7 @@ const StoreDashboard = () => {
         bulkBuyQuantity: '',
         bulkGetQuantity: '',
       });
+      setShowCampaignForm(false);
       loadPromotionalCampaigns();
     } catch (error) {
       toast.error(error.response?.data?.message || 'Failed to create promotional campaign');
@@ -976,6 +920,71 @@ const StoreDashboard = () => {
     }
   };
 
+  const loadStaffOperations = async () => {
+    const token = localStorage.getItem('medVisionToken');
+    if (!token) return;
+
+    try {
+      setStaffOpsLoading(true);
+      const [permissionsResponse, performanceResponse, attendanceResponse, trainingResponse] = await Promise.all([
+        axios.get(`${baseURL}/store-staff/permissions`, {
+          headers: { Authorization: `Bearer ${token}` },
+        }),
+        axios.get(`${baseURL}/staff/performance`, {
+          headers: { Authorization: `Bearer ${token}` },
+        }),
+        axios.get(`${baseURL}/staff/attendance`, {
+          headers: { Authorization: `Bearer ${token}` },
+        }),
+        axios.get(`${baseURL}/staff/training`, {
+          headers: { Authorization: `Bearer ${token}` },
+        }),
+      ]);
+
+      setStaffPermissions(permissionsResponse.data?.permissions || []);
+      setPerformanceRecords(performanceResponse.data?.records || []);
+      setAttendanceRecords(attendanceResponse.data?.records || []);
+      setTrainingRecords(trainingResponse.data?.records || []);
+    } catch (error) {
+      console.error('Failed to load staff operations:', error.message);
+      setStaffPermissions([]);
+      setPerformanceRecords([]);
+      setAttendanceRecords([]);
+      setTrainingRecords([]);
+    } finally {
+      setStaffOpsLoading(false);
+    }
+  };
+
+  const loadCompliance = async () => {
+    const token = localStorage.getItem('medVisionToken');
+    if (!token) return;
+
+    try {
+      setComplianceLoading(true);
+      const [itemsResponse, remindersResponse] = await Promise.all([
+        axios.get(`${baseURL}/compliance/checklist`, {
+          headers: { Authorization: `Bearer ${token}` },
+        }),
+        axios.get(`${baseURL}/compliance/reminders`, {
+          headers: { Authorization: `Bearer ${token}` },
+        }),
+      ]);
+
+      setComplianceItems(itemsResponse.data?.items || []);
+      setComplianceReminders({
+        overdue: remindersResponse.data?.overdue || [],
+        upcoming: remindersResponse.data?.upcoming || [],
+      });
+    } catch (error) {
+      console.error('Failed to load compliance data:', error.message);
+      setComplianceItems([]);
+      setComplianceReminders({ overdue: [], upcoming: [] });
+    } finally {
+      setComplianceLoading(false);
+    }
+  };
+
   const updatePrescriptionStatus = async (id, status) => {
     const token = localStorage.getItem('medVisionToken');
     if (!token) return;
@@ -994,7 +1003,6 @@ const StoreDashboard = () => {
 
   const sectionConfig = [
     { key: 'staff', label: 'Staff Members', icon: Users },
-    { key: 'staffCompliance', label: 'Staff & Compliance', icon: ShieldCheck },
     { key: 'promotions', label: 'Promotions', icon: BadgePercent },
     { key: 'importPatients', label: 'Import Patients', icon: FileUp },
     { key: 'inventory', label: 'Inventory', icon: Package },
@@ -1401,12 +1409,6 @@ const StoreDashboard = () => {
     if (selectedSection === 'staff') {
       loadStoreStaffMembers();
     }
-    if (selectedSection === 'staffCompliance') {
-      loadStoreStaffMembers();
-      loadStaffPermissions();
-      loadStaffOperations();
-      loadCompliance();
-    }
     if (selectedSection === 'inventory') {
       loadStoreInventory();
     }
@@ -1428,6 +1430,11 @@ const StoreDashboard = () => {
     }
     if (selectedSection === 'reviews') {
       loadStoreReviews();
+    }
+    if (selectedSection === 'staffCompliance') {
+      loadStoreStaffMembers();
+      loadStaffOperations();
+      loadCompliance();
     }
 
     if (selectedSection !== 'inventory') {
@@ -2316,123 +2323,463 @@ const StoreDashboard = () => {
             )}
 
             {selectedSection === 'promotions' && (
-              <div className="grid gap-6 xl:grid-cols-[1.1fr_1fr]">
-                <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-                  <div className="flex items-center gap-3 mb-6">
-                    <BadgePercent className="text-fuchsia-600" size={24} />
-                    <div>
-                      <h2 className="text-xl font-semibold text-slate-900">Promotional Campaign Management</h2>
-                      <p className="text-sm text-slate-500">Create offers, coupon codes, and bulk discounts for your store.</p>
-                    </div>
-                  </div>
-
-                  <form className="grid gap-3" onSubmit={submitPromotionalCampaign}>
-                    <div className="grid grid-cols-2 gap-2">
-                      <select className="rounded-xl border border-slate-200 px-3 py-2 text-sm" value={newCampaign.campaignType} onChange={(event) => setNewCampaign((prev) => ({ ...prev, campaignType: event.target.value }))}>
-                        <option>Offer</option>
-                        <option>Coupon</option>
-                        <option>Bulk Discount</option>
-                      </select>
-                      <select className="rounded-xl border border-slate-200 px-3 py-2 text-sm" value={newCampaign.status} onChange={(event) => setNewCampaign((prev) => ({ ...prev, status: event.target.value }))}>
-                        <option>Active</option>
-                        <option>Inactive</option>
-                        <option>Scheduled</option>
-                      </select>
-                    </div>
-
-                    <input type="text" placeholder="Campaign title" className="rounded-xl border border-slate-200 px-3 py-2 text-sm" value={newCampaign.title} onChange={(event) => setNewCampaign((prev) => ({ ...prev, title: event.target.value }))} required />
-                    <textarea rows={2} placeholder="Description" className="rounded-xl border border-slate-200 px-3 py-2 text-sm" value={newCampaign.description} onChange={(event) => setNewCampaign((prev) => ({ ...prev, description: event.target.value }))} />
-
-                    {newCampaign.campaignType === 'Coupon' && (
-                      <input type="text" placeholder="Coupon code (e.g. SAVE20)" className="rounded-xl border border-slate-200 px-3 py-2 text-sm uppercase" value={newCampaign.couponCode} onChange={(event) => setNewCampaign((prev) => ({ ...prev, couponCode: event.target.value.toUpperCase() }))} required />
-                    )}
-
-                    <div className="grid grid-cols-2 gap-2">
-                      <select className="rounded-xl border border-slate-200 px-3 py-2 text-sm" value={newCampaign.discountType} onChange={(event) => setNewCampaign((prev) => ({ ...prev, discountType: event.target.value }))}>
-                        <option>Percentage</option>
-                        <option>Flat</option>
-                      </select>
-                      <input type="number" min="0" step="0.01" placeholder="Discount value" className="rounded-xl border border-slate-200 px-3 py-2 text-sm" value={newCampaign.discountValue} onChange={(event) => setNewCampaign((prev) => ({ ...prev, discountValue: event.target.value }))} required />
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-2">
-                      <input type="number" min="0" step="0.01" placeholder="Min order amount" className="rounded-xl border border-slate-200 px-3 py-2 text-sm" value={newCampaign.minOrderAmount} onChange={(event) => setNewCampaign((prev) => ({ ...prev, minOrderAmount: event.target.value }))} />
-                      <input type="number" min="0" step="0.01" placeholder="Max discount cap" className="rounded-xl border border-slate-200 px-3 py-2 text-sm" value={newCampaign.maxDiscountAmount} onChange={(event) => setNewCampaign((prev) => ({ ...prev, maxDiscountAmount: event.target.value }))} />
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-2">
-                      <input type="date" className="rounded-xl border border-slate-200 px-3 py-2 text-sm" value={newCampaign.validFrom} onChange={(event) => setNewCampaign((prev) => ({ ...prev, validFrom: event.target.value }))} />
-                      <input type="date" className="rounded-xl border border-slate-200 px-3 py-2 text-sm" value={newCampaign.validTill} onChange={(event) => setNewCampaign((prev) => ({ ...prev, validTill: event.target.value }))} />
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-2">
-                      <select className="rounded-xl border border-slate-200 px-3 py-2 text-sm" value={newCampaign.targetScope} onChange={(event) => setNewCampaign((prev) => ({ ...prev, targetScope: event.target.value }))}>
-                        <option>All</option>
-                        <option>Category</option>
-                        <option>Medicine</option>
-                      </select>
-                      <input type="text" placeholder="Target value (optional)" className="rounded-xl border border-slate-200 px-3 py-2 text-sm" value={newCampaign.targetValue} onChange={(event) => setNewCampaign((prev) => ({ ...prev, targetValue: event.target.value }))} />
-                    </div>
-
-                    {newCampaign.campaignType === 'Bulk Discount' && (
-                      <div className="grid grid-cols-3 gap-2">
-                        <input type="number" min="0" placeholder="Min Qty" className="rounded-xl border border-slate-200 px-3 py-2 text-sm" value={newCampaign.bulkMinQuantity} onChange={(event) => setNewCampaign((prev) => ({ ...prev, bulkMinQuantity: event.target.value }))} />
-                        <input type="number" min="0" placeholder="Buy Qty" className="rounded-xl border border-slate-200 px-3 py-2 text-sm" value={newCampaign.bulkBuyQuantity} onChange={(event) => setNewCampaign((prev) => ({ ...prev, bulkBuyQuantity: event.target.value }))} />
-                        <input type="number" min="0" placeholder="Get Qty" className="rounded-xl border border-slate-200 px-3 py-2 text-sm" value={newCampaign.bulkGetQuantity} onChange={(event) => setNewCampaign((prev) => ({ ...prev, bulkGetQuantity: event.target.value }))} />
+              <div className="grid gap-6">
+                {/* Header with Title and Add Button */}
+                <div className="rounded-3xl border border-slate-200 bg-gradient-to-r from-fuchsia-50 to-purple-50 p-6 shadow-sm">
+                  <div className="flex items-center justify-between gap-4">
+                    <div className="flex items-center gap-3">
+                      <div className="rounded-2xl bg-fuchsia-600 p-3">
+                        <BadgePercent className="text-white" size={28} />
                       </div>
-                    )}
-
-                    <div className="grid grid-cols-2 gap-2">
-                      <input type="number" min="0" placeholder="Usage limit (0 = unlimited)" className="rounded-xl border border-slate-200 px-3 py-2 text-sm" value={newCampaign.usageLimit} onChange={(event) => setNewCampaign((prev) => ({ ...prev, usageLimit: event.target.value }))} />
-                      <label className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-700">
-                        <input type="checkbox" checked={newCampaign.autoApply} onChange={(event) => setNewCampaign((prev) => ({ ...prev, autoApply: event.target.checked }))} />
-                        Auto apply
-                      </label>
+                      <div>
+                        <h2 className="text-2xl font-bold text-slate-900">Promotional Campaigns</h2>
+                        <p className="text-sm text-slate-600">Create and manage offers, coupons, and discounts</p>
+                      </div>
                     </div>
-
-                    <button type="submit" className="rounded-xl bg-fuchsia-600 px-4 py-2 text-sm font-semibold text-white hover:bg-fuchsia-700">
-                      Create Campaign
+                    <button
+                      type="button"
+                      onClick={() => setShowCampaignForm(!showCampaignForm)}
+                      className="inline-flex items-center gap-2 rounded-xl bg-fuchsia-600 px-4 py-3 font-semibold text-white hover:bg-fuchsia-700 transition-colors shadow-md hover:shadow-lg"
+                    >
+                      <Plus size={20} />
+                      Add Campaign
                     </button>
-                  </form>
+                  </div>
                 </div>
 
-                <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-                  <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-lg font-semibold text-slate-900">Active & Scheduled Campaigns</h3>
-                    <button type="button" onClick={loadPromotionalCampaigns} className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50">Refresh</button>
+                {/* Campaign Stats */}
+                <div className="grid grid-cols-3 gap-4">
+                  <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                    <p className="text-sm text-slate-600 font-medium">Total Campaigns</p>
+                    <p className="text-3xl font-bold text-slate-900 mt-2">{campaigns.length}</p>
                   </div>
+                  <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
+                    <p className="text-sm text-emerald-700 font-medium">Active</p>
+                    <p className="text-3xl font-bold text-emerald-700 mt-2">
+                      {campaigns.filter((c) => c.status === 'Active').length}
+                    </p>
+                  </div>
+                  <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                    <p className="text-sm text-slate-600 font-medium">Inactive</p>
+                    <p className="text-3xl font-bold text-slate-700 mt-2">
+                      {campaigns.filter((c) => c.status !== 'Active').length}
+                    </p>
+                  </div>
+                </div>
 
-                  <div className="max-h-[560px] space-y-3 overflow-y-auto pr-1">
-                    {campaignsLoading ? (
-                      <p className="text-sm text-slate-500">Loading campaigns...</p>
-                    ) : campaigns.length === 0 ? (
-                      <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-6 text-center text-sm text-slate-500">No campaigns created yet.</div>
-                    ) : campaigns.map((campaign) => (
-                      <div key={campaign._id} className="rounded-2xl border border-slate-200 p-4">
-                        <div className="flex items-start justify-between gap-2">
-                          <div>
-                            <p className="font-semibold text-slate-900">{campaign.title}</p>
-                            <p className="text-xs text-slate-500">{campaign.campaignType} • {campaign.discountType} {campaign.discountValue}</p>
-                            {campaign.couponCode ? <p className="text-xs font-semibold text-fuchsia-700 mt-1">Code: {campaign.couponCode}</p> : null}
-                            {campaign.description ? <p className="text-xs text-slate-600 mt-1">{campaign.description}</p> : null}
-                          </div>
-                          <span className={`rounded-full px-2 py-1 text-[11px] font-semibold ${campaign.status === 'Active' ? 'bg-emerald-100 text-emerald-700' : campaign.status === 'Scheduled' ? 'bg-blue-100 text-blue-700' : campaign.status === 'Inactive' ? 'bg-slate-100 text-slate-700' : 'bg-amber-100 text-amber-700'}`}>
-                            {campaign.status}
-                          </span>
+                {/* Add Campaign Form - Collapsible */}
+                {showCampaignForm && (
+                  <div className="rounded-3xl border-2 border-fuchsia-200 bg-gradient-to-br from-fuchsia-50 to-white p-6 shadow-sm">
+                    <div className="flex items-center justify-between mb-6">
+                      <h3 className="text-lg font-semibold text-slate-900">Create New Campaign</h3>
+                      <button
+                        type="button"
+                        onClick={() => setShowCampaignForm(false)}
+                        className="text-slate-400 hover:text-slate-600 text-2xl"
+                      >
+                        ×
+                      </button>
+                    </div>
+
+                    <form className="grid gap-4" onSubmit={submitPromotionalCampaign}>
+                      {/* Campaign Type & Status */}
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-sm font-semibold text-slate-700 mb-2">Campaign Type</label>
+                          <select
+                            className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-fuchsia-500"
+                            value={newCampaign.campaignType}
+                            onChange={(event) => setNewCampaign((prev) => ({ ...prev, campaignType: event.target.value }))}
+                          >
+                            <option>Offer</option>
+                            <option>Coupon</option>
+                            <option>Bulk Discount</option>
+                          </select>
                         </div>
-
-                        <div className="mt-3 flex flex-wrap gap-2">
-                          {campaign.status !== 'Active' && (
-                            <button type="button" onClick={() => updateCampaignStatus(campaign._id, 'Active')} className="rounded-lg bg-emerald-100 px-2.5 py-1 text-xs font-semibold text-emerald-700 hover:bg-emerald-200">Activate</button>
-                          )}
-                          {campaign.status !== 'Inactive' && (
-                            <button type="button" onClick={() => updateCampaignStatus(campaign._id, 'Inactive')} className="rounded-lg bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-200">Deactivate</button>
-                          )}
-                          <button type="button" onClick={() => deleteCampaign(campaign._id)} className="rounded-lg bg-rose-100 px-2.5 py-1 text-xs font-semibold text-rose-700 hover:bg-rose-200">Delete</button>
+                        <div>
+                          <label className="block text-sm font-semibold text-slate-700 mb-2">Status</label>
+                          <select
+                            className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-fuchsia-500"
+                            value={newCampaign.status}
+                            onChange={(event) => setNewCampaign((prev) => ({ ...prev, status: event.target.value }))}
+                          >
+                            <option>Active</option>
+                            <option>Inactive</option>
+                            <option>Scheduled</option>
+                          </select>
                         </div>
                       </div>
-                    ))}
+
+                      {/* Title & Description */}
+                      <div>
+                        <label className="block text-sm font-semibold text-slate-700 mb-2">Campaign Title</label>
+                        <input
+                          type="text"
+                          placeholder="e.g., Summer Sale 50% Off"
+                          className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-fuchsia-500"
+                          value={newCampaign.title}
+                          onChange={(event) => setNewCampaign((prev) => ({ ...prev, title: event.target.value }))}
+                          required
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-semibold text-slate-700 mb-2">Description</label>
+                        <textarea
+                          rows={2}
+                          placeholder="Describe your campaign..."
+                          className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-fuchsia-500"
+                          value={newCampaign.description}
+                          onChange={(event) => setNewCampaign((prev) => ({ ...prev, description: event.target.value }))}
+                        />
+                      </div>
+
+                      {/* Coupon Code (if applicable) */}
+                      {newCampaign.campaignType === 'Coupon' && (
+                        <div>
+                          <label className="block text-sm font-semibold text-slate-700 mb-2">Coupon Code</label>
+                          <input
+                            type="text"
+                            placeholder="SAVE20"
+                            className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm uppercase focus:outline-none focus:ring-2 focus:ring-fuchsia-500"
+                            value={newCampaign.couponCode}
+                            onChange={(event) => setNewCampaign((prev) => ({ ...prev, couponCode: event.target.value.toUpperCase() }))}
+                            required
+                          />
+                        </div>
+                      )}
+
+                      {/* Discount Settings */}
+                      <div>
+                        <label className="block text-sm font-semibold text-slate-700 mb-3">Discount Settings</label>
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <label className="block text-xs text-slate-600 mb-1">Type</label>
+                            <select
+                              className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-fuchsia-500"
+                              value={newCampaign.discountType}
+                              onChange={(event) => setNewCampaign((prev) => ({ ...prev, discountType: event.target.value }))}
+                            >
+                              <option>Percentage</option>
+                              <option>Flat</option>
+                            </select>
+                          </div>
+                          <div>
+                            <label className="block text-xs text-slate-600 mb-1">Value</label>
+                            <input
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              placeholder="Amount or %"
+                              className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-fuchsia-500"
+                              value={newCampaign.discountValue}
+                              onChange={(event) => setNewCampaign((prev) => ({ ...prev, discountValue: event.target.value }))}
+                              required
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Constraints */}
+                      <div>
+                        <label className="block text-sm font-semibold text-slate-700 mb-3">Constraints</label>
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <label className="block text-xs text-slate-600 mb-1">Min Order Amount</label>
+                            <input
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              placeholder="₹0"
+                              className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-fuchsia-500"
+                              value={newCampaign.minOrderAmount}
+                              onChange={(event) => setNewCampaign((prev) => ({ ...prev, minOrderAmount: event.target.value }))}
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs text-slate-600 mb-1">Max Discount Cap</label>
+                            <input
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              placeholder="₹0"
+                              className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-fuchsia-500"
+                              value={newCampaign.maxDiscountAmount}
+                              onChange={(event) => setNewCampaign((prev) => ({ ...prev, maxDiscountAmount: event.target.value }))}
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Validity Period */}
+                      <div>
+                        <label className="block text-sm font-semibold text-slate-700 mb-3">Validity Period</label>
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <label className="block text-xs text-slate-600 mb-1">Valid From</label>
+                            <input
+                              type="date"
+                              className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-fuchsia-500"
+                              value={newCampaign.validFrom}
+                              onChange={(event) => setNewCampaign((prev) => ({ ...prev, validFrom: event.target.value }))}
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs text-slate-600 mb-1">Valid Till</label>
+                            <input
+                              type="date"
+                              className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-fuchsia-500"
+                              value={newCampaign.validTill}
+                              onChange={(event) => setNewCampaign((prev) => ({ ...prev, validTill: event.target.value }))}
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Target Scope */}
+                      <div>
+                        <label className="block text-sm font-semibold text-slate-700 mb-3">Target Scope</label>
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <label className="block text-xs text-slate-600 mb-1">Apply To</label>
+                            <select
+                              className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-fuchsia-500"
+                              value={newCampaign.targetScope}
+                              onChange={(event) => setNewCampaign((prev) => ({ ...prev, targetScope: event.target.value }))}
+                            >
+                              <option>All</option>
+                              <option>Category</option>
+                              <option>Medicine</option>
+                            </select>
+                          </div>
+                          <div>
+                            <label className="block text-xs text-slate-600 mb-1">Specific Item (Optional)</label>
+                            <input
+                              type="text"
+                              placeholder="Category/Medicine ID"
+                              className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-fuchsia-500"
+                              value={newCampaign.targetValue}
+                              onChange={(event) => setNewCampaign((prev) => ({ ...prev, targetValue: event.target.value }))}
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Bulk Discount Options */}
+                      {newCampaign.campaignType === 'Bulk Discount' && (
+                        <div>
+                          <label className="block text-sm font-semibold text-slate-700 mb-3">Bulk Discount Terms</label>
+                          <div className="grid grid-cols-3 gap-3">
+                            <div>
+                              <label className="block text-xs text-slate-600 mb-1">Min Qty</label>
+                              <input
+                                type="number"
+                                min="0"
+                                placeholder="Minimum"
+                                className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-fuchsia-500"
+                                value={newCampaign.bulkMinQuantity}
+                                onChange={(event) => setNewCampaign((prev) => ({ ...prev, bulkMinQuantity: event.target.value }))}
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-xs text-slate-600 mb-1">Buy Qty</label>
+                              <input
+                                type="number"
+                                min="0"
+                                placeholder="To Buy"
+                                className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-fuchsia-500"
+                                value={newCampaign.bulkBuyQuantity}
+                                onChange={(event) => setNewCampaign((prev) => ({ ...prev, bulkBuyQuantity: event.target.value }))}
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-xs text-slate-600 mb-1">Get Qty</label>
+                              <input
+                                type="number"
+                                min="0"
+                                placeholder="Get Free"
+                                className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-fuchsia-500"
+                                value={newCampaign.bulkGetQuantity}
+                                onChange={(event) => setNewCampaign((prev) => ({ ...prev, bulkGetQuantity: event.target.value }))}
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Additional Settings */}
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-sm font-semibold text-slate-700 mb-2">Usage Limit</label>
+                          <input
+                            type="number"
+                            min="0"
+                            placeholder="0 = Unlimited"
+                            className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-fuchsia-500"
+                            value={newCampaign.usageLimit}
+                            onChange={(event) => setNewCampaign((prev) => ({ ...prev, usageLimit: event.target.value }))}
+                          />
+                        </div>
+                        <div className="flex items-end">
+                          <label className="inline-flex items-center gap-3 rounded-xl border border-slate-200 px-3 py-2.5 text-sm text-slate-700 w-full cursor-pointer hover:bg-slate-50">
+                            <input
+                              type="checkbox"
+                              className="w-4 h-4 rounded cursor-pointer"
+                              checked={newCampaign.autoApply}
+                              onChange={(event) => setNewCampaign((prev) => ({ ...prev, autoApply: event.target.checked }))}
+                            />
+                            <span className="font-medium">Auto Apply</span>
+                          </label>
+                        </div>
+                      </div>
+
+                      {/* Submit Buttons */}
+                      <div className="flex gap-3 pt-4">
+                        <button
+                          type="submit"
+                          className="flex-1 rounded-xl bg-fuchsia-600 px-4 py-3 font-semibold text-white hover:bg-fuchsia-700 transition-colors"
+                        >
+                          Create Campaign
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setShowCampaignForm(false)}
+                          className="flex-1 rounded-xl border border-slate-200 px-4 py-3 font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </form>
                   </div>
+                )}
+
+                {/* Campaigns List */}
+                <div>
+                  <div className="mb-4 flex items-center justify-between">
+                    <h3 className="text-lg font-semibold text-slate-900">All Campaigns</h3>
+                    <button
+                      type="button"
+                      onClick={loadPromotionalCampaigns}
+                      className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
+                    >
+                      Refresh
+                    </button>
+                  </div>
+
+                  {campaignsLoading ? (
+                    <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center">
+                      <p className="text-sm text-slate-500">Loading campaigns...</p>
+                    </div>
+                  ) : campaigns.length === 0 ? (
+                    <div className="rounded-2xl border-2 border-dashed border-slate-300 bg-slate-50 p-12 text-center">
+                      <BadgePercent className="mx-auto text-slate-400 mb-3" size={40} />
+                      <p className="text-base font-semibold text-slate-600">No campaigns yet</p>
+                      <p className="text-sm text-slate-500 mt-1">Create your first promotional campaign to get started</p>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+                      {campaigns.map((campaign) => (
+                        <div
+                          key={campaign._id}
+                          className="rounded-2xl border border-slate-200 bg-white p-5 hover:shadow-md transition-shadow"
+                        >
+                          {/* Header Badge */}
+                          <div className="flex items-start justify-between gap-2 mb-3">
+                            <div className="flex-1">
+                              <span className={`inline-block rounded-full px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider ${
+                                campaign.status === 'Active' ? 'bg-emerald-100 text-emerald-700' :
+                                campaign.status === 'Scheduled' ? 'bg-blue-100 text-blue-700' :
+                                campaign.status === 'Inactive' ? 'bg-slate-100 text-slate-700' :
+                                'bg-amber-100 text-amber-700'
+                              }`}>
+                                {campaign.status}
+                              </span>
+                            </div>
+                            <span className={`rounded-full p-2 ${
+                              campaign.campaignType === 'Coupon' ? 'bg-purple-100' :
+                              campaign.campaignType === 'Offer' ? 'bg-fuchsia-100' :
+                              'bg-orange-100'
+                            }`}>
+                              <BadgePercent size={16} className={
+                                campaign.campaignType === 'Coupon' ? 'text-purple-600' :
+                                campaign.campaignType === 'Offer' ? 'text-fuchsia-600' :
+                                'text-orange-600'
+                              } />
+                            </span>
+                          </div>
+
+                          {/* Campaign Info */}
+                          <h4 className="font-bold text-slate-900 text-base mb-1">{campaign.title}</h4>
+                          <div className="flex items-center gap-2 mb-3">
+                            <span className="text-xs font-semibold text-slate-600 bg-slate-100 px-2 py-1 rounded-full">
+                              {campaign.campaignType}
+                            </span>
+                            <span className="text-sm font-bold text-fuchsia-600">
+                              {campaign.discountValue}{campaign.discountType === 'Percentage' ? '%' : ' ₹'} off
+                            </span>
+                          </div>
+
+                          {/* Description */}
+                          {campaign.description && (
+                            <p className="text-xs text-slate-600 mb-3 line-clamp-2">{campaign.description}</p>
+                          )}
+
+                          {/* Coupon Code */}
+                          {campaign.couponCode && (
+                            <div className="mb-3 rounded-lg bg-purple-50 p-2 text-center border border-purple-200">
+                              <p className="text-[10px] text-purple-600 font-semibold uppercase">Code</p>
+                              <p className="text-sm font-bold text-purple-700 tracking-wider">{campaign.couponCode}</p>
+                            </div>
+                          )}
+
+                          {/* Key Details */}
+                          <div className="mb-4 space-y-1 text-xs text-slate-600">
+                            {campaign.minOrderAmount > 0 && (
+                              <p>• Min Order: ₹{campaign.minOrderAmount}</p>
+                            )}
+                            {campaign.maxDiscountAmount > 0 && (
+                              <p>• Max Discount: ₹{campaign.maxDiscountAmount}</p>
+                            )}
+                            {campaign.usageLimit > 0 && (
+                              <p>• Usage Limit: {campaign.usageLimit}</p>
+                            )}
+                            {campaign.validFrom && (
+                              <p>• Valid: {formatShortDate(campaign.validFrom)} - {formatShortDate(campaign.validTill)}</p>
+                            )}
+                          </div>
+
+                          {/* Action Buttons */}
+                          <div className="flex gap-2">
+                            {campaign.status !== 'Active' && (
+                              <button
+                                type="button"
+                                onClick={() => updateCampaignStatus(campaign._id, 'Active')}
+                                className="flex-1 rounded-lg bg-emerald-100 px-2.5 py-2 text-xs font-semibold text-emerald-700 hover:bg-emerald-200 transition-colors"
+                              >
+                                Activate
+                              </button>
+                            )}
+                            {campaign.status !== 'Inactive' && (
+                              <button
+                                type="button"
+                                onClick={() => updateCampaignStatus(campaign._id, 'Inactive')}
+                                className="flex-1 rounded-lg bg-slate-100 px-2.5 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-200 transition-colors"
+                              >
+                                Deactivate
+                              </button>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => deleteCampaign(campaign._id)}
+                              className="flex-1 rounded-lg bg-rose-100 px-2.5 py-2 text-xs font-semibold text-rose-700 hover:bg-rose-200 transition-colors"
+                            >
+                              Delete
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
             )}

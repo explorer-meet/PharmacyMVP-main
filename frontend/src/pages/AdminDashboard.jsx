@@ -1,9 +1,8 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { Store, PlusSquare, ShieldCheck, BarChart3, ClipboardCheck, FileText } from 'lucide-react';
 import { baseURL } from '../main';
-import { use } from 'react';
 
 const AdminDashboard = () => {
   const navigate = useNavigate();
@@ -38,11 +37,6 @@ const AdminDashboard = () => {
   const activeStores = stores.filter((store) => store.status === 'Active').length;
   const inactiveStores = stores.length - activeStores;
   const pendingRequests = storeRequests.filter((req) => req.status === 'pending').length;
-  const [confirmBox, setConfirmBox] = useState({
-  show: false,
-  message: "",
-  onConfirm: null,
-});
 
   const resetStoreForm = () => {
     setStoreForm({
@@ -197,7 +191,7 @@ const AdminDashboard = () => {
     const newStatus = store.status === 'Active' ? 'Inactive' : 'Active';
 
     try {
-      const res = await axios.patch(
+      await axios.patch(
         `${baseURL}/stores/${store._id}/status`,
         { status: newStatus },
         {

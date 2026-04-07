@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import axios from 'axios';
-import { Activity, Calendar, Pill, FileText, Clock, User, Mail, Phone, Menu, X, Home, CircleUser as UserCircle, ShoppingBag, Syringe, Bell, MessageSquare, Mail as MailIcon, Pencil, ClipboardList, DollarSign, Package, Truck, ChevronDown, ChevronUp, CreditCard, Plus, Minus, Trash2, CheckCircle2, Star, AlertTriangle, Info, Download } from 'lucide-react';
+import { Activity, Calendar, Pill, FileText, Clock, User, Menu, X, Home, CircleUser as UserCircle, ShoppingBag, Syringe, Bell, MessageSquare, Mail as MailIcon, Pencil, ClipboardList, DollarSign, Package, Truck, ChevronDown, ChevronUp, CreditCard, Plus, Minus, Trash2, CheckCircle2, Star, AlertTriangle, Info, Download } from 'lucide-react';
 import { baseURL } from '../main';
 import Loader from '../components/Loader';
 import PrescriptionDialog from '../components/PrescriptionDialog';
+import html2canvas from 'html2canvas';
+import jsPDF from 'jspdf';
 
 const Dashboard = () => {
     const latestOrderStorageKey = 'medVisionLatestOrderId';
@@ -49,6 +51,8 @@ const Dashboard = () => {
     const [prescriptionRequests, setPrescriptionRequests] = useState([]);
     const [prescriptionsLoading, setPrescriptionsLoading] = useState(false);
     const [expandedDashboardOrder, setExpandedDashboardOrder] = useState(null);
+    const [managedDashboardOrder, setManagedDashboardOrder] = useState(null);
+    const [downloadingOrderId, setDownloadingOrderId] = useState(null);
     const [isEditingProfile, setIsEditingProfile] = useState(false);
     const [isProfileSaving, setIsProfileSaving] = useState(false);
     const [profileForm, setProfileForm] = useState({
@@ -1084,22 +1088,33 @@ const Dashboard = () => {
         return parsed.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: '2-digit' });
     };
 
+    const formatVaccinationDateLabel = (value) => {
+        if (!value) return 'Select the date';
+        const parsed = new Date(value);
+        if (Number.isNaN(parsed.getTime())) return value;
+        return parsed.toLocaleDateString('en-IN', {
+            day: '2-digit',
+            month: 'short',
+            year: 'numeric',
+        });
+    };
+
+    const openVaccinationDatePicker = (vaccinationId) => {
+        const input = document.getElementById(`vac-date-${vaccinationId}`);
+        if (!input) return;
+
+        if (typeof input.showPicker === 'function') {
+            input.showPicker();
+            return;
+        }
+
+        input.focus();
+        input.click();
+    };
+
     const formatUsd = (value) => {
         const amount = Number(value) || 0;
         return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
-    };
-
-    const WHATSAPP_SUPPORT_NUMBER = '918758770402';
-    const openWhatsAppOrderChat = (order) => {
-        if (!order) return;
-        const orderId = order.id || 'N/A';
-        const status = order.trackingStatus || order.status || 'Order Placed';
-        const orderDate = formatDashboardOrderDate(order.date);
-
-        const message = `Hello MedVision, I want a tracking update for Order #${orderId}. Current status shown: ${status}. Order date: ${orderDate}.`;
-
-        const waUrl = `https://wa.me/${WHATSAPP_SUPPORT_NUMBER}?text=${encodeURIComponent(message)}`;
-        window.open(waUrl, '_blank', 'noopener,noreferrer');
     };
 
     const getPaymentMeta = (paymentType) => {
@@ -1144,8 +1159,109 @@ const Dashboard = () => {
         setExpandedDashboardOrder((prev) => (prev === orderId ? null : orderId));
     };
 
+    const toggleDashboardOrderManagement = (orderId) => {
+        setManagedDashboardOrder((prev) => (prev === orderId ? null : orderId));
+    };
+
+        const normalizeDashboardItems = (order) => {
+                return (order?.items || []).map((item) => {
+                        const qty = Number(item?.quantity ?? 1);
+                        const price = Number(item?.price ?? item?.totalPrice ?? 0);
+                        return {
+                                name: item?.name || item?.medicine || 'Medicine',
+                                quantity: Number.isFinite(qty) && qty > 0 ? qty : 1,
+                                price: Number.isFinite(price) ? price : 0,
+                        };
+                });
+        };
+
+        const downloadDashboardOrderInvoice = async (order) => {
+                if (!order?.id) return;
+
+                const items = normalizeDashboardItems(order);
+                const subtotalAmount = items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+                const totalAmount = Number(order?.totalAmount || subtotalAmount || 0);
+                const discountAmount = Math.max(0, subtotalAmount - totalAmount);
+                const finalAmount = Math.max(0, subtotalAmount - discountAmount);
+
+                try {
+                        setDownloadingOrderId(order.id);
+
+                        const invoiceContent = document.createElement('div');
+                        invoiceContent.style.cssText = 'position: absolute; left: -9999px; width: 850px; background: white; padding: 40px; font-family: Arial, sans-serif;';
+
+                        const invoiceHTML = `
+                            <div style="max-width: 850px; margin: 0 auto; background-color: white; padding: 40px;">
+                                <div style="text-align: center; margin-bottom: 30px; border-bottom: 3px solid #0f766e; padding-bottom: 20px;">
+                                    <h1 style="color: #0f766e; margin: 0; font-size: 28px;">INVOICE</h1>
+                                    <p style="margin: 10px 0; color: #666; font-size: 14px;">Pharmacy MVP - Your Trusted Medicine Store</p>
+                                </div>
+
+                                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 24px; padding: 16px; background-color: #f8fafc; border-radius: 10px;">
+                                    <div><p style="font-size:12px;color:#666;margin:0 0 4px 0;">ORDER ID</p><p style="font-size:16px;margin:0;font-weight:600;">#${order.id}</p></div>
+                                    <div><p style="font-size:12px;color:#666;margin:0 0 4px 0;">DATE</p><p style="font-size:16px;margin:0;font-weight:600;">${formatDashboardOrderDate(order.date)}</p></div>
+                                    <div><p style="font-size:12px;color:#666;margin:0 0 4px 0;">CUSTOMER</p><p style="font-size:16px;margin:0;font-weight:600;">${userData?.name || 'N/A'}</p></div>
+                                    <div><p style="font-size:12px;color:#666;margin:0 0 4px 0;">PAYMENT</p><p style="font-size:16px;margin:0;font-weight:600;">${getPaymentMeta(order.payment).label}</p></div>
+                                </div>
+
+                                <table style="width:100%; border-collapse: collapse; margin-bottom:24px;">
+                                    <thead>
+                                        <tr style="background:#0f766e;color:#fff;">
+                                            <th style="padding:10px;text-align:left;">Item</th>
+                                            <th style="padding:10px;text-align:left;">Qty</th>
+                                            <th style="padding:10px;text-align:left;">Unit Price</th>
+                                            <th style="padding:10px;text-align:left;">Total</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        ${items.map((item) => `
+                                            <tr style="border-bottom:1px solid #e2e8f0;">
+                                                <td style="padding:10px;">${item.name}</td>
+                                                <td style="padding:10px;">${item.quantity}</td>
+                                                <td style="padding:10px;">INR ${item.price.toFixed(2)}</td>
+                                                <td style="padding:10px;">INR ${(item.price * item.quantity).toFixed(2)}</td>
+                                            </tr>
+                                        `).join('')}
+                                    </tbody>
+                                </table>
+
+                                <div style="margin-left:auto; width:320px; border:1px solid #d1fae5; border-radius:10px; padding:14px; background:#f0fdfa;">
+                                    <div style="display:flex;justify-content:space-between;padding:6px 0;"><span>Subtotal</span><span>INR ${subtotalAmount.toFixed(2)}</span></div>
+                                    ${discountAmount > 0 ? `<div style="display:flex;justify-content:space-between;padding:6px 0;color:#0f766e;"><span>Discount</span><span>- INR ${discountAmount.toFixed(2)}</span></div>` : ''}
+                                    <div style="display:flex;justify-content:space-between;padding:10px 0 6px 0;border-top:2px solid #0f766e;font-weight:700;"><span>Total</span><span>INR ${finalAmount.toFixed(2)}</span></div>
+                                </div>
+                            </div>
+                        `;
+
+                        invoiceContent.innerHTML = invoiceHTML;
+                        document.body.appendChild(invoiceContent);
+
+                        const canvas = await html2canvas(invoiceContent, {
+                                backgroundColor: '#ffffff',
+                                scale: 2,
+                                logging: false,
+                                useCORS: true,
+                        });
+
+                        const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+                        const imgData = canvas.toDataURL('image/png');
+                        const pdfWidth = pdf.internal.pageSize.getWidth();
+                        const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+
+                        pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+                        pdf.save(`Invoice_${order.id}_${new Date().getTime()}.pdf`);
+
+                        document.body.removeChild(invoiceContent);
+                } catch (error) {
+                        console.error('Error downloading dashboard invoice:', error);
+                        alert('Failed to download invoice. Please try again.');
+                } finally {
+                        setDownloadingOrderId(null);
+                }
+    };
+
     const sidebarItems = [
-        { icon: Home,        text: "Dashboard",       isActive: !showPrescriptions && !showMyOrders && !showMyVaccinations && !showProfile && !showNotifications && !showFeedback && !showRaiseQuery, iconBg: "bg-cyan-500/20",    color: "text-cyan-400",    onClick: () => { resetDashboardPanels(); setSidebarOpen(false); } },
+        { icon: Home,        text: "Dashboard",       isActive: !showPrescriptions && !showMyOrders && !showMyVaccinations && !showHealthManagement && !showProfile && !showNotifications && !showFeedback && !showRaiseQuery, iconBg: "bg-cyan-500/20",    color: "text-cyan-400",    onClick: () => { resetDashboardPanels(); setSidebarOpen(false); } },
         { icon: Pill,        text: "My Prescriptions", isActive: showPrescriptions,   iconBg: "bg-sky-500/20",     color: "text-sky-400",     onClick: () => { const n = !showPrescriptions;  resetDashboardPanels(); setShowPrescriptions(n); if (n) { fetchMyPrescriptionRequests(); } setSidebarOpen(false); } },
         { icon: ShoppingBag, text: "My Orders",        isActive: showMyOrders,        iconBg: "bg-emerald-500/20", color: "text-emerald-400", onClick: () => { const n = !showMyOrders;        resetDashboardPanels(); setShowMyOrders(n);        setSidebarOpen(false); } },
         { icon: Syringe,     text: "My Vaccinations",  isActive: showMyVaccinations,  iconBg: "bg-teal-500/20",    color: "text-teal-400",    onClick: () => { const n = !showMyVaccinations;  resetDashboardPanels(); setShowMyVaccinations(n); if (n) { loadVaccinations(); } setSidebarOpen(false); } },
@@ -2573,31 +2689,99 @@ const Dashboard = () => {
                                                         <p className="text-lg font-bold text-gray-900">{formatUsd(order.totalAmount)}</p>
                                                     </div>
 
-                                                    <div className="flex items-center gap-3 flex-wrap">
+                                                    <div className="flex items-center gap-2 flex-wrap">
                                                         <button
-                                                            className="bg-slate-900 hover:bg-slate-800 text-white py-2.5 px-4 rounded-xl shadow transition-colors"
+                                                            className="group inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:border-slate-300 hover:bg-slate-50 transition"
                                                             onClick={() => navigate(`/tracking/${order.id}`)}
+                                                            title="Track order"
                                                         >
-                                                            Track Order
+                                                            <Truck className="w-4 h-4 text-slate-600 group-hover:text-slate-800" />
+                                                            <span className="hidden sm:inline">Track</span>
                                                         </button>
+
                                                         <button
-                                                            className="bg-gray-100 hover:bg-gray-200 text-gray-800 py-2.5 px-4 rounded-xl shadow transition-colors inline-flex items-center gap-1.5"
+                                                            className={`group inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-sm font-medium transition ${
+                                                                managedDashboardOrder === order.id
+                                                                    ? 'border-blue-300 bg-blue-50 text-blue-700'
+                                                                    : 'border-slate-200 bg-white text-slate-700 hover:border-blue-200 hover:bg-blue-50/60'
+                                                            }`}
+                                                            onClick={() => toggleDashboardOrderManagement(order.id)}
+                                                            title="Manage order"
+                                                        >
+                                                            <ClipboardList className="w-4 h-4" />
+                                                            <span className="hidden sm:inline">Manage</span>
+                                                        </button>
+
+                                                        <button
+                                                            className="group inline-flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-700 hover:bg-emerald-100 transition disabled:opacity-60"
+                                                            onClick={() => downloadDashboardOrderInvoice(order)}
+                                                            disabled={downloadingOrderId === order.id}
+                                                            title="Download invoice"
+                                                        >
+                                                            <Download className={`w-4 h-4 ${downloadingOrderId === order.id ? 'animate-spin' : ''}`} />
+                                                            <span className="hidden sm:inline">{downloadingOrderId === order.id ? 'Downloading' : 'Invoice'}</span>
+                                                        </button>
+
+                                                        <button
+                                                            className={`group inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-sm font-medium transition ${
+                                                                expandedDashboardOrder === order.id
+                                                                    ? 'border-purple-300 bg-purple-50 text-purple-700'
+                                                                    : 'border-slate-200 bg-white text-slate-700 hover:border-purple-200 hover:bg-purple-50/60'
+                                                            }`}
                                                             onClick={() => toggleDashboardOrderItems(order.id)}
+                                                            title="View order items"
                                                         >
                                                             {expandedDashboardOrder === order.id ? (
-                                                                <>
-                                                                    <ChevronUp className="w-4 h-4" /> Hide Items
-                                                                </>
+                                                                <ChevronUp className="w-4 h-4" />
                                                             ) : (
-                                                                <>
-                                                                    <ChevronDown className="w-4 h-4" /> View Items
-                                                                </>
+                                                                <ChevronDown className="w-4 h-4" />
                                                             )}
+                                                            <span className="hidden sm:inline">Items</span>
                                                         </button>
                                                     </div>
                                                 </div>
                                                     );
                                                 })()}
+
+                                                {managedDashboardOrder === order.id && (
+                                                    <div className="mt-4 bg-gradient-to-br from-sky-50 to-cyan-50 p-4 rounded-xl border border-sky-200">
+                                                        <h3 className="font-semibold text-slate-800 mb-3 flex items-center gap-2">
+                                                            <ClipboardList className="w-4 h-4 text-sky-600" />
+                                                            Order Management - #{order.id}
+                                                        </h3>
+
+                                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
+                                                            <div className="rounded-lg border border-slate-200 bg-white px-3 py-2">
+                                                                <p className="text-xs text-slate-500">Status</p>
+                                                                <p className="text-sm font-semibold text-slate-800">{order.trackingStatus || order.status || 'Order Placed'}</p>
+                                                            </div>
+                                                            <div className="rounded-lg border border-slate-200 bg-white px-3 py-2">
+                                                                <p className="text-xs text-slate-500">Payment</p>
+                                                                <p className="text-sm font-semibold text-slate-800">{getPaymentMeta(order.payment).label}</p>
+                                                            </div>
+                                                            <div className="rounded-lg border border-slate-200 bg-white px-3 py-2">
+                                                                <p className="text-xs text-slate-500">Order Total</p>
+                                                                <p className="text-sm font-semibold text-slate-800">{formatUsd(order.totalAmount)}</p>
+                                                            </div>
+                                                        </div>
+
+                                                        <div className="rounded-lg border border-slate-200 bg-white p-3">
+                                                            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2">Order Items ({order.items?.length || 0})</p>
+                                                            {order.items?.length ? (
+                                                                <div className="space-y-2">
+                                                                    {order.items.map((item, idx) => (
+                                                                        <div key={idx} className="flex items-center justify-between text-sm rounded-lg border border-slate-100 px-3 py-2 bg-slate-50">
+                                                                            <span className="font-medium text-slate-700 truncate pr-3">{item.name || 'Unnamed Item'}</span>
+                                                                            <span className="text-slate-600">Qty {item.quantity || 1} - {formatUsd(item.price || 0)}</span>
+                                                                        </div>
+                                                                    ))}
+                                                                </div>
+                                                            ) : (
+                                                                <p className="text-sm text-slate-500">No items found for this order.</p>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                )}
 
                                                 {expandedDashboardOrder === order.id && (
                                                     <div className="mt-4 bg-gradient-to-br from-gray-50 to-gray-100 p-4 rounded-xl border border-gray-200">
@@ -2731,15 +2915,33 @@ const Dashboard = () => {
                                                             </td>
                                                             <td className="p-3">
                                                                 {isVaccinated ? (
-                                                                    <div className="flex items-center gap-1.5 bg-gray-50 border px-2 py-1 rounded-lg w-fit">
+                                                                    <div
+                                                                        role="button"
+                                                                        tabIndex={isSaving ? -1 : 0}
+                                                                        onClick={() => !isSaving && openVaccinationDatePicker(vaccine._id)}
+                                                                        onKeyDown={(e) => {
+                                                                            if (isSaving) return;
+                                                                            if (e.key === 'Enter' || e.key === ' ') {
+                                                                                e.preventDefault();
+                                                                                openVaccinationDatePicker(vaccine._id);
+                                                                            }
+                                                                        }}
+                                                                        className={`relative flex items-center gap-1.5 border px-2 py-1 rounded-lg w-fit cursor-pointer ${date ? 'bg-gray-50' : 'bg-teal-50 border-teal-200'}`}
+                                                                    >
                                                                         <Calendar size={13} className="text-gray-400 shrink-0" />
+                                                                        <span
+                                                                            className={`text-xs text-left ${isSaving ? 'opacity-50' : ''} ${date ? 'text-gray-700' : 'text-teal-700 font-semibold hover:underline'}`}
+                                                                        >
+                                                                            {formatVaccinationDateLabel(date)}
+                                                                        </span>
                                                                         <input
+                                                                            id={`vac-date-${vaccine._id}`}
                                                                             type="date"
                                                                             disabled={isSaving}
                                                                             value={date}
                                                                             max={new Date().toISOString().substring(0, 10)}
                                                                             onChange={e => handleVacDateChange(vaccine._id, e.target.value)}
-                                                                            className="bg-transparent outline-none text-xs text-gray-700 disabled:opacity-50"
+                                                                            className="absolute inset-0 opacity-0 pointer-events-none"
                                                                         />
                                                                     </div>
                                                                 ) : (

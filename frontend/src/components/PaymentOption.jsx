@@ -1,4 +1,3 @@
-import React from 'react';
 
 export function PaymentOption({ icon, title, description, selected, onClick }) {
   return (

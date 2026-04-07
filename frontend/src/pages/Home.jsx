@@ -113,20 +113,23 @@ const Home = () => {
         className="relative overflow-hidden px-4 sm:px-6 lg:px-16 pb-16 lg:pb-24"
         style={{ paddingTop: 'calc(var(--app-navbar-offset, 88px) + 1.5rem)' }}
       >
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_18%,rgba(56,189,248,0.25),transparent_35%),radial-gradient(circle_at_78%_18%,rgba(34,197,94,0.16),transparent_30%),radial-gradient(circle_at_55%_82%,rgba(14,165,233,0.16),transparent_30%)]" />
-        <div className="absolute -right-20 top-0 h-72 w-72 rounded-full bg-cyan-300/25 blur-3xl" />
-        <div className="absolute -left-12 bottom-0 h-80 w-80 rounded-full bg-sky-300/25 blur-3xl" />
+        {/* Animated gradient mesh */}
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_10%_10%,rgba(56,189,248,0.30),transparent_40%),radial-gradient(ellipse_at_85%_15%,rgba(34,197,94,0.20),transparent_35%),radial-gradient(ellipse_at_50%_90%,rgba(99,102,241,0.12),transparent_40%)]" />
+        <div className="absolute -right-20 top-0 h-96 w-96 rounded-full bg-cyan-300/20 blur-3xl animate-pulse" style={{ animationDuration: '6s' }} />
+        <div className="absolute -left-12 bottom-0 h-96 w-96 rounded-full bg-sky-300/20 blur-3xl animate-pulse" style={{ animationDuration: '8s', animationDelay: '2s' }} />
+        <div className="absolute right-1/3 top-1/2 h-64 w-64 rounded-full bg-emerald-200/15 blur-3xl animate-pulse" style={{ animationDuration: '10s', animationDelay: '1s' }} />
 
         <div className="relative z-10 mx-auto grid max-w-7xl items-center gap-10 lg:grid-cols-[1.1fr_0.9fr]">
           <div className="space-y-7 animate-fade-in-up">
-            <span className="inline-flex items-center gap-2 rounded-full border border-cyan-200 bg-white/70 px-4 py-1.5 text-xs font-semibold uppercase tracking-[0.2em] text-cyan-700 shadow-sm">
-              <Sparkles className="h-3.5 w-3.5" />
+            <span className="inline-flex items-center gap-2 rounded-full border border-cyan-200 bg-white/80 px-4 py-2 text-xs font-bold uppercase tracking-[0.2em] text-cyan-700 shadow-md shadow-cyan-100 backdrop-blur-sm">
+              <Sparkles className="h-3.5 w-3.5 text-cyan-500" />
               Smart Pharmacy Experience
+              <span className="ml-1 h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
             </span>
 
-            <h1 className="max-w-3xl text-4xl font-black leading-tight text-slate-900 md:text-6xl">
+            <h1 className="max-w-3xl text-4xl font-black leading-[1.08] text-slate-900 md:text-6xl">
               Medicines Delivered
-              <span className="block bg-gradient-to-r from-cyan-600 via-sky-600 to-emerald-500 bg-clip-text text-transparent">
+              <span className="block bg-gradient-to-r from-cyan-500 via-sky-500 to-emerald-400 bg-clip-text text-transparent pb-1">
                 Faster. Safer. Smarter.
               </span>
             </h1>
@@ -138,21 +141,22 @@ const Home = () => {
             <div className="flex flex-col gap-3 sm:flex-row">
               <button
                 onClick={handleOnlinePharmacy}
-                className="inline-flex items-center justify-center gap-2 rounded-xl bg-slate-900 px-7 py-3.5 text-sm font-semibold text-white shadow-lg shadow-slate-300 transition hover:-translate-y-0.5 hover:bg-slate-800"
+                className="group inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-br from-slate-900 to-slate-700 px-7 py-3.5 text-sm font-bold text-white shadow-lg shadow-slate-300/50 transition-all duration-200 hover:-translate-y-1 hover:shadow-xl hover:shadow-slate-400/30"
               >
                 <ShoppingCart className="h-5 w-5" />
                 Start Shopping
+                <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
               </button>
               <button
                 onClick={handlePrescriptionHelp}
-                className="inline-flex items-center justify-center gap-2 rounded-xl border border-violet-200 bg-violet-50 px-7 py-3.5 text-sm font-semibold text-violet-700 transition hover:bg-violet-100"
+                className="inline-flex items-center justify-center gap-2 rounded-xl border border-violet-200 bg-gradient-to-br from-violet-50 to-fuchsia-50 px-7 py-3.5 text-sm font-bold text-violet-700 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-violet-300 hover:shadow-md"
               >
                 <FileText className="h-5 w-5" />
                 Prescription Help
               </button>
               <button
                 onClick={handleEmergencyPharmacy}
-                className="inline-flex items-center justify-center gap-2 rounded-xl border border-cyan-300 bg-white px-7 py-3.5 text-sm font-semibold text-cyan-700 transition hover:bg-cyan-50"
+                className="inline-flex items-center justify-center gap-2 rounded-xl border border-cyan-200 bg-gradient-to-br from-cyan-50 to-sky-50 px-7 py-3.5 text-sm font-bold text-cyan-700 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-cyan-300 hover:shadow-md"
               >
                 <HeartPulse className="h-5 w-5" />
                 Emergency Guidance
@@ -160,83 +164,114 @@ const Home = () => {
             </div>
 
             <div className="grid grid-cols-3 gap-3 pt-5">
-              <div className="rounded-2xl border border-sky-100 bg-white/80 p-4 shadow-sm">
-                <p className="text-2xl font-bold text-sky-700">12K+</p>
-                <p className="mt-1 text-xs font-medium text-slate-500">Orders Delivered</p>
-              </div>
-              <div className="rounded-2xl border border-cyan-100 bg-white/80 p-4 shadow-sm">
-                <p className="text-2xl font-bold text-cyan-700">1.5L+</p>
-                <p className="mt-1 text-xs font-medium text-slate-500">Medicines Listed</p>
-              </div>
-              <div className="rounded-2xl border border-emerald-100 bg-white/80 p-4 shadow-sm">
-                <p className="text-2xl font-bold text-emerald-700">30 Min</p>
-                <p className="mt-1 text-xs font-medium text-slate-500">Avg Dispatch</p>
-              </div>
+              {[
+                { val: '12K+', label: 'Orders Delivered', from: 'from-sky-500', to: 'to-cyan-500', bg: 'bg-sky-50', border: 'border-sky-100' },
+                { val: '1.5L+', label: 'Medicines Listed', from: 'from-cyan-500', to: 'to-teal-500', bg: 'bg-cyan-50', border: 'border-cyan-100' },
+                { val: '30 Min', label: 'Avg Dispatch', from: 'from-emerald-500', to: 'to-green-500', bg: 'bg-emerald-50', border: 'border-emerald-100' },
+              ].map((s) => (
+                <div key={s.label} className={`rounded-2xl border ${s.border} ${s.bg} p-4 shadow-sm backdrop-blur-sm hover:shadow-md transition-shadow duration-200`}>
+                  <p className={`text-2xl font-black bg-gradient-to-r ${s.from} ${s.to} bg-clip-text text-transparent`}>{s.val}</p>
+                  <p className="mt-1 text-xs font-semibold text-slate-500">{s.label}</p>
+                </div>
+              ))}
             </div>
           </div>
 
           <div className="relative hidden lg:block animate-fade-in-right">
-            <div className="rounded-[2rem] border border-white/70 bg-white/80 p-7 shadow-2xl backdrop-blur-xl">
-              <div className="rounded-2xl bg-gradient-to-r from-slate-900 to-cyan-700 p-6 text-white">
-                <p className="text-xs uppercase tracking-[0.2em] text-cyan-200">Pharmacy Store Highlights</p>
-                <h3 className="mt-3 text-2xl font-bold">Everything You Need, Organized Better</h3>
-                <p className="mt-2 text-sm text-cyan-100">Explore medicine categories, discover essentials, and order confidently.</p>
+            <div className="relative overflow-hidden rounded-[2rem] border border-white/70 bg-white/80 p-7 shadow-2xl backdrop-blur-xl">
+              <div className="pointer-events-none absolute -top-14 -right-12 h-44 w-44 rounded-full bg-cyan-300/20 blur-3xl" />
+              <div className="pointer-events-none absolute -bottom-16 -left-10 h-44 w-44 rounded-full bg-emerald-300/20 blur-3xl" />
+
+              <div className="relative rounded-3xl bg-gradient-to-br from-slate-900 via-cyan-900 to-emerald-800 p-6 text-white shadow-xl">
+                <p className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.22em] text-cyan-100">
+                  <Sparkles className="h-3 w-3" />
+                  Pharmacy Store Highlights
+                </p>
+                <h3 className="mt-4 text-2xl font-black leading-tight">Everything You Need, Organized Better</h3>
+                <p className="mt-2 text-sm leading-6 text-cyan-100">Explore medicine categories, discover essentials, and order confidently.</p>
 
                 <div className="mt-5 grid grid-cols-2 gap-3">
-                  <div className="rounded-xl bg-white/10 px-3 py-3 text-sm">
-                    <p className="text-cyan-100">OTC & Wellness</p>
-                    <p className="font-semibold">18K+ products</p>
-                  </div>
-                  <div className="rounded-xl bg-white/10 px-3 py-3 text-sm">
-                    <p className="text-cyan-100">Prescription</p>
-                    <p className="font-semibold">Upload & verify</p>
-                  </div>
-                  <div className="rounded-xl bg-white/10 px-3 py-3 text-sm">
-                    <p className="text-cyan-100">Family Care</p>
-                    <p className="font-semibold">Daily essentials</p>
-                  </div>
-                  <div className="rounded-xl bg-white/10 px-3 py-3 text-sm">
-                    <p className="text-cyan-100">Devices</p>
-                    <p className="font-semibold">Monitors & kits</p>
-                  </div>
+                  {[
+                    { title: 'OTC & Wellness', sub: '18K+ products', dot: 'bg-sky-300' },
+                    { title: 'Prescription', sub: 'Upload & verify', dot: 'bg-violet-300' },
+                    { title: 'Family Care', sub: 'Daily essentials', dot: 'bg-emerald-300' },
+                    { title: 'Devices', sub: 'Monitors & kits', dot: 'bg-amber-300' },
+                  ].map((item) => (
+                    <div key={item.title} className="rounded-2xl border border-white/15 bg-white/10 px-3.5 py-3 text-sm backdrop-blur-sm transition-all duration-200 hover:bg-white/15">
+                      <p className="flex items-center gap-2 text-cyan-100">
+                        <span className={`h-2 w-2 rounded-full ${item.dot}`} />
+                        {item.title}
+                      </p>
+                      <p className="mt-1 font-bold text-white">{item.sub}</p>
+                    </div>
+                  ))}
                 </div>
               </div>
 
-              <div className="mt-5 grid grid-cols-2 gap-3">
-                <div className="rounded-2xl border border-slate-200 bg-white p-4">
-                  <img src={tracking} alt="tracking" className="h-10 w-10 object-contain" />
-                  <p className="mt-3 text-sm font-semibold text-slate-800">Store Categories</p>
-                  <p className="text-xs text-slate-500">Browse by needs: fever, cold, diabetes, immunity.</p>
+              <div className="relative mt-5 grid grid-cols-2 gap-3">
+                <div className="group rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md">
+                  <div className="inline-flex rounded-xl border border-cyan-100 bg-cyan-50 p-2">
+                    <img src={tracking} alt="tracking" className="h-8 w-8 object-contain" />
+                  </div>
+                  <p className="mt-3 text-sm font-bold text-slate-800">Store Categories</p>
+                  <p className="mt-1 text-xs leading-5 text-slate-500">Browse by needs: fever, cold, diabetes, immunity.</p>
                 </div>
-                <div className="rounded-2xl border border-slate-200 bg-white p-4">
-                  <img src={info} alt="info" className="h-10 w-10 object-contain" />
-                  <p className="mt-3 text-sm font-semibold text-slate-800">Smart Refill</p>
-                  <p className="text-xs text-slate-500">Reorder your routine medicines in a click.</p>
+                <div className="group rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md">
+                  <div className="inline-flex rounded-xl border border-emerald-100 bg-emerald-50 p-2">
+                    <img src={info} alt="info" className="h-8 w-8 object-contain" />
+                  </div>
+                  <p className="mt-3 text-sm font-bold text-slate-800">Smart Refill</p>
+                  <p className="mt-1 text-xs leading-5 text-slate-500">Reorder your routine medicines in a click.</p>
                 </div>
               </div>
 
-              <div className="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3">
-                <p className="text-xs font-semibold uppercase tracking-[0.15em] text-emerald-700">Most Ordered Today</p>
-                <p className="mt-1 text-sm text-emerald-800">Paracetamol, Vitamin D3, Cough Syrup, ORS Packs</p>
-              </div>
             </div>
           </div>
         </div>
       </section>
 
-      <section className="reveal-on-scroll px-4 sm:px-6 lg:px-16 pb-10">
+      {/* Trust strip marquee */}
+      <div className="overflow-hidden border-y border-slate-100 bg-white py-3">
+        <div className="flex animate-marquee whitespace-nowrap">
+          {[
+            '✅ 100% Genuine Medicines',
+            '🚚 Fast Doorstep Delivery',
+            '🔒 SSL Secured Payments',
+            '📋 Easy Prescription Upload',
+            '⏰ 24/7 Order Support',
+            '💊 1.5 Lakh+ Medicines',
+            '⭐ Trusted by 50K+ Patients',
+            '🏥 Multiple Verified Stores',
+            '✅ 100% Genuine Medicines',
+            '🚚 Fast Doorstep Delivery',
+            '🔒 SSL Secured Payments',
+            '📋 Easy Prescription Upload',
+            '⏰ 24/7 Order Support',
+            '💊 1.5 Lakh+ Medicines',
+          ].map((item, i) => (
+            <span key={i} className="mx-6 text-xs font-semibold text-slate-600 tracking-wide">{item}</span>
+          ))}
+        </div>
+      </div>
+
+      <section className="reveal-on-scroll px-4 sm:px-6 lg:px-16 py-10">
         <div className="mx-auto grid max-w-7xl grid-cols-2 gap-4 md:grid-cols-4">
           {[
-            { icon: Clock, label: "24/7 Order Support", tone: "text-sky-700 bg-sky-100 border-sky-200" },
-            { icon: Shield, label: "100% Genuine Medicines", tone: "text-cyan-700 bg-cyan-100 border-cyan-200" },
-            { icon: Truck, label: "Fast Doorstep Delivery", tone: "text-emerald-700 bg-emerald-100 border-emerald-200" },
-            { icon: FileText, label: "Quick Prescription Upload", tone: "text-violet-700 bg-violet-100 border-violet-200" },
+            { icon: Clock, label: '24/7 Order Support', sub: 'Always available', iconBg: 'bg-sky-100 text-sky-600', border: 'border-sky-100', delay: '0ms' },
+            { icon: Shield, label: '100% Genuine Medicines', sub: 'Verified sources', iconBg: 'bg-cyan-100 text-cyan-600', border: 'border-cyan-100', delay: '80ms' },
+            { icon: Truck, label: 'Fast Doorstep Delivery', sub: 'Avg 30-min dispatch', iconBg: 'bg-emerald-100 text-emerald-600', border: 'border-emerald-100', delay: '160ms' },
+            { icon: FileText, label: 'Prescription Upload', sub: 'AI-assisted auto-fill', iconBg: 'bg-violet-100 text-violet-600', border: 'border-violet-100', delay: '240ms' },
           ].map((feature, i) => (
-            <div key={i} className="lift-on-hover rounded-2xl border border-slate-100 bg-white p-4 shadow-sm transition hover:-translate-y-1 hover:shadow-md">
-              <div className={`mb-3 inline-flex rounded-xl border p-2.5 ${feature.tone}`}>
+            <div
+              key={i}
+              className={`group rounded-2xl border ${feature.border} bg-white p-5 shadow-sm transition-all duration-300 hover:-translate-y-1.5 hover:shadow-lg`}
+              style={{ transitionDelay: feature.delay }}
+            >
+              <div className={`mb-4 inline-flex rounded-xl p-3 ${feature.iconBg} transition-transform duration-300 group-hover:scale-110`}>
                 <feature.icon className="h-5 w-5" />
               </div>
-              <p className="text-sm font-semibold text-slate-800">{feature.label}</p>
+              <p className="text-sm font-bold text-slate-800">{feature.label}</p>
+              <p className="mt-1 text-xs text-slate-500">{feature.sub}</p>
             </div>
           ))}
         </div>
@@ -367,71 +402,88 @@ const Home = () => {
             {[
               {
                 img: info,
-                title: "Search Medicines",
-                desc: "Find medicines by name, compare options, and add items to your cart in seconds.",
+                title: 'Search Medicines',
+                desc: 'Find medicines by name, compare options, and add items to your cart in seconds.',
                 onClick: handleOnlinePharmacy,
-                icon: <Search className="h-8 w-8 text-sky-600" />,
-                accent: "from-sky-50 to-cyan-50",
-                cta: "Open Pharmacy",
+                iconEl: <Search className="h-8 w-8 text-sky-600" />,
+                accent: 'from-sky-50 via-cyan-50 to-white',
+                ring: 'ring-sky-200',
+                badge: '🛒',
+                cta: 'Open Pharmacy',
+                ctaColor: 'text-sky-700',
               },
               {
                 img: tracking,
-                title: "Prescription Help",
-                desc: "Upload prescriptions, review active meds, and get guided support from your dashboard.",
+                title: 'Prescription Help',
+                desc: 'Upload prescriptions, review active meds, and get guided support from your dashboard.',
                 onClick: handlePrescriptionHelp,
-                icon: <FileText className="h-8 w-8 text-violet-600" />,
-                accent: "from-violet-50 to-fuchsia-50",
-                cta: "Open Prescription Help",
+                iconEl: <FileText className="h-8 w-8 text-violet-600" />,
+                accent: 'from-violet-50 via-fuchsia-50 to-white',
+                ring: 'ring-violet-200',
+                badge: '📋',
+                cta: 'Open Prescription Help',
+                ctaColor: 'text-violet-700',
               },
               {
                 img: emergency,
-                title: "Emergency Guidance",
-                desc: "Access first-step medicine guidance and emergency support instructions quickly.",
+                title: 'Emergency Guidance',
+                desc: 'Access first-step medicine guidance and emergency support instructions quickly.',
                 onClick: handleEmergencyPharmacy,
-                icon: <Shield className="h-8 w-8 text-emerald-600" />,
-                accent: "from-emerald-50 to-teal-50",
-                cta: "Open Emergency Help",
+                iconEl: <Shield className="h-8 w-8 text-emerald-600" />,
+                accent: 'from-emerald-50 via-teal-50 to-white',
+                ring: 'ring-emerald-200',
+                badge: '🚨',
+                cta: 'Open Emergency Help',
+                ctaColor: 'text-emerald-700',
               },
             ].map((service, index) => (
               <button
                 type="button"
                 key={index}
                 onClick={service.onClick}
-                className="lift-on-hover group relative overflow-hidden rounded-3xl border border-slate-100 bg-white p-7 text-left shadow-md transition-all duration-300 hover:-translate-y-2 hover:shadow-2xl"
+                className="group relative overflow-hidden rounded-3xl border border-slate-100 bg-white p-7 text-left shadow-md transition-all duration-300 hover:-translate-y-2 hover:shadow-2xl"
               >
-                <div className={`absolute inset-0 bg-gradient-to-br ${service.accent} opacity-0 transition-opacity duration-300 group-hover:opacity-100`} />
+                <div className={`absolute inset-0 bg-gradient-to-br ${service.accent} opacity-0 transition-opacity duration-300 group-hover:opacity-100 rounded-3xl`} />
+                {/* Top accent bar */}
+                <div className={`absolute top-0 left-0 right-0 h-1 bg-gradient-to-r ${service.accent.replace('from-', 'from-').replace('via-', 'to-').split(' ')[0]} ${service.accent.split(' ')[1]} rounded-t-3xl`} />
                 <div className="relative z-10">
-                  <div className="mb-4 flex items-center justify-between">
-                    <img src={service.img} alt={service.title} className="h-14 w-14 object-contain" />
-                    <span className="opacity-0 transition-all duration-300 group-hover:translate-x-0 group-hover:opacity-100">
-                      {service.icon}
-                    </span>
+                  <div className="mb-5 flex items-start justify-between">
+                    <div className={`rounded-2xl ring-2 ${service.ring} bg-white p-2 shadow-sm`}>
+                      <img src={service.img} alt={service.title} className="h-12 w-12 object-contain" />
+                    </div>
+                    <span className="text-2xl">{service.badge}</span>
                   </div>
-                  <h3 className="text-2xl font-bold text-slate-900">{service.title}</h3>
+                  <h3 className="text-xl font-black text-slate-900 leading-tight">{service.title}</h3>
                   <p className="mt-3 text-sm leading-7 text-slate-600">{service.desc}</p>
-                  <div className="mt-6 inline-flex items-center gap-2 text-sm font-semibold text-slate-900">
+                  <div className={`mt-6 inline-flex items-center gap-2 text-sm font-bold ${service.ctaColor}`}>
                     {service.cta}
-                    <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
+                    <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1.5" />
                   </div>
                 </div>
               </button>
             ))}
           </div>
 
-          <div className="mt-12 rounded-[2rem] border border-slate-200 bg-white p-6 shadow-lg md:p-8">
-            <div className="grid gap-5 md:grid-cols-[1.3fr_1fr_1fr_1fr] md:items-center">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-cyan-700">How It Works</p>
-                <h3 className="mt-2 text-2xl font-bold text-slate-900">Three steps. One smooth flow.</h3>
-              </div>
+          <div className="mt-12 rounded-[2rem] border border-cyan-100 bg-gradient-to-br from-white to-cyan-50/50 p-6 shadow-lg md:p-8">
+            <div className="mb-6 text-center">
+              <p className="text-xs font-bold uppercase tracking-[0.2em] text-cyan-600">How It Works</p>
+              <h3 className="mt-2 text-2xl font-black text-slate-900">Three steps. One smooth flow.</h3>
+            </div>
+            <div className="relative grid grid-cols-1 gap-4 md:grid-cols-3">
+              {/* Connector line - desktop only */}
+              <div className="absolute hidden md:block top-7 left-[calc(16.66%-8px)] right-[calc(16.66%-8px)] h-0.5 bg-gradient-to-r from-cyan-200 via-teal-200 to-emerald-200" />
               {[
-                "Search and add medicines",
-                "Confirm shipping and payment",
-                "Track order in real time",
-              ].map((step, idx) => (
-                <div key={step} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                  <p className="text-sm font-semibold text-cyan-700">Step {idx + 1}</p>
-                  <p className="mt-2 text-sm text-slate-700">{step}</p>
+                { step: '01', label: 'Search & Add', desc: 'Find medicines by name, brand, or health condition', icon: Search, color: 'bg-cyan-500', light: 'bg-cyan-50 border-cyan-200 text-cyan-700' },
+                { step: '02', label: 'Confirm & Pay', desc: 'Choose delivery address, apply coupons, and pay securely', icon: ShoppingCart, color: 'bg-teal-500', light: 'bg-teal-50 border-teal-200 text-teal-700' },
+                { step: '03', label: 'Track in Real Time', desc: 'Live order tracking from dispatch to doorstep', icon: Truck, color: 'bg-emerald-500', light: 'bg-emerald-50 border-emerald-200 text-emerald-700' },
+              ].map((s) => (
+                <div key={s.step} className="relative flex flex-col items-center text-center gap-3 p-5">
+                  <div className={`relative z-10 flex h-14 w-14 items-center justify-center rounded-2xl ${s.color} shadow-lg shadow-${s.color}/30`}>
+                    <s.icon className="h-6 w-6 text-white" />
+                  </div>
+                  <p className="text-xs font-bold text-slate-400 tracking-widest">{s.step}</p>
+                  <h4 className="text-base font-black text-slate-900">{s.label}</h4>
+                  <p className="text-xs text-slate-500 leading-relaxed">{s.desc}</p>
                 </div>
               ))}
             </div>
@@ -492,19 +544,36 @@ const Home = () => {
       </section>
 
       <section className="px-4 sm:px-6 lg:px-16 py-12">
-        <div className="mx-auto max-w-7xl rounded-[2rem] bg-gradient-to-r from-cyan-600 to-emerald-500 px-8 py-10 text-white shadow-2xl">
-          <div className="flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
+        <div className="relative mx-auto max-w-7xl overflow-hidden rounded-[2rem] bg-gradient-to-br from-slate-900 via-cyan-900 to-emerald-900 px-8 py-12 text-white shadow-2xl">
+          {/* Decorative blobs */}
+          <div className="absolute -top-12 -right-12 h-48 w-48 rounded-full bg-cyan-400/20 blur-3xl" />
+          <div className="absolute -bottom-12 -left-12 h-48 w-48 rounded-full bg-emerald-400/20 blur-3xl" />
+          <div className="absolute top-0 left-1/2 -translate-x-1/2 h-px w-3/4 bg-gradient-to-r from-transparent via-cyan-400/40 to-transparent" />
+          <div className="relative flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
             <div>
-              <p className="text-xs uppercase tracking-[0.2em] text-cyan-100">Ready To Begin?</p>
-              <h3 className="mt-2 text-3xl font-black">Your medicines are just a few clicks away.</h3>
+              <p className="inline-flex items-center gap-2 text-xs uppercase tracking-[0.25em] text-cyan-300 font-semibold">
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                Ready To Begin?
+              </p>
+              <h3 className="mt-3 text-3xl font-black leading-snug md:text-4xl">Your medicines are<br />just a few clicks away.</h3>
+              <p className="mt-2 text-sm text-cyan-200">Fast delivery · Genuine medicines · Trusted by 50K+ patients</p>
             </div>
-            <button
-              onClick={handleOnlinePharmacy}
-              className="inline-flex items-center gap-2 rounded-xl bg-white px-6 py-3 text-sm font-semibold text-slate-900 transition hover:scale-[1.02]"
-            >
-              Go To Pharmacy
-              <ArrowRight className="h-4 w-4" />
-            </button>
+            <div className="flex flex-col sm:flex-row gap-3 flex-shrink-0">
+              <button
+                onClick={handleOnlinePharmacy}
+                className="group inline-flex items-center gap-2 rounded-xl bg-white px-7 py-3.5 text-sm font-bold text-slate-900 shadow-lg shadow-black/20 transition-all duration-200 hover:scale-[1.03] hover:shadow-xl"
+              >
+                Go To Pharmacy
+                <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+              </button>
+              <button
+                onClick={handlePrescriptionHelp}
+                className="inline-flex items-center gap-2 rounded-xl border border-white/20 bg-white/10 px-7 py-3.5 text-sm font-bold text-white backdrop-blur-sm transition-all duration-200 hover:bg-white/20"
+              >
+                <FileText className="h-4 w-4" />
+                Upload Prescription
+              </button>
+            </div>
           </div>
         </div>
       </section>
@@ -513,34 +582,41 @@ const Home = () => {
 
       <style>{`
         @keyframes fadeInUp {
-          from {
-            opacity: 0;
-            transform: translateY(20px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
+          from { opacity: 0; transform: translateY(28px); }
+          to   { opacity: 1; transform: translateY(0); }
         }
-
         @keyframes fadeInRight {
-          from {
-            opacity: 0;
-            transform: translateX(20px);
-          }
-          to {
-            opacity: 1;
-            transform: translateX(0);
-          }
+          from { opacity: 0; transform: translateX(28px); }
+          to   { opacity: 1; transform: translateX(0); }
         }
-
+        @keyframes marqueeScroll {
+          0%   { transform: translateX(0); }
+          100% { transform: translateX(-50%); }
+        }
         .animate-fade-in-up {
-          animation: fadeInUp 0.8s ease-out;
+          animation: fadeInUp 0.85s cubic-bezier(.22,1,.36,1) both;
         }
-
         .animate-fade-in-right {
-          animation: fadeInRight 0.9s ease-out;
+          animation: fadeInRight 0.95s cubic-bezier(.22,1,.36,1) 0.15s both;
         }
+        .animate-marquee {
+          animation: marqueeScroll 28s linear infinite;
+        }
+        /* Scroll reveal */
+        .reveal-on-scroll {
+          opacity: 0;
+          transform: translateY(24px);
+          transition: opacity 0.65s cubic-bezier(.22,1,.36,1), transform 0.65s cubic-bezier(.22,1,.36,1);
+        }
+        .reveal-on-scroll.is-visible {
+          opacity: 1;
+          transform: translateY(0);
+        }
+        /* Stagger children of reveal sections */
+        .reveal-on-scroll.is-visible > * > *:nth-child(1) { transition-delay: 0ms; }
+        .reveal-on-scroll.is-visible > * > *:nth-child(2) { transition-delay: 80ms; }
+        .reveal-on-scroll.is-visible > * > *:nth-child(3) { transition-delay: 160ms; }
+        .reveal-on-scroll.is-visible > * > *:nth-child(4) { transition-delay: 240ms; }
       `}</style>
     </div>
   );

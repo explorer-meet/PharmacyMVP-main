@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Pill, HeartPulse, Activity, Brain, ShieldPlus, Thermometer, MapPin, ChevronDown, AlertCircle, Star, Upload } from 'lucide-react';
 import SearchBar from '../components/SearchBar';
 import CartButton from '../components/CartButton';
@@ -18,7 +18,7 @@ function OnlinePharmacy() {
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(false);
   const [medicines, setMedicines] = useState([]);
-  const [userData, setUserData] = useState(null);
+  const [, setUserData] = useState(null);
   const [stores, setStores] = useState([]);
   const [filteredStores, setFilteredStores] = useState([]);
   const [selectedStore, setSelectedStore] = useState(null);
@@ -39,8 +39,9 @@ function OnlinePharmacy() {
   const [showExtractedMedicinesModal, setShowExtractedMedicinesModal] = useState(false);
   const [selectedPrescriptionId, setSelectedPrescriptionId] = useState(null);
   const [userPrescriptions, setUserPrescriptions] = useState([]);
-  const [prescriptionsLoading, setPrescriptionsLoading] = useState(false);
+  const [, setPrescriptionsLoading] = useState(false);
   const [showPrescriptionHistory, setShowPrescriptionHistory] = useState(false);
+  const [showQuickPanel, setShowQuickPanel] = useState(false);
 
   // Advanced Search Filter States
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
@@ -181,7 +182,7 @@ function OnlinePharmacy() {
     }
   };
 
-  const handlePrescriptionUploadSuccess = (prescription) => {
+  const handlePrescriptionUploadSuccess = () => {
     loadUserPrescriptions();
   };
 
@@ -190,7 +191,7 @@ function OnlinePharmacy() {
     setShowExtractedMedicinesModal(true);
   };
 
-  const handleDeletePrescription = async (prescriptionId) => {
+  const handleDeletePrescription = async () => {
     // For MVP, deletion not implemented yet
     // In future, add API endpoint to delete prescriptions
   };
@@ -321,7 +322,7 @@ function OnlinePharmacy() {
       setSelectedStore(stores[0]._id);
       setFilteredStores(stores);
     }
-  }, [stores]);
+  }, [stores, selectedStore]);
 
 
   // Load user prescriptions on component mount
@@ -583,112 +584,132 @@ function OnlinePharmacy() {
         <CartButton openOnMount={openCartOnLoad} appliedCampaign={appliedCampaign} selectedStoreId={selectedStore} />
 
         <div className="max-w-6xl mx-auto px-4 pb-8 mt-6">
-          <div className="relative z-0 mb-4">
-            <SearchBar onSearchChange={setSearchTerm} medicines={medicines} />
-          </div>
 
-          {/* Advanced Filters Toggle */}
-          <div className="mb-8">
-            <div className="flex items-center gap-3 flex-wrap">
+          {/* Search + Advanced Filters — unified card */}
+          <div className="mb-8 bg-white/80 backdrop-blur-sm border border-slate-200 rounded-2xl shadow-sm p-4 transition-all duration-300">
+
+            {/* Row: SearchBar + Filter button */}
+            <div className="flex items-center gap-3">
+              <div className="relative flex-1 z-10">
+                <SearchBar onSearchChange={setSearchTerm} medicines={medicines} />
+              </div>
+
+              {/* Advanced Filters toggle — pill button flush with search */}
               <button
                 onClick={() => setShowAdvancedFilters((v) => !v)}
-                className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold border transition-all duration-200 ${
+                className={`flex-shrink-0 inline-flex items-center gap-2 px-4 py-[13px] rounded-xl text-sm font-semibold border transition-all duration-300 ${
                   showAdvancedFilters || hasAdvancedFilter
-                    ? 'bg-cyan-600 text-white border-cyan-600 shadow'
-                    : 'bg-white text-slate-700 border-slate-200 hover:border-cyan-300 hover:text-cyan-700'
+                    ? 'bg-cyan-600 text-white border-cyan-600 shadow-md shadow-cyan-200'
+                    : 'bg-slate-50 text-slate-600 border-slate-200 hover:border-cyan-300 hover:text-cyan-700 hover:bg-cyan-50'
                 }`}
               >
-                <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
-                Advanced Filters
+                <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
+                <span className="hidden sm:inline">Filters</span>
                 {hasAdvancedFilter && (
-                  <span className="ml-1 flex items-center justify-center w-5 h-5 rounded-full bg-white/20 text-xs font-bold">
+                  <span className="flex items-center justify-center min-w-[18px] h-[18px] rounded-full bg-white/25 text-[10px] font-bold px-1">
                     {[filterBrand, filterManufacturer, filterComposition, filterPriceMin || filterPriceMax, filterInStock ? '1' : '', filterRequiresPrescription !== 'all' ? '1' : ''].filter(Boolean).length}
                   </span>
                 )}
               </button>
-              {hasAdvancedFilter && (
-                <button
-                  onClick={clearAdvancedFilters}
-                  className="inline-flex items-center gap-1 px-3 py-2 rounded-xl text-xs font-semibold text-red-600 border border-red-200 bg-red-50 hover:bg-red-100 transition"
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-                  Clear Filters
-                </button>
-              )}
             </div>
 
-            {showAdvancedFilters && (
-              <div className="mt-4 bg-white border border-slate-200 rounded-2xl p-5 shadow-sm animate-in fade-in slide-in-from-top-2 duration-200">
-                <p className="text-xs font-bold uppercase tracking-widest text-slate-400 mb-4">Filter Medicines</p>
+            {/* Active filter chips */}
+            {hasAdvancedFilter && (
+              <div className="mt-3 flex items-center gap-2 flex-wrap">
+                <span className="text-xs text-slate-400 font-medium">Active:</span>
+                {filterBrand && <span className="px-2 py-0.5 rounded-full bg-cyan-100 text-cyan-700 text-xs font-semibold">Brand: {filterBrand}</span>}
+                {filterManufacturer && <span className="px-2 py-0.5 rounded-full bg-cyan-100 text-cyan-700 text-xs font-semibold">Mfr: {filterManufacturer}</span>}
+                {filterComposition && <span className="px-2 py-0.5 rounded-full bg-cyan-100 text-cyan-700 text-xs font-semibold">Comp: {filterComposition}</span>}
+                {(filterPriceMin || filterPriceMax) && <span className="px-2 py-0.5 rounded-full bg-cyan-100 text-cyan-700 text-xs font-semibold">₹{filterPriceMin || '0'} – ₹{filterPriceMax || '∞'}</span>}
+                {filterInStock && <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 text-xs font-semibold">In Stock</span>}
+                {filterRequiresPrescription !== 'all' && <span className="px-2 py-0.5 rounded-full bg-violet-100 text-violet-700 text-xs font-semibold">{filterRequiresPrescription === 'yes' ? 'Rx Required' : 'OTC Only'}</span>}
+                <button
+                  onClick={clearAdvancedFilters}
+                  className="ml-auto inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold text-red-500 border border-red-200 bg-red-50 hover:bg-red-100 transition-all duration-200"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                  Clear all
+                </button>
+              </div>
+            )}
+
+            {/* Expandable filter panel */}
+            <div
+              className={`overflow-hidden transition-all duration-300 ease-in-out ${
+                showAdvancedFilters ? 'max-h-[600px] opacity-100 mt-4' : 'max-h-0 opacity-0'
+              }`}
+            >
+              <div className="border-t border-slate-100 pt-4">
+                <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-4">Refine Results</p>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                   <div>
-                    <label className="block text-xs font-semibold text-slate-600 mb-1.5">Brand / Product Name</label>
+                    <label className="block text-xs font-semibold text-slate-500 mb-1.5">Brand / Product Name</label>
                     <input
                       type="text"
                       value={filterBrand}
                       onChange={(e) => setFilterBrand(e.target.value)}
                       placeholder="e.g. Dolo, Crocin"
-                      className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:border-transparent"
+                      className="w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:border-transparent focus:bg-white transition-all duration-200"
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-semibold text-slate-600 mb-1.5">Manufacturer</label>
+                    <label className="block text-xs font-semibold text-slate-500 mb-1.5">Manufacturer</label>
                     <input
                       type="text"
                       value={filterManufacturer}
                       onChange={(e) => setFilterManufacturer(e.target.value)}
                       placeholder="e.g. Cipla, Sun Pharma"
-                      className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:border-transparent"
+                      className="w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:border-transparent focus:bg-white transition-all duration-200"
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-semibold text-slate-600 mb-1.5">Composition / Active Ingredient</label>
+                    <label className="block text-xs font-semibold text-slate-500 mb-1.5">Composition / Active Ingredient</label>
                     <input
                       type="text"
                       value={filterComposition}
                       onChange={(e) => setFilterComposition(e.target.value)}
                       placeholder="e.g. paracetamol, metformin"
-                      className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:border-transparent"
+                      className="w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:border-transparent focus:bg-white transition-all duration-200"
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-semibold text-slate-600 mb-1.5">Min Price (₹)</label>
+                    <label className="block text-xs font-semibold text-slate-500 mb-1.5">Min Price (₹)</label>
                     <input
                       type="number"
                       value={filterPriceMin}
                       onChange={(e) => setFilterPriceMin(e.target.value)}
                       min="0"
                       placeholder="0"
-                      className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:border-transparent"
+                      className="w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:border-transparent focus:bg-white transition-all duration-200"
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-semibold text-slate-600 mb-1.5">Max Price (₹)</label>
+                    <label className="block text-xs font-semibold text-slate-500 mb-1.5">Max Price (₹)</label>
                     <input
                       type="number"
                       value={filterPriceMax}
                       onChange={(e) => setFilterPriceMax(e.target.value)}
                       min="0"
                       placeholder="9999"
-                      className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:border-transparent"
+                      className="w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:border-transparent focus:bg-white transition-all duration-200"
                     />
                   </div>
                   <div className="flex flex-col justify-between gap-3">
-                    <label className="flex items-center gap-2 cursor-pointer">
+                    <label className="flex items-center gap-2.5 cursor-pointer group">
                       <input
                         type="checkbox"
                         checked={filterInStock}
                         onChange={(e) => setFilterInStock(e.target.checked)}
-                        className="w-4 h-4 rounded border-slate-300 text-cyan-600 focus:ring-cyan-400"
+                        className="w-4 h-4 rounded border-slate-300 text-cyan-600 focus:ring-cyan-400 cursor-pointer"
                       />
-                      <span className="text-sm font-medium text-slate-700">In Stock Only</span>
+                      <span className="text-sm font-medium text-slate-600 group-hover:text-slate-800 transition-colors">In Stock Only</span>
                     </label>
                     <div>
-                      <label className="block text-xs font-semibold text-slate-600 mb-1.5">Prescription Required</label>
+                      <label className="block text-xs font-semibold text-slate-500 mb-1.5">Prescription Required</label>
                       <select
                         value={filterRequiresPrescription}
                         onChange={(e) => setFilterRequiresPrescription(e.target.value)}
-                        className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:border-transparent bg-white"
+                        className="w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:border-transparent focus:bg-white transition-all duration-200 cursor-pointer"
                       >
                         <option value="all">All Medicines</option>
                         <option value="no">OTC (No Prescription)</option>
@@ -698,7 +719,8 @@ function OnlinePharmacy() {
                   </div>
                 </div>
               </div>
-            )}
+            </div>
+
           </div>
 
           <div className="mt-6 rounded-3xl border border-cyan-100 bg-gradient-to-br from-cyan-50 via-white to-emerald-50 p-6 sm:p-8">
@@ -716,29 +738,8 @@ function OnlinePharmacy() {
             </div>
 
             <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6 gap-4">
-              {/* Upload Prescription Card */}
-              <button
-                onClick={() => setShowUploadPrescriptionModal(true)}
-                className="group min-h-[120px] rounded-2xl border-2 border-dashed border-cyan-300 bg-gradient-to-br from-cyan-50 to-blue-50 p-4 text-left transition-all duration-200 hover:border-cyan-500 hover:bg-cyan-100 hover:-translate-y-1"
-              >
-                <div className="flex items-start justify-between gap-2">
-                  <div className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-cyan-100 text-cyan-700 group-hover:bg-cyan-200">
-                    <Upload className="w-6 h-6" />
-                  </div>
-                  <span className="rounded-full px-2 py-1 text-[10px] font-bold bg-cyan-100 text-cyan-700">
-                    NEW
-                  </span>
-                </div>
-                <p className="mt-3 text-sm font-bold leading-tight line-clamp-2 text-slate-900">
-                  Upload Prescription
-                </p>
-                <p className="mt-2 text-xs text-slate-600">
-                  Auto-fill medicines
-                </p>
-              </button>
-
               {/* Health Conditions */}
-              {healthConditions.map((condition) => {
+              {healthConditions.filter((c) => c.key !== 'favorites').map((condition) => {
                 const isActive = selectedCondition === condition.key;
                 const Icon = condition.icon;
                 const conditionCount = condition.key === 'favorites'
@@ -885,6 +886,98 @@ function OnlinePharmacy() {
           </div>
         </div>
 
+        {/* Quick Actions — Right-side Slide-out Panel */}
+        <div
+          className="fixed right-0 top-1/2 -translate-y-1/2 z-[90] flex flex-row items-stretch"
+          onMouseEnter={() => setShowQuickPanel(true)}
+          onMouseLeave={() => setShowQuickPanel(false)}
+        >
+          {/* Expanded Content */}
+          <div
+            className={`overflow-hidden transition-all duration-300 ease-in-out ${
+              showQuickPanel ? 'max-w-xs opacity-100' : 'max-w-0 opacity-0'
+            }`}
+          >
+            <div className="w-56 flex flex-col gap-3 bg-white/95 backdrop-blur-sm border border-slate-200 border-r-0 rounded-l-2xl shadow-2xl p-4">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1 px-1">Quick Actions</p>
+
+              {/* Upload Prescription */}
+              <button
+                type="button"
+                onClick={() => { setShowUploadPrescriptionModal(true); setShowQuickPanel(false); }}
+                className="group flex items-center gap-3 rounded-xl border border-dashed border-cyan-300 bg-gradient-to-br from-cyan-50 to-blue-50 p-3 text-left transition-all hover:border-cyan-500 hover:bg-cyan-100 hover:shadow-md"
+              >
+                <div className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-cyan-100 text-cyan-700 group-hover:bg-cyan-200 flex-shrink-0">
+                  <Upload className="w-5 h-5" />
+                </div>
+                <div>
+                  <p className="text-sm font-bold text-slate-900 leading-tight">Upload Prescription</p>
+                  <p className="text-xs text-slate-500 mt-0.5">Auto-fill medicines</p>
+                </div>
+              </button>
+
+              {/* Favorites */}
+              <button
+                type="button"
+                onClick={() => { setSelectedCondition(selectedCondition === 'favorites' ? 'all' : 'favorites'); setShowQuickPanel(false); }}
+                className={`group flex items-center gap-3 rounded-xl border p-3 text-left transition-all hover:shadow-md ${
+                  selectedCondition === 'favorites'
+                    ? 'bg-gradient-to-br from-amber-500 to-orange-400 border-amber-400 text-white'
+                    : 'border-amber-200 bg-gradient-to-br from-amber-50 to-yellow-50 hover:border-amber-400'
+                }`}
+              >
+                <div className={`inline-flex h-9 w-9 items-center justify-center rounded-xl flex-shrink-0 ${
+                  selectedCondition === 'favorites' ? 'bg-white/20' : 'bg-amber-100 group-hover:bg-amber-200'
+                }`}>
+                  <Star className={`w-5 h-5 ${
+                    selectedCondition === 'favorites' ? 'text-white fill-white' : 'text-amber-500'
+                  }`} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className={`text-sm font-bold leading-tight ${
+                    selectedCondition === 'favorites' ? 'text-white' : 'text-slate-900'
+                  }`}>Favorites</p>
+                  <p className={`text-xs mt-0.5 ${
+                    selectedCondition === 'favorites' ? 'text-amber-100' : 'text-slate-500'
+                  }`}>{medicines.filter((m) => wishlistMedicineIds.includes(String(m._id))).length} saved</p>
+                </div>
+                {medicines.filter((m) => wishlistMedicineIds.includes(String(m._id))).length > 0 && (
+                  <span className={`text-xs font-bold px-1.5 py-0.5 rounded-full flex-shrink-0 ${
+                    selectedCondition === 'favorites' ? 'bg-white/20 text-white' : 'bg-amber-200 text-amber-700'
+                  }`}>
+                    {medicines.filter((m) => wishlistMedicineIds.includes(String(m._id))).length}
+                  </span>
+                )}
+              </button>
+            </div>
+          </div>
+
+          {/* Handle Tab */}
+          <div
+            role="button"
+            aria-label="Quick actions"
+            tabIndex={0}
+            onClick={() => setShowQuickPanel((v) => !v)}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setShowQuickPanel((v) => !v); }}
+            className="relative w-9 flex flex-col items-center justify-center gap-2 bg-gradient-to-b from-cyan-500 to-emerald-500 rounded-l-2xl cursor-pointer shadow-xl py-5 select-none"
+          >
+            <Upload className="w-4 h-4 text-white/90" />
+            <div className="flex flex-col gap-[3px] my-0.5">
+              <div className="w-3 h-[2px] bg-white/50 rounded-full" />
+              <div className="w-3 h-[2px] bg-white/50 rounded-full" />
+              <div className="w-3 h-[2px] bg-white/50 rounded-full" />
+            </div>
+            <Star className={`w-4 h-4 ${
+              selectedCondition === 'favorites' ? 'text-amber-300 fill-amber-300' : 'text-white/90'
+            }`} />
+            {medicines.filter((m) => wishlistMedicineIds.includes(String(m._id))).length > 0 && (
+              <span className="absolute -top-1.5 right-0.5 min-w-[16px] h-4 flex items-center justify-center text-[9px] font-bold bg-amber-400 text-white rounded-full px-1 leading-none">
+                {medicines.filter((m) => wishlistMedicineIds.includes(String(m._id))).length}
+              </span>
+            )}
+          </div>
+        </div>
+
         {/* Prescription Upload Modal */}
         <PrescriptionUploadModal
           isOpen={showUploadPrescriptionModal}
@@ -897,7 +990,7 @@ function OnlinePharmacy() {
           isOpen={showExtractedMedicinesModal}
           onClose={() => setShowExtractedMedicinesModal(false)}
           prescriptionId={selectedPrescriptionId}
-          onAddToCart={(count) => {
+          onAddToCart={() => {
             loadUserPrescriptions();
           }}
         />

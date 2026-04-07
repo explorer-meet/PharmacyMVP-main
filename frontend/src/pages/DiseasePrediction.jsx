@@ -1,5 +1,4 @@
-import React from 'react'
-import { HeartIcon, BrainIcon, CigaretteIcon as LungIcon, BabyIcon as KidneyIcon } from 'lucide-react'
+import { HeartIcon, CigaretteIcon as LungIcon, BabyIcon as KidneyIcon } from 'lucide-react'
 import { Link } from 'react-router-dom'
 
 export default function DiseasePrediction() {

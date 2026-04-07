@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { MapPin, Phone, User, Mail, ShoppingCart, ChevronLeft, Truck, Package, IndianRupee, ShieldCheck } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { baseURL } from '../main';
@@ -118,7 +118,7 @@ export function AddressPage() {
           })
         }, 1000)
       }
-    } catch (error) {
+    } catch {
       console.log("Error updating the address to order");
     }
   }

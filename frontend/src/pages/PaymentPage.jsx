@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { CreditCard, Wallet, Truck, QrCode, ShieldCheck, ChevronLeft, Package, DollarSign } from 'lucide-react';
+import { CreditCard, Truck, QrCode, ShieldCheck, ChevronLeft, Package, DollarSign } from 'lucide-react';
 import { BrowserProvider, parseEther } from 'ethers';
 import toast from 'react-hot-toast';
 import { baseURL } from '../main';
@@ -220,12 +220,22 @@ export function PaymentPage() {
           deletecartitems();
           setIsProcessing(false);
           toast.success(response.data.message);
-          navigate('/orderconfirmation', { state: { orderId: currentOrderId } });
+          navigate('/orderconfirmation', {
+            state: {
+              orderId: currentOrderId,
+              checkoutSummary: {
+                ...(checkoutSummary || {}),
+                subtotalAmount,
+                discountAmount,
+                finalAmount: payableAmount,
+              },
+            },
+          });
           console.log(cartItems);
 
         }, 1000);
       }
-    } catch (error) {
+    } catch {
       console.log("Error updating the address to order");
       setIsProcessing(false);
     }
@@ -238,7 +248,7 @@ export function PaymentPage() {
       if (response.status === 200) {
         console.log("Items from cart has been deleted");
       }
-    } catch (error) {
+    } catch {
       console.log("Error deleting the items from the cart");
     }
   }

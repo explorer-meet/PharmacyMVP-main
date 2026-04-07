@@ -149,14 +149,23 @@ const sendUserNotification = async ({
   emailMessage,
   emailHtml,
   smsMessage,
+  notificationCategory,
 }) => {
   const output = {
     email: null,
     sms: null,
   };
 
-  const canSendEmail = Boolean(preferences?.isEmailNotificationOn);
-  const canSendSms = Boolean(preferences?.isSmsNotificationOn);
+  const category = String(notificationCategory || '').trim();
+  const emailCategoryEnabled = category
+    ? Boolean(preferences?.emailPrefs?.[category])
+    : true;
+  const smsCategoryEnabled = category
+    ? Boolean(preferences?.smsPrefs?.[category])
+    : true;
+
+  const canSendEmail = Boolean(preferences?.isEmailNotificationOn) && emailCategoryEnabled;
+  const canSendSms = Boolean(preferences?.isSmsNotificationOn) && smsCategoryEnabled;
 
   if (canSendEmail && user?.email && emailSubject && emailMessage) {
     output.email = await sendEmailNotification({
@@ -169,7 +178,9 @@ const sendUserNotification = async ({
     output.email = {
       sent: false,
       bypassed: true,
-      reason: 'Email disabled or missing email address/content',
+      reason: category
+        ? `Email disabled for category ${category} or missing email address/content`
+        : 'Email disabled or missing email address/content',
       channel: 'email',
     };
   }
@@ -184,7 +195,9 @@ const sendUserNotification = async ({
     output.sms = {
       sent: false,
       bypassed: true,
-      reason: 'SMS disabled or missing phone/content',
+      reason: category
+        ? `SMS disabled for category ${category} or missing phone/content`
+        : 'SMS disabled or missing phone/content',
       channel: 'sms',
     };
   }

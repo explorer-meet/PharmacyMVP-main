@@ -1,12 +1,10 @@
-import React, { useState } from 'react';
-import { CreditCard, Wallet, Truck, QrCode } from 'lucide-react';
+import { useState } from 'react';
 import { PaymentOption } from './PaymentOption';
 import { paymentMethods } from './PaymentMethods';
 import axios from 'axios';
 
 export function PaymentModal({ isOpen, onClose }) {
     const [selectedMethod, setSelectedMethod] = useState('card');
-    const [isModalOpen, setIsModalOpen] = useState(false);
     const [loading, setLoading] = useState(false);
     const [account, setAccount] = useState('');
     const ethereum = window.ethereum;
@@ -15,13 +13,13 @@ export function PaymentModal({ isOpen, onClose }) {
 
     const connectWallet = async () => {
         try {
-            if (!window.ethereum) {
+            if (!ethereum) {
                 alert('Please install MetaMask to make payments!');
                 return false;
             }
 
             setLoading(true);
-            const accounts = await window.ethereum.request({
+            const accounts = await ethereum.request({
                 method: 'eth_requestAccounts'
             });
 
@@ -53,7 +51,7 @@ export function PaymentModal({ isOpen, onClose }) {
             const amountInEth = totalAmount / ETH_TO_INR_RATE;
 
             // Create provider and get signer
-            const provider = new BrowserProvider(window.ethereum);
+            const provider = new BrowserProvider(ethereum);
             const signer = await provider.getSigner();
 
             // Replace with your merchant wallet address
@@ -87,7 +85,6 @@ export function PaymentModal({ isOpen, onClose }) {
 
             // Clear cart and close modal
             setCartItems([]);
-            setIsModalOpen(false);
             alert('Payment successful!');
         } catch (error) {
             console.error('Payment failed:', error);
@@ -136,9 +133,10 @@ export function PaymentModal({ isOpen, onClose }) {
 
                 <button
                     onClick={handlePayment}
+                    disabled={loading}
                     className="w-full mt-6 bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition-colors"
                 >
-                    Pay Now
+                    {loading ? 'Processing...' : 'Pay Now'}
                 </button>
             </div>
         </div>

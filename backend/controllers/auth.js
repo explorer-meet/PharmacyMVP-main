@@ -23,7 +23,7 @@ const { sendUserNotification, sendEmailNotification } = require("../utils/notifi
 const jwt = require("jsonwebtoken");
 const bcrypt = require('bcrypt');
 
-const triggerUserNotifications = async ({ userId, emailSubject, emailMessage, emailHtml, smsMessage }) => {
+const triggerUserNotifications = async ({ userId, emailSubject, emailMessage, emailHtml, smsMessage, notificationCategory }) => {
     try {
         console.log('[Notification] triggerUserNotifications called', {
             userId: userId ? String(userId) : null,
@@ -31,6 +31,7 @@ const triggerUserNotifications = async ({ userId, emailSubject, emailMessage, em
             hasEmailMessage: Boolean(emailMessage),
             hasEmailHtml: Boolean(emailHtml),
             hasSmsMessage: Boolean(smsMessage),
+            notificationCategory: notificationCategory || null,
         });
 
         if (!userId) {
@@ -63,6 +64,7 @@ const triggerUserNotifications = async ({ userId, emailSubject, emailMessage, em
             emailMessage,
             emailHtml,
             smsMessage,
+            notificationCategory,
         });
 
         console.log('[Notification] triggerUserNotifications result', dispatchResult);
@@ -1433,6 +1435,7 @@ const finalpayment = async (req, res) => {
                     status: orderPlacedStatus,
                 }),
                 smsMessage: null,
+                notificationCategory: 'orderUpdates',
             });
 
             console.log('[Notification][OrderPlaced] Dispatch summary', {
@@ -1936,6 +1939,7 @@ const reviewPrescriptionRequest = async (req, res) => {
                         reviewNotes,
                 }),
                 smsMessage: `Prescription ${readableStatus}. ${reviewNotes ? `Notes: ${reviewNotes}` : 'Please check dashboard for details.'}`,
+                notificationCategory: 'prescriptionReminders',
             });
         });
 
@@ -2020,6 +2024,7 @@ const updateOrderTrackingStatus = async (req, res) => {
                         deliveryType: deliveryType || order.deliveryType,
                 }),
                 smsMessage: `Order ${order.orderId}: ${trackingStatus}`,
+                notificationCategory: 'orderUpdates',
             });
         });
 
@@ -2636,6 +2641,7 @@ const answerStoreQuery = async (req, res) => {
                         answer,
                 }),
                 smsMessage: `Your query has been answered: ${answer}`,
+                notificationCategory: 'healthReminders',
             });
         });
 

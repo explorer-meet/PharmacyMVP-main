@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Search, X, Pill } from 'lucide-react';
 
 const SearchBar = ({ onSearchChange, medicines = [] }) => {

@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react'
+import { useEffect } from 'react'
 import { useLocation } from 'react-router-dom'
 import { AlertTriangle, Phone, Clock, MapPin, Heart, Thermometer, Stethoscope, Pill } from 'lucide-react'
 import CheckoutFooter from '../components/CheckoutFooter'

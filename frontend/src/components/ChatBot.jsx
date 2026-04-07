@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { MessageCircle, X, Send, Bot, User, ChevronDown } from 'lucide-react';
+import { X, Send, Bot, User, ChevronDown } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 
 const FAQ_RESPONSES = [
@@ -66,11 +66,21 @@ const FAQ_RESPONSES = [
 ];
 
 const SUGGESTED_QUESTIONS = [
-  "How do I track my order?",
-  "How to upload a prescription?",
-  "What payment methods are accepted?",
-  "Find nearest pharmacy store",
-  "How to get discount offers?",
+  { label: "Track my order", text: "How do I track my order?" },
+  { label: "Upload prescription", text: "How to upload a prescription?" },
+  { label: "Payment methods", text: "What payment methods are accepted?" },
+  { label: "Nearest store", text: "Find nearest pharmacy store" },
+  { label: "Discount & coupons", text: "How to get discount offers?" },
+  { label: "Refund / Return", text: "Can I return or get a refund?" },
+  { label: "Vaccination records", text: "How do I track my vaccinations?" },
+  { label: "Change language", text: "How do I change the app language?" },
+  { label: "Cancel order", text: "How do I cancel an order?" },
+  { label: "Prescription medicines", text: "Which medicines require a prescription?" },
+  { label: "Notifications / Alerts", text: "How to manage notifications and alerts?" },
+  { label: "Emergency help", text: "I need emergency medical help" },
+  { label: "Contact support", text: "How do I contact customer support?" },
+  { label: "Account / Profile", text: "How do I update my account profile?" },
+  { label: "Dark mode", text: "How do I switch to dark mode?" },
 ];
 
 const findBestAnswer = (input) => {
@@ -92,6 +102,7 @@ const ChatBot = () => {
   const [input, setInput] = useState('');
   const [typing, setTyping] = useState(false);
   const [unread, setUnread] = useState(0);
+  const [showSuggestions, setShowSuggestions] = useState(true);
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
 
@@ -143,17 +154,38 @@ const ChatBot = () => {
       <button
         onClick={() => setOpen((o) => !o)}
         aria-label="Open chat"
-        className="fixed bottom-24 right-6 z-[9998] flex items-center justify-center w-14 h-14 rounded-full bg-gradient-to-br from-cyan-600 to-emerald-600 shadow-2xl hover:scale-110 active:scale-95 transition-transform duration-200"
+        className="fixed bottom-24 right-6 z-[9998] group flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-cyan-500 via-teal-500 to-emerald-500 shadow-[0_8px_32px_rgba(6,182,212,0.45)] hover:shadow-[0_12px_40px_rgba(6,182,212,0.6)] hover:scale-110 active:scale-95 transition-all duration-300"
+        style={{ borderRadius: '1.25rem' }}
       >
+        {/* Shimmer ring */}
+        <span className="absolute inset-0 rounded-[1.25rem] ring-2 ring-white/20 group-hover:ring-white/40 transition-all duration-300" />
+
         {open ? (
-          <X className="w-6 h-6 text-white" />
+          <X className="w-6 h-6 text-white drop-shadow" />
         ) : (
-          <MessageCircle className="w-6 h-6 text-white" />
+          <div className="flex flex-col items-center justify-center gap-0.5">
+            {/* Custom pill chat icon */}
+            <svg width="28" height="26" viewBox="0 0 28 26" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <rect x="1" y="1" width="26" height="18" rx="9" fill="white" fillOpacity="0.18" stroke="white" strokeWidth="1.5"/>
+              <circle cx="8.5" cy="10" r="2" fill="white"/>
+              <circle cx="14" cy="10" r="2" fill="white"/>
+              <circle cx="19.5" cy="10" r="2" fill="white"/>
+              <path d="M7 19L4 24" stroke="white" strokeWidth="1.5" strokeLinecap="round"/>
+            </svg>
+            <span className="text-[9px] font-bold text-white/90 leading-none tracking-wide">ASK ME</span>
+          </div>
         )}
+
+        {/* Unread badge */}
         {!open && unread > 0 && (
-          <span className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white ring-2 ring-white">
+          <span className="absolute -top-1.5 -right-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white ring-2 ring-white shadow-md">
             {unread}
           </span>
+        )}
+
+        {/* Idle pulse ring */}
+        {!open && (
+          <span className="absolute inset-0 rounded-[1.25rem] animate-ping opacity-20 bg-cyan-400 pointer-events-none" />
         )}
       </button>
 
@@ -161,15 +193,18 @@ const ChatBot = () => {
       {open && (
         <div className="fixed bottom-40 right-6 z-[9997] w-80 sm:w-96 flex flex-col rounded-2xl shadow-2xl border border-cyan-100 overflow-hidden bg-white dark:bg-slate-900 dark:border-slate-700 animate-in fade-in slide-in-from-bottom-4 duration-200">
           {/* Header */}
-          <div className="flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-cyan-600 to-emerald-600">
-            <div className="flex-shrink-0 w-9 h-9 rounded-full bg-white/20 flex items-center justify-center">
-              <Bot className="w-5 h-5 text-white" />
+          <div className="flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-cyan-500 via-teal-500 to-emerald-500 relative overflow-hidden">
+            {/* Decorative blobs */}
+            <div className="absolute -top-4 -right-4 w-16 h-16 rounded-full bg-white/10 blur-xl pointer-events-none" />
+            <div className="absolute -bottom-4 left-8 w-12 h-12 rounded-full bg-emerald-300/20 blur-lg pointer-events-none" />
+            <div className="relative flex-shrink-0 w-10 h-10 rounded-xl bg-white/20 border border-white/30 flex items-center justify-center shadow-inner">
+              <Bot className="w-5 h-5 text-white drop-shadow" />
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-bold text-white truncate">{t.chatbot.title}</p>
+              <p className="text-sm font-bold text-white truncate drop-shadow">{t.chatbot.title}</p>
               <div className="flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-emerald-300 animate-pulse"></span>
-                <p className="text-xs text-cyan-100">Online</p>
+                <span className="w-2 h-2 rounded-full bg-emerald-300 animate-pulse shadow shadow-emerald-300/50"></span>
+                <p className="text-xs text-cyan-100 font-medium">Online · Always here to help</p>
               </div>
             </div>
             <button
@@ -225,23 +260,43 @@ const ChatBot = () => {
             <div ref={messagesEndRef} />
           </div>
 
-          {/* Suggested Questions */}
-          {messages.length <= 2 && (
-            <div className="px-3 py-2 bg-white dark:bg-slate-900 border-t border-slate-100 dark:border-slate-700">
-              <p className="text-[10px] uppercase tracking-widest text-slate-400 mb-1.5 font-semibold px-1">Quick Questions</p>
-              <div className="flex flex-wrap gap-1.5">
-                {SUGGESTED_QUESTIONS.map((q) => (
-                  <button
-                    key={q}
-                    onClick={() => sendMessage(q)}
-                    className="px-2.5 py-1 rounded-full text-xs bg-cyan-50 dark:bg-cyan-900/30 text-cyan-700 dark:text-cyan-300 border border-cyan-100 dark:border-cyan-800 hover:bg-cyan-100 dark:hover:bg-cyan-900/50 transition"
-                  >
-                    {q}
-                  </button>
-                ))}
+          {/* Suggested Questions — always visible, collapsible */}
+          <div className="bg-white dark:bg-slate-900 border-t border-slate-100 dark:border-slate-700">
+            <button
+              onClick={() => setShowSuggestions((v) => !v)}
+              className="w-full flex items-center justify-between px-3 pt-2 pb-1 group"
+            >
+              <p className="text-[10px] uppercase tracking-widest text-slate-400 font-semibold group-hover:text-cyan-600 transition-colors">Quick Questions</p>
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className={`w-3 h-3 text-slate-400 transition-transform duration-200 ${showSuggestions ? 'rotate-180' : ''}`}
+                viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"
+                strokeLinecap="round" strokeLinejoin="round"
+              >
+                <polyline points="6 9 12 15 18 9" />
+              </svg>
+            </button>
+
+            <div
+              className={`overflow-hidden transition-all duration-300 ease-in-out ${
+                showSuggestions ? 'max-h-24 opacity-100 pb-2' : 'max-h-0 opacity-0'
+              }`}
+            >
+              <div className="overflow-x-auto px-3 scrollbar-hide">
+                <div className="flex gap-1.5 w-max">
+                  {SUGGESTED_QUESTIONS.map((q) => (
+                    <button
+                      key={q.text}
+                      onClick={() => sendMessage(q.text)}
+                      className="flex-shrink-0 px-3 py-1.5 rounded-full text-xs bg-cyan-50 dark:bg-cyan-900/30 text-cyan-700 dark:text-cyan-300 border border-cyan-100 dark:border-cyan-800 hover:bg-cyan-100 dark:hover:bg-cyan-900/50 hover:border-cyan-300 transition-all duration-150 whitespace-nowrap"
+                    >
+                      {q.label}
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
-          )}
+          </div>
 
           {/* Input */}
           <div className="flex items-center gap-2 px-3 py-2.5 bg-white dark:bg-slate-900 border-t border-slate-100 dark:border-slate-700">

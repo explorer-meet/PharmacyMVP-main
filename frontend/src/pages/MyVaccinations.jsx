@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import toast from 'react-hot-toast';
 import { Syringe, Calendar, CheckCircle2, XCircle, Loader2, ShieldCheck } from 'lucide-react';
