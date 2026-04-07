@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { baseURL } from '../main';
 import { useNavigate } from 'react-router-dom';
-import { Package, Truck, DollarSign, ChevronDown, ChevronUp, ClipboardList, CreditCard } from 'lucide-react';
+import { Package, Truck, ChevronDown, ChevronUp, ClipboardList, CreditCard } from 'lucide-react';
 import CheckoutFooter from '../components/CheckoutFooter';
 
 const Orders = () => {
@@ -120,7 +120,6 @@ const Orders = () => {
               <div className="bg-white/15 backdrop-blur rounded-2xl px-4 py-3 min-w-[150px] border border-white/20">
                 <p className="text-[11px] uppercase tracking-wide text-blue-100">Total Spent</p>
                 <p className="text-lg font-semibold flex items-center gap-1.5">
-                  <DollarSign className="w-4 h-4" />
                   {formatUSD(totalSpent)}
                 </p>
               </div>

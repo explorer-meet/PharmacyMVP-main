@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { ShoppingCart, X, Trash, Lock, Plus, Minus, DollarSign, ArrowLeft, Gift, Sparkles, Tag, CheckCircle2 } from 'lucide-react';
+import { ShoppingCart, X, Trash, Lock, Plus, Minus, ArrowLeft, Gift, Sparkles, Tag, CheckCircle2 } from 'lucide-react';
 import axios from 'axios';
 import { baseURL } from '../main';
 import { useNavigate } from 'react-router-dom';
@@ -370,7 +370,6 @@ const CartPage = ({ appliedCampaign = null, selectedStoreId = null }) => {
                       <div className="flex-1 min-w-0">
                         <h3 className="text-lg font-bold text-slate-900 truncate">{item.name}</h3>
                         <p className="text-slate-500 mt-2 flex items-center gap-1 font-semibold">
-                          <DollarSign className="w-4 h-4 text-blue-600" />
                           {formatUsd(item.price)}
                         </p>
                       </div>
@@ -500,7 +499,7 @@ const CartPage = ({ appliedCampaign = null, selectedStoreId = null }) => {
                   {discountAmount > 0 && (
                     <div className="text-center">
                       <p className="text-xs text-emerald-700 font-semibold mb-1">You&apos;re Saving</p>
-                      <p className="text-lg font-bold text-emerald-600">₹{discountAmount.toFixed(2)}</p>
+                      <p className="text-lg font-bold text-emerald-600">${discountAmount.toFixed(2)}</p>
                     </div>
                   )}
                 </div>
@@ -509,7 +508,6 @@ const CartPage = ({ appliedCampaign = null, selectedStoreId = null }) => {
               {/* Price Summary */}
               <div className="p-6 space-y-3 border-b border-slate-100 bg-gradient-to-br from-slate-50 to-blue-50">
                 <p className="text-sm font-bold text-slate-700 mb-4 flex items-center gap-2">
-                  <DollarSign className="w-4 h-4 text-blue-600" />
                   Price Summary
                 </p>
                 
@@ -597,7 +595,7 @@ const CartPage = ({ appliedCampaign = null, selectedStoreId = null }) => {
                   const isApplied = activeCampaign?._id === coupon._id;
                   const discountDisplay = coupon.discountType === 'Percentage' 
                     ? `${coupon.discountValue}%` 
-                    : `₹${coupon.discountValue}`;
+                    : `$${coupon.discountValue}`;
 
                   return (
                     <div
@@ -648,13 +646,13 @@ const CartPage = ({ appliedCampaign = null, selectedStoreId = null }) => {
                         {coupon.minOrderAmount > 0 && (
                           <p className="flex items-center gap-2">
                             <Tag className="w-3 h-3" />
-                            Min Order: ₹{coupon.minOrderAmount}
+                            Min Order: ${coupon.minOrderAmount}
                           </p>
                         )}
                         {coupon.maxDiscountAmount > 0 && coupon.discountType === 'Percentage' && (
                           <p className="flex items-center gap-2">
                             <Gift className="w-3 h-3" />
-                            Max Discount: ₹{coupon.maxDiscountAmount}
+                            Max Discount: ${coupon.maxDiscountAmount}
                           </p>
                         )}
                       </div>

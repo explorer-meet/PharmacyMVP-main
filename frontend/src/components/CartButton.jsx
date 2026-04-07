@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { ShoppingCart, X, Trash, Lock, Plus, Minus, DollarSign } from 'lucide-react';
+import { ShoppingCart, X, Trash, Lock, Plus, Minus } from 'lucide-react';
 import axios from 'axios';
 import { baseURL } from '../main';
 import { useNavigate } from 'react-router-dom';
@@ -374,7 +374,6 @@ const CartButton = ({ openOnMount = false, appliedCampaign = null, selectedStore
                         <div>
                           <h3 className="font-semibold text-slate-900">{item.name}</h3>
                           <p className="text-sm text-slate-500 flex items-center gap-1 mt-0.5">
-                            <DollarSign className="w-4 h-4" />
                             {formatUsd(item.price)}
                           </p>
                         </div>

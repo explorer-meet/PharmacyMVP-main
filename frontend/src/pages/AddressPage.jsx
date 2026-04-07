@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { MapPin, Phone, User, Mail, ShoppingCart, ChevronLeft, Truck, Package, IndianRupee, ShieldCheck } from 'lucide-react';
+import { MapPin, Phone, User, Mail, ShoppingCart, ChevronLeft, Truck, Package, ShieldCheck } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { baseURL } from '../main';
 import axios from 'axios';
@@ -146,8 +146,7 @@ export function AddressPage() {
               <div className="bg-white/15 backdrop-blur rounded-2xl px-4 py-3 min-w-[150px] border border-white/20">
                 <p className="text-[11px] uppercase tracking-wide text-blue-100">Total Payable</p>
                 <p className="text-lg font-semibold flex items-center gap-1.5">
-                  <IndianRupee className="w-4 h-4" />
-                  {totalAmount}
+                  $ {totalAmount}
                 </p>
               </div>
               <div className="bg-white/15 backdrop-blur rounded-2xl px-4 py-3 min-w-[150px] border border-white/20">

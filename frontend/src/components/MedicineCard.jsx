@@ -313,7 +313,7 @@ const MedicineCard = ({
               <div>
                 <p className="text-xs text-gray-500 font-medium mb-0.5">Price</p>
                 <p className="text-2xl font-black bg-gradient-to-r from-cyan-600 to-emerald-600 bg-clip-text text-transparent">
-                  ₹{price}
+                  ${price}
                 </p>
               </div>
               <div className="text-right">

@@ -363,34 +363,6 @@ const Navbar = () => {
                                     : <Moon className="w-4 h-4 text-slate-600" />
                                 }
                             </button>
-
-                            {/* Language Selector */}
-                            <div className="relative" ref={langMenuRef}>
-                                <button
-                                    onClick={() => setShowLangMenu((v) => !v)}
-                                    title="Change Language"
-                                    className="flex items-center gap-1.5 p-2.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-100 transition dark:bg-slate-800 dark:border-slate-700 dark:hover:bg-slate-700"
-                                >
-                                    <Globe className="w-4 h-4 text-slate-600 dark:text-slate-300" />
-                                    <span className="text-xs font-bold text-slate-600 dark:text-slate-300 uppercase">{language}</span>
-                                </button>
-                                {showLangMenu && (
-                                    <div className="absolute right-0 top-full mt-2 w-44 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-xl z-[200] py-1.5 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-150">
-                                        {SUPPORTED_LANGUAGES.map((lang) => (
-                                            <button
-                                                key={lang.code}
-                                                onClick={() => { changeLanguage(lang.code); setShowLangMenu(false); }}
-                                                className={`w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-left transition hover:bg-cyan-50 dark:hover:bg-slate-700 ${language === lang.code ? 'font-bold text-cyan-700 dark:text-cyan-400 bg-cyan-50 dark:bg-slate-700' : 'text-slate-700 dark:text-slate-200'}`}
-                                            >
-                                                <span>{lang.flag}</span>
-                                                <span>{lang.name}</span>
-                                                {language === lang.code && <span className="ml-auto w-2 h-2 rounded-full bg-cyan-500" />}
-                                            </button>
-                                        ))}
-                                    </div>
-                                )}
-                            </div>
-
                         </div>
 
                     </div>
