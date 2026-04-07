@@ -2490,7 +2490,7 @@ const StoreDashboard = () => {
                               type="number"
                               min="0"
                               step="0.01"
-                              placeholder="₹0"
+                              placeholder="$0"
                               className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-fuchsia-500"
                               value={newCampaign.minOrderAmount}
                               onChange={(event) => setNewCampaign((prev) => ({ ...prev, minOrderAmount: event.target.value }))}
@@ -2502,7 +2502,7 @@ const StoreDashboard = () => {
                               type="number"
                               min="0"
                               step="0.01"
-                              placeholder="₹0"
+                              placeholder="$0"
                               className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-fuchsia-500"
                               value={newCampaign.maxDiscountAmount}
                               onChange={(event) => setNewCampaign((prev) => ({ ...prev, maxDiscountAmount: event.target.value }))}
@@ -2715,7 +2715,7 @@ const StoreDashboard = () => {
                               {campaign.campaignType}
                             </span>
                             <span className="text-sm font-bold text-fuchsia-600">
-                              {campaign.discountValue}{campaign.discountType === 'Percentage' ? '%' : ' ₹'} off
+                              {campaign.discountValue}{campaign.discountType === 'Percentage' ? '%' : ' $'} off
                             </span>
                           </div>
 
@@ -2735,10 +2735,10 @@ const StoreDashboard = () => {
                           {/* Key Details */}
                           <div className="mb-4 space-y-1 text-xs text-slate-600">
                             {campaign.minOrderAmount > 0 && (
-                              <p>• Min Order: ₹{campaign.minOrderAmount}</p>
+                              <p>• Min Order: ${campaign.minOrderAmount}</p>
                             )}
                             {campaign.maxDiscountAmount > 0 && (
-                              <p>• Max Discount: ₹{campaign.maxDiscountAmount}</p>
+                              <p>• Max Discount: ${campaign.maxDiscountAmount}</p>
                             )}
                             {campaign.usageLimit > 0 && (
                               <p>• Usage Limit: {campaign.usageLimit}</p>

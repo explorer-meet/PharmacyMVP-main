@@ -620,7 +620,7 @@ function OnlinePharmacy() {
                 {filterBrand && <span className="px-2 py-0.5 rounded-full bg-cyan-100 text-cyan-700 text-xs font-semibold">Brand: {filterBrand}</span>}
                 {filterManufacturer && <span className="px-2 py-0.5 rounded-full bg-cyan-100 text-cyan-700 text-xs font-semibold">Mfr: {filterManufacturer}</span>}
                 {filterComposition && <span className="px-2 py-0.5 rounded-full bg-cyan-100 text-cyan-700 text-xs font-semibold">Comp: {filterComposition}</span>}
-                {(filterPriceMin || filterPriceMax) && <span className="px-2 py-0.5 rounded-full bg-cyan-100 text-cyan-700 text-xs font-semibold">₹{filterPriceMin || '0'} – ₹{filterPriceMax || '∞'}</span>}
+                {(filterPriceMin || filterPriceMax) && <span className="px-2 py-0.5 rounded-full bg-cyan-100 text-cyan-700 text-xs font-semibold">${filterPriceMin || '0'} – ${filterPriceMax || '∞'}</span>}
                 {filterInStock && <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 text-xs font-semibold">In Stock</span>}
                 {filterRequiresPrescription !== 'all' && <span className="px-2 py-0.5 rounded-full bg-violet-100 text-violet-700 text-xs font-semibold">{filterRequiresPrescription === 'yes' ? 'Rx Required' : 'OTC Only'}</span>}
                 <button
@@ -673,7 +673,7 @@ function OnlinePharmacy() {
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-semibold text-slate-500 mb-1.5">Min Price (₹)</label>
+                    <label className="block text-xs font-semibold text-slate-500 mb-1.5">Min Price ($)</label>
                     <input
                       type="number"
                       value={filterPriceMin}
@@ -684,7 +684,7 @@ function OnlinePharmacy() {
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-semibold text-slate-500 mb-1.5">Max Price (₹)</label>
+                    <label className="block text-xs font-semibold text-slate-500 mb-1.5">Max Price ($)</label>
                     <input
                       type="number"
                       value={filterPriceMax}

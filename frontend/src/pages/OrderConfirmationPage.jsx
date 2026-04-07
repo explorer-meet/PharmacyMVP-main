@@ -172,8 +172,8 @@ export function OrderConfirmationPage() {
                 <tr style="border-bottom: 1px solid #e0e0e0;">
                   <td style="padding: 12px;">${item.name || 'N/A'}</td>
                   <td style="padding: 12px;">${item.quantity || 0}</td>
-                  <td style="padding: 12px;">₹${Number(item.price).toFixed(2)}</td>
-                  <td style="padding: 12px;">₹${(Number(item.price) * Number(item.quantity)).toFixed(2)}</td>
+                  <td style="padding: 12px;">$${Number(item.price).toFixed(2)}</td>
+                  <td style="padding: 12px;">$${(Number(item.price) * Number(item.quantity)).toFixed(2)}</td>
                 </tr>
               `).join('')}
             </tbody>
@@ -206,21 +206,21 @@ export function OrderConfirmationPage() {
               <div style="font-size: 14px; color: #333;">
                 <div style="display: flex; justify-content: space-between; padding: 8px 0;">
                   <span style="color: #666;">Subtotal:</span>
-                  <span style="font-weight: bold;">₹${Number(subtotalAmount || 0).toFixed(2)}</span>
+                  <span style="font-weight: bold;">$${Number(subtotalAmount || 0).toFixed(2)}</span>
                 </div>
                 ${discountAmount > 0 ? `
                 <div style="display: flex; justify-content: space-between; padding: 8px 0;">
                   <span style="color: #0f766e;">Promo Discount:</span>
-                  <span style="font-weight: bold; color: #0f766e;">- ₹${Number(discountAmount).toFixed(2)}</span>
+                  <span style="font-weight: bold; color: #0f766e;">- $${Number(discountAmount).toFixed(2)}</span>
                 </div>
                 ` : ''}
                 <div style="display: flex; justify-content: space-between; padding: 8px 0;">
                   <span style="color: #666;">Taxes & Fees:</span>
-                  <span style="font-weight: bold;">₹0.00</span>
+                  <span style="font-weight: bold;">$0.00</span>
                 </div>
                 <div style="display: flex; justify-content: space-between; padding: 12px 0; border-top: 2px solid #0f766e; margin-top: 10px; font-size: 16px; font-weight: bold; color: #0f766e;">
                   <span>Total:</span>
-                  <span>₹${Number(finalAmount || 0).toFixed(2)}</span>
+                  <span>$${Number(finalAmount || 0).toFixed(2)}</span>
                 </div>
               </div>
             </div>

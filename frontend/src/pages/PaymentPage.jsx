@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { CreditCard, Truck, QrCode, ShieldCheck, ChevronLeft, Package, DollarSign } from 'lucide-react';
+import { CreditCard, Truck, QrCode, ShieldCheck, ChevronLeft, Package } from 'lucide-react';
 import { BrowserProvider, parseEther } from 'ethers';
 import toast from 'react-hot-toast';
 import { baseURL } from '../main';
@@ -87,7 +87,7 @@ export function PaymentPage() {
 
   const formattedPayableAmount = new Intl.NumberFormat('en-US', {
     style: 'currency',
-    currency: 'INR',
+    currency: 'USD',
   }).format(payableAmount);
 
   const fetchDataFromApi = async () => {
@@ -282,7 +282,6 @@ export function PaymentPage() {
                 <div className="bg-white/15 backdrop-blur rounded-2xl px-4 py-3 min-w-[150px] border border-white/20">
                   <p className="text-[11px] uppercase tracking-wide text-blue-100">Total Amount</p>
                   <p className="text-lg font-semibold flex items-center gap-1.5">
-                    <DollarSign className="w-4 h-4" />
                     {formattedPayableAmount}
                   </p>
                 </div>
@@ -332,13 +331,13 @@ export function PaymentPage() {
                 </div>
                 <div className="flex items-center justify-between text-sm text-gray-600">
                   <span>Subtotal</span>
-                  <span className="font-semibold text-gray-900">{new Intl.NumberFormat('en-US', { style: 'currency', currency: 'INR' }).format(subtotalAmount)}</span>
+                  <span className="font-semibold text-gray-900">{new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(subtotalAmount)}</span>
                 </div>
                 {discountAmount > 0 && (
                   <>
                     <div className="flex items-center justify-between text-sm text-emerald-700">
                       <span>Promo Discount</span>
-                      <span className="font-semibold">- {new Intl.NumberFormat('en-US', { style: 'currency', currency: 'INR' }).format(discountAmount)}</span>
+                      <span className="font-semibold">- {new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(discountAmount)}</span>
                     </div>
                     {checkoutSummary?.campaign?.couponCode && (
                       <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-700">

@@ -118,7 +118,7 @@ const SearchBar = ({ onSearchChange, medicines = [] }) => {
                     {medicine.price && (
                       <div className="flex-shrink-0 text-right">
                         <div className="text-sm font-bold text-cyan-600">
-                          ₹{medicine.price}
+                          ${medicine.price}
                         </div>
                       </div>
                     )}

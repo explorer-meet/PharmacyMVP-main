@@ -2635,7 +2635,6 @@ const Dashboard = () => {
                                             <div className="bg-white/15 backdrop-blur rounded-2xl px-4 py-3 min-w-[150px] border border-white/20">
                                                 <p className="text-[11px] uppercase tracking-wide text-blue-100">Total Spent</p>
                                                 <p className="text-lg font-semibold flex items-center gap-1.5">
-                                                    <DollarSign className="w-4 h-4" />
                                                     {formatUsd(dashboardOrders.reduce((sum, order) => sum + (order.totalAmount || 0), 0))}
                                                 </p>
                                             </div>
