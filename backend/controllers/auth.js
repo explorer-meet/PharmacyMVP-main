@@ -20,6 +20,12 @@ const PrescriptionRequest = require("../models/prescriptionRequest");
 const Prescription = require("../models/prescription");
 const Cart = require("../models/cart");
 const { sendUserNotification, sendEmailNotification } = require("../utils/notificationService");
+const {
+    isS3Ready,
+    uploadBufferToS3,
+    deleteFileFromS3,
+    getSignedS3Url,
+} = require("../utils/s3Service");
 const jwt = require("jsonwebtoken");
 const bcrypt = require('bcrypt');
 
@@ -83,6 +89,30 @@ const runInBackground = (label, task) => {
             console.error(`[BackgroundTask][${label}] Failed:`, error?.message || error);
         }
     });
+};
+
+const resolvePrescriptionFileUrls = async (prescriptions) => {
+    const rows = Array.isArray(prescriptions) ? prescriptions : [];
+    if (!rows.length) return [];
+
+    return Promise.all(
+        rows.map(async (item) => {
+            const row = item?.toObject ? item.toObject() : { ...item };
+
+            // Keep legacy local paths untouched and only sign S3-backed records.
+            if (!row?.fileKey || !isS3Ready()) {
+                return row;
+            }
+
+            try {
+                row.filePath = await getSignedS3Url(row.fileKey);
+            } catch (error) {
+                console.error('Failed to sign prescription S3 URL:', error?.message || error);
+            }
+
+            return row;
+        }),
+    );
 };
 
 const escapeHtml = (value) =>
@@ -493,6 +523,7 @@ const mapPatientOrder = (order) => {
 const mapStoreOrder = (order) => {
     const user = order.userId || {};
     const dateLabel = formatOrderDateLabel(order.createdAt);
+    const normalizedTotal = Number(order.totalPrice) || 0;
 
     return {
         id: order.orderId,
@@ -502,9 +533,12 @@ const mapStoreOrder = (order) => {
         customer: getCustomerName(user),
         customerEmail: user.email || 'N/A',
         customerContact: user.mobile || 'N/A',
-        total: Number(order.totalPrice) || 0,
+        total: normalizedTotal,
+        totalPrice: normalizedTotal,
         status: order.status || 'Pending',
         date: dateLabel,
+        createdAt: order.createdAt || null,
+        updatedAt: order.updatedAt || null,
         address: order.address || 'N/A',
         payment: order.payment || 'Pending',
         items: (order.items || []).map((item) => ({
@@ -1787,11 +1821,24 @@ const uploadPrescriptionFile = async (req, res) => {
             return res.status(404).json({ message: 'User not found' });
         }
 
+        if (!isS3Ready()) {
+            return res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({
+                message: 'S3 storage is not configured. Please set AWS_S3_BUCKET and AWS_REGION.',
+            });
+        }
+
+        const uploadResult = await uploadBufferToS3({
+            buffer: req.file.buffer,
+            contentType: req.file.mimetype,
+            originalName: req.file.originalname,
+            folder: 'prescriptions/general',
+        });
+
         // Create prescription record in dedicated collection
         const prescription = new Prescription({
             userId: userId,
             fileName: req.file.originalname,
-            filePath: req.file.path, // In real implementation, this would be the uploaded file URL
+            filePath: uploadResult.url,
             uploadedAt: new Date(),
             status: isApproved ? 'approved' : 'rejected'
         });
@@ -2142,10 +2189,24 @@ const uploadPrescriptionRequest = async (req, res) => {
             return res.status(StatusCodes.BAD_REQUEST).json({ message: 'Prescription file is required' });
         }
 
+        if (!isS3Ready()) {
+            return res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({
+                message: 'S3 storage is not configured. Please set AWS_S3_BUCKET and AWS_REGION.',
+            });
+        }
+
+        const uploadResult = await uploadBufferToS3({
+            buffer: req.file.buffer,
+            contentType: req.file.mimetype,
+            originalName: req.file.originalname,
+            folder: 'prescriptions/requests',
+        });
+
         const request = await PrescriptionRequest.create({
             userId,
             fileName: req.file.originalname,
-            filePath: req.file.path,
+            filePath: uploadResult.url,
+            fileKey: uploadResult.key,
             mimeType: req.file.mimetype,
             status: 'pending',
         });
@@ -2165,8 +2226,10 @@ const uploadPrescriptionRequest = async (req, res) => {
 const getMyPrescriptionRequests = async (req, res) => {
     try {
         const userId = req.user?._id;
-        const prescriptions = await PrescriptionRequest.find({ userId })
+        const rawPrescriptions = await PrescriptionRequest.find({ userId })
             .sort({ createdAt: -1 });
+
+        const prescriptions = await resolvePrescriptionFileUrls(rawPrescriptions);
 
         return res.status(StatusCodes.OK).json({ prescriptions });
     } catch (error) {
@@ -2183,10 +2246,12 @@ const getStorePrescriptionRequests = async (req, res) => {
             return res.status(permissionCheck.statusCode).json({ message: permissionCheck.message });
         }
 
-        const prescriptions = await PrescriptionRequest.find({})
+        const rawPrescriptions = await PrescriptionRequest.find({})
             .populate('userId', 'name email mobile')
             .populate('reviewedByStaffId', 'firstName lastName role')
             .sort({ status: 1, createdAt: -1 });
+
+        const prescriptions = await resolvePrescriptionFileUrls(rawPrescriptions);
 
         return res.status(StatusCodes.OK).json({ prescriptions });
     } catch (error) {
@@ -2875,13 +2940,35 @@ const reuploadPrescriptionRequest = async (req, res) => {
             return res.status(StatusCodes.BAD_REQUEST).json({ message: 'Prescription file is required' });
         }
 
+        if (!isS3Ready()) {
+            return res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({
+                message: 'S3 storage is not configured. Please set AWS_S3_BUCKET and AWS_REGION.',
+            });
+        }
+
         const existingRequest = await PrescriptionRequest.findOne({ _id: id, userId });
         if (!existingRequest) {
             return res.status(StatusCodes.NOT_FOUND).json({ message: 'Prescription request not found' });
         }
 
+        if (existingRequest.fileKey) {
+            try {
+                await deleteFileFromS3(existingRequest.fileKey);
+            } catch (deleteError) {
+                console.error('Failed to delete old prescription object from S3:', deleteError?.message || deleteError);
+            }
+        }
+
+        const uploadResult = await uploadBufferToS3({
+            buffer: req.file.buffer,
+            contentType: req.file.mimetype,
+            originalName: req.file.originalname,
+            folder: 'prescriptions/requests',
+        });
+
         existingRequest.fileName = req.file.originalname;
-        existingRequest.filePath = req.file.path;
+        existingRequest.filePath = uploadResult.url;
+        existingRequest.fileKey = uploadResult.key;
         existingRequest.mimeType = req.file.mimetype;
         existingRequest.status = 'pending';
         existingRequest.reviewNotes = '';
@@ -3576,7 +3663,7 @@ const uploadPrescriptionForAutoFill = async (req, res) => {
         const { extractMedicinesFromText, matchMedicineWithDatabase } = require('../utils/prescriptionProcessor');
         const Pharmacy = require('../models/pharmacy');
 
-        const { filename, mimetype, size, path: filePath } = req.file;
+        const { originalname, mimetype, size, buffer } = req.file;
 
         // Validate file type
         const allowedMimes = ['application/pdf', 'image/jpeg', 'image/png', 'image/gif'];
@@ -3586,11 +3673,24 @@ const uploadPrescriptionForAutoFill = async (req, res) => {
             });
         }
 
+        if (!isS3Ready()) {
+            return res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({
+                message: 'S3 storage is not configured. Please set AWS_S3_BUCKET and AWS_REGION.',
+            });
+        }
+
+        const uploadResult = await uploadBufferToS3({
+            buffer,
+            contentType: mimetype,
+            originalName: originalname,
+            folder: 'prescriptions/auto-fill',
+        });
+
         // Create prescription upload record
         const prescriptionUpload = new PrescriptionUpload({
             userId,
-            fileName: filename,
-            filePath: filePath,
+            fileName: originalname,
+            filePath: uploadResult.url,
             mimeType: mimetype,
             fileSize: size,
             status: 'uploaded',
@@ -5473,7 +5573,7 @@ const validatePublicCoupon = async (req, res) => {
 };
 
 module.exports = {
-    signUp, signIn, forgotPassword, fetchData, adminsignIn, AdminfetchData, uploadPrescriptionFile, UpdatePatientProfile, fetchpharmacymedicines, updateorderedmedicines, updatecartquantity, addmedicinetodb, decreaseupdatecartquantity, deletemedicine, finalitems, finaladdress, finalpayment, deletecartItems, createStoreApprovalRequest, getStoreApprovalRequests, reviewStoreApprovalRequest, getAllStores, updateStoreStatus, addStore, getUserNotificationPreferences, updateUserNotificationPreferences,
+    signUp, signIn, forgotPassword, fetchData, updateStoreProfile, adminsignIn, AdminfetchData, uploadPrescriptionFile, UpdatePatientProfile, fetchpharmacymedicines, updateorderedmedicines, updatecartquantity, addmedicinetodb, decreaseupdatecartquantity, deletemedicine, finalitems, finaladdress, finalpayment, deletecartItems, createStoreApprovalRequest, getStoreApprovalRequests, reviewStoreApprovalRequest, getAllStores, updateStoreStatus, addStore, getUserNotificationPreferences, updateUserNotificationPreferences,
     uploadPrescriptionRequest, reuploadPrescriptionRequest, getMyPrescriptionRequests, getStorePrescriptionRequests, reviewPrescriptionRequest,
     getStoreOrders, updateOrderTrackingStatus, getMyOrders, getOrderById, getStoreStaffMembers, createStoreStaffMember, updateStoreStaffMember, updateStoreStaffStatus, deleteStoreStaffMember, getCart, seedVaccinationMasterIfEmpty, upsertUserVaccination, getUserVaccinations, getVaccinationMaster, getUserVaccinationsForDashboard, updateUserVaccinationByMasterId, createUserQuery, getUserQueries, getStoreQueries, answerStoreQuery, importPatientsFromCsv,
     getMedicinesByStore,
@@ -5646,3 +5746,71 @@ const summarizeInvoiceTotals = (lineItems = [], discount = 0) => {
         grandTotal,
     };
 };
+
+async function updateStoreProfile(req, res) {
+    try {
+        const storeId = req.user?.storeId || req.user?._id;
+        const roleCode = Number(req.user?.roleCode || ROLE_CODES.STORE_ADMIN);
+
+        if (roleCode !== ROLE_CODES.STORE_ADMIN) {
+            return res.status(StatusCodes.FORBIDDEN).json({ message: 'Only Store Admin can edit store profile' });
+        }
+
+        const {
+            storeName,
+            ownerName,
+            countryCode,
+            mobile,
+            address,
+            city,
+            state,
+            pincode,
+        } = req.body || {};
+
+        const updatePayload = {};
+        if (typeof storeName === 'string' && storeName.trim()) updatePayload.storeName = storeName.trim();
+        if (typeof ownerName === 'string' && ownerName.trim()) updatePayload.ownerName = ownerName.trim();
+        if (typeof countryCode === 'string' && countryCode.trim()) updatePayload.countryCode = countryCode.trim();
+        if (typeof mobile === 'string' && mobile.trim()) updatePayload.mobile = mobile.trim();
+        if (typeof address === 'string') updatePayload.address = address.trim();
+        if (typeof city === 'string') updatePayload.city = city.trim();
+        if (typeof state === 'string') updatePayload.state = state.trim();
+        if (typeof pincode === 'string') updatePayload.pincode = pincode.trim();
+
+        if (!Object.keys(updatePayload).length) {
+            return res.status(StatusCodes.BAD_REQUEST).json({ message: 'No valid store profile fields provided' });
+        }
+
+        const updatedStore = await Store.findByIdAndUpdate(
+            storeId,
+            { $set: updatePayload },
+            { new: true, runValidators: true },
+        ).lean();
+
+        if (!updatedStore) {
+            return res.status(StatusCodes.NOT_FOUND).json({ message: 'Store not found' });
+        }
+
+        // Keep linked login records aligned with latest store identity.
+        await User.updateMany(
+            { linkedStoreId: updatedStore._id },
+            {
+                $set: {
+                    storeName: updatedStore.storeName || '',
+                    ownerName: updatedStore.ownerName || '',
+                    mobile: updatedStore.mobile || 'NA',
+                    address: updatedStore.address || 'NA',
+                },
+            },
+        );
+
+        return res.status(StatusCodes.OK).json({
+            success: true,
+            message: 'Store profile updated successfully',
+            store: updatedStore,
+        });
+    } catch (error) {
+        console.error('updateStoreProfile error:', error);
+        return res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({ message: 'Failed to update store profile' });
+    }
+}

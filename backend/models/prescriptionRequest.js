@@ -36,6 +36,11 @@ const prescriptionRequestSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
+    fileKey: {
+      type: String,
+      default: '',
+      trim: true,
+    },
     mimeType: {
       type: String,
       required: true,

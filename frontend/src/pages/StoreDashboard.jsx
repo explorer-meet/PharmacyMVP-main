@@ -36,7 +36,30 @@ const StoreDashboard = () => {
   const [selectedSection, setSelectedSection] = useState('staff');
   const [dashboardAccessRole, setDashboardAccessRole] = useState('Store Admin');
   const [storeName, setStoreName] = useState('');
-  const [storeProfile, setStoreProfile] = useState({ ownerName: '', email: '', mobile: '' });
+  const [storeProfile, setStoreProfile] = useState({
+    storeName: '',
+    ownerName: '',
+    email: '',
+    countryCode: '+91',
+    mobile: '',
+    address: '',
+    city: '',
+    state: '',
+    pincode: '',
+  });
+  const [isEditingStoreProfile, setIsEditingStoreProfile] = useState(false);
+  const [storeProfileDraft, setStoreProfileDraft] = useState({
+    storeName: '',
+    ownerName: '',
+    email: '',
+    countryCode: '+91',
+    mobile: '',
+    address: '',
+    city: '',
+    state: '',
+    pincode: '',
+  });
+  const [storeProfileSaving, setStoreProfileSaving] = useState(false);
   const [storeDataLoading, setStoreDataLoading] = useState(false);
   const [staffMembers, setStaffMembers] = useState([]);
   const [staffLoading, setStaffLoading] = useState(false);
@@ -88,9 +111,43 @@ const StoreDashboard = () => {
   const [orders, setOrders] = useState([]);
   const [ordersLoading, setOrdersLoading] = useState(false);
   const [selectedOrderId, setSelectedOrderId] = useState(null);
+  const [selectedOrderFilter, setSelectedOrderFilter] = useState('all');
   const [updatingTrackingStatus, setUpdatingTrackingStatus] = useState(false);
   const orderDetailsRef = useRef(null);
-  const selectedOrder = orders.find((item) => item.id === selectedOrderId);
+  const normalizeOrderStatusKey = (order) => {
+    const normalizedStatus = String(order?.trackingStatus || order?.status || '').toLowerCase();
+
+    if (normalizedStatus.includes('out for delivery')) return 'outForDelivery';
+    if (normalizedStatus.includes('order placed') || normalizedStatus.includes('booked') || normalizedStatus.includes('pending')) return 'booked';
+    if (normalizedStatus.includes('packed')) return 'packed';
+    if (normalizedStatus.includes('ready for pick up') || normalizedStatus.includes('picked up')) return 'pickup';
+    if (normalizedStatus.includes('delivered') || normalizedStatus.includes('completed')) return 'delivered';
+
+    return 'other';
+  };
+  const orderFilterConfig = [
+    { key: 'all', label: 'All Orders' },
+    { key: 'booked', label: 'Booked' },
+    { key: 'packed', label: 'Packed' },
+    { key: 'outForDelivery', label: 'Out for Delivery' },
+    { key: 'pickup', label: 'Pick Up' },
+    { key: 'delivered', label: 'Delivered' },
+  ];
+  const orderStatusCounts = orders.reduce(
+    (acc, order) => {
+      const key = normalizeOrderStatusKey(order);
+      acc.all += 1;
+      if (Object.prototype.hasOwnProperty.call(acc, key)) {
+        acc[key] += 1;
+      }
+      return acc;
+    },
+    { all: 0, booked: 0, packed: 0, outForDelivery: 0, pickup: 0, delivered: 0 }
+  );
+  const filteredOrders = selectedOrderFilter === 'all'
+    ? orders
+    : orders.filter((order) => normalizeOrderStatusKey(order) === selectedOrderFilter);
+  const selectedOrder = filteredOrders.find((item) => item.id === selectedOrderId);
   const parseCurrencyAmount = (value) => Number(String(value).replace(/[^\d.]/g, '')) || 0;
   const formatUSD = (value) =>
     new Intl.NumberFormat('en-US', {
@@ -98,7 +155,15 @@ const StoreDashboard = () => {
       currency: 'USD',
       maximumFractionDigits: 2,
     }).format(Number(value) || 0);
-  const isCompletedOrder = (status) => ['completed', 'delivered'].includes(String(status || '').toLowerCase());
+  const isCompletedOrder = (order) => {
+    const normalizedStatus = String(order?.status || '').toLowerCase();
+    const normalizedTracking = String(order?.trackingStatus || '').toLowerCase();
+
+    return ['completed', 'delivered'].includes(normalizedStatus)
+      || normalizedTracking.includes('delivered')
+      || normalizedTracking.includes('picked up')
+      || normalizedTracking.includes('ready for pick up');
+  };
   const getTrackingBadge = (trackingStatus) => {
     const s = (trackingStatus || 'Order Placed').toLowerCase();
     if (s.includes('delivered') || s.includes('pick up')) return { dot: 'bg-emerald-500', pill: 'bg-emerald-50 text-emerald-700 border border-emerald-200' };
@@ -135,9 +200,15 @@ const StoreDashboard = () => {
       className: 'bg-slate-50 border-slate-200 text-slate-700',
     };
   };
+  const resolveFileUrl = (filePath) => {
+    const value = String(filePath || '').trim();
+    if (!value) return '';
+    if (/^https?:\/\//i.test(value)) return value;
+    return `${baseURL.replace('/api', '')}/${value.replace(/\\/g, '/')}`;
+  };
   const reportOrdersTotal = orders.length;
-  const reportCompletedOrders = orders.filter((order) => isCompletedOrder(order.status)).length;
-  const reportPendingOrders = orders.filter((order) => !isCompletedOrder(order.status)).length;
+  const reportCompletedOrders = orders.filter((order) => isCompletedOrder(order)).length;
+  const reportPendingOrders = orders.filter((order) => !isCompletedOrder(order)).length;
   const reportTotalRevenue = orders.reduce((sum, order) => sum + parseCurrencyAmount(order.total), 0);
   const reportAverageOrderValue = reportOrdersTotal ? reportTotalRevenue / reportOrdersTotal : 0;
   const reportUniqueCustomers = new Set(orders.map((order) => order.customer)).size;
@@ -147,22 +218,21 @@ const StoreDashboard = () => {
   const calculateRevenueSummary = () => {
     const now = new Date();
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
     const weekAgo = new Date(today);
     weekAgo.setDate(weekAgo.getDate() - 7);
-    const monthAgo = new Date(today);
-    monthAgo.setMonth(monthAgo.getMonth() - 1);
 
     const todayOrders = orders.filter((order) => {
       const orderDate = new Date(order.createdAt);
-      return orderDate >= today;
+      return orderDate >= today && orderDate <= now;
     });
     const weekOrders = orders.filter((order) => {
       const orderDate = new Date(order.createdAt);
-      return orderDate >= weekAgo && orderDate < today;
+      return orderDate >= weekAgo && orderDate <= now;
     });
     const monthOrders = orders.filter((order) => {
       const orderDate = new Date(order.createdAt);
-      return orderDate >= monthAgo && orderDate < today;
+      return orderDate >= monthStart && orderDate <= now;
     });
 
     const revenueToday = todayOrders.reduce((sum, order) => sum + (order.totalPrice || 0), 0);
@@ -188,6 +258,39 @@ const StoreDashboard = () => {
   };
 
   const revenueSummary = calculateRevenueSummary();
+  const todayStart = new Date();
+  todayStart.setHours(0, 0, 0, 0);
+  const todayOrdersCount = orders.filter((order) => {
+    const orderDate = new Date(order.createdAt);
+    return orderDate >= todayStart;
+  }).length;
+
+  const monthWiseRevenue = (() => {
+    const map = new Map();
+
+    orders.forEach((order) => {
+      const orderDate = new Date(order.createdAt);
+      if (Number.isNaN(orderDate.getTime())) return;
+
+      const monthKey = `${orderDate.getFullYear()}-${String(orderDate.getMonth() + 1).padStart(2, '0')}`;
+      const monthLabel = orderDate.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+      const orderRevenue = Number(order.totalPrice) || parseCurrencyAmount(order.total);
+
+      if (!map.has(monthKey)) {
+        map.set(monthKey, { key: monthKey, label: monthLabel, revenue: 0, orders: 0 });
+      }
+
+      const bucket = map.get(monthKey);
+      bucket.revenue += orderRevenue;
+      bucket.orders += 1;
+    });
+
+    return Array.from(map.values())
+      .sort((a, b) => b.key.localeCompare(a.key))
+      .slice(0, 6);
+  })();
+
+  const maxMonthRevenue = monthWiseRevenue.reduce((max, item) => Math.max(max, item.revenue), 0);
 
   const handleSelectOrder = (orderId) => {
     setSelectedOrderId(orderId);
@@ -203,6 +306,7 @@ const StoreDashboard = () => {
   const [selectedPrescriptionId, setSelectedPrescriptionId] = useState(null);
   const [prescriptionsLoading, setPrescriptionsLoading] = useState(false);
   const selectedPrescription = prescriptions.find((item) => item._id === selectedPrescriptionId);
+  const selectedPrescriptionFileUrl = resolveFileUrl(selectedPrescription?.filePath);
   const [patientsCsvFile, setPatientsCsvFile] = useState(null);
   const [csvUploadMessage, setCsvUploadMessage] = useState('');
   const [csvImporting, setCsvImporting] = useState(false);
@@ -767,15 +871,84 @@ const StoreDashboard = () => {
       if (userData?.dashboardAccessRole) {
         setDashboardAccessRole(userData.dashboardAccessRole);
       }
-      setStoreProfile({
-        ownerName: userData?.ownerName || userData?.loggedInStaff?.firstName || '',
-        email: userData?.loggedInStaff?.email || userData?.email || '',
-        mobile: userData?.loggedInStaff?.contact || userData?.mobile || '',
-      });
+      const profileData = {
+        storeName: userData?.storeName || '',
+        ownerName: userData?.ownerName || '',
+        email: userData?.email || '',
+        countryCode: userData?.countryCode || '+91',
+        mobile: userData?.mobile || '',
+        address: userData?.address || '',
+        city: userData?.city || '',
+        state: userData?.state || '',
+        pincode: userData?.pincode || '',
+      };
+
+      setStoreProfile(profileData);
+      setStoreProfileDraft(profileData);
     } catch (error) {
       console.error('Failed to load store data:', error.message);
     } finally {
       setStoreDataLoading(false);
+    }
+  };
+
+  const handleStoreProfileDraftChange = (event) => {
+    const { name, value } = event.target;
+    setStoreProfileDraft((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const saveStoreProfile = async (event) => {
+    event.preventDefault();
+
+    const token = localStorage.getItem('medVisionToken');
+    if (!token) return;
+
+    if (!storeProfileDraft.storeName || !storeProfileDraft.ownerName || !storeProfileDraft.mobile) {
+      toast.error('Store name, owner name, and mobile are required.');
+      return;
+    }
+
+    try {
+      setStoreProfileSaving(true);
+      const response = await axios.put(
+        `${baseURL}/store-profile`,
+        {
+          storeName: storeProfileDraft.storeName,
+          ownerName: storeProfileDraft.ownerName,
+          countryCode: storeProfileDraft.countryCode,
+          mobile: storeProfileDraft.mobile,
+          address: storeProfileDraft.address,
+          city: storeProfileDraft.city,
+          state: storeProfileDraft.state,
+          pincode: storeProfileDraft.pincode,
+        },
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        },
+      );
+
+      const updatedStore = response.data?.store || {};
+      const nextProfile = {
+        storeName: updatedStore.storeName || storeProfileDraft.storeName,
+        ownerName: updatedStore.ownerName || storeProfileDraft.ownerName,
+        email: updatedStore.email || storeProfile.email,
+        countryCode: updatedStore.countryCode || storeProfileDraft.countryCode,
+        mobile: updatedStore.mobile || storeProfileDraft.mobile,
+        address: updatedStore.address || storeProfileDraft.address,
+        city: updatedStore.city || storeProfileDraft.city,
+        state: updatedStore.state || storeProfileDraft.state,
+        pincode: updatedStore.pincode || storeProfileDraft.pincode,
+      };
+
+      setStoreName(nextProfile.storeName);
+      setStoreProfile(nextProfile);
+      setStoreProfileDraft(nextProfile);
+      setIsEditingStoreProfile(false);
+      toast.success('Store details updated successfully');
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Failed to update store details');
+    } finally {
+      setStoreProfileSaving(false);
     }
   };
 
@@ -1536,6 +1709,19 @@ const StoreDashboard = () => {
     };
   }, []);
 
+  useEffect(() => {
+    if (selectedSection !== 'orders') return;
+
+    if (!filteredOrders.length) {
+      setSelectedOrderId(null);
+      return;
+    }
+
+    if (!filteredOrders.some((order) => order.id === selectedOrderId)) {
+      setSelectedOrderId(filteredOrders[0].id);
+    }
+  }, [selectedSection, selectedOrderFilter, filteredOrders, selectedOrderId]);
+
   const handleSubmitAnswer = async (queryId) => {
     const answer = answerText.trim();
     if (!answer) return;
@@ -1722,28 +1908,166 @@ const StoreDashboard = () => {
                   <UserCheck className="text-indigo-600" size={24} />
                   <div>
                     <h2 className="text-xl font-semibold text-slate-900">My Profile</h2>
-                    <p className="text-sm text-slate-500">Role, account, and access scope for the current dashboard view.</p>
+                    <p className="text-sm text-slate-500">Store details, account info, and profile management.</p>
                   </div>
                 </div>
-                <div className="grid gap-4 sm:grid-cols-2">
+                <div className="mb-6 grid gap-4 sm:grid-cols-2">
                   <div className="rounded-2xl bg-slate-50 p-4">
                     <p className="text-xs text-slate-500">Store</p>
-                    <p className="text-lg font-semibold text-slate-900">{storeName || 'N/A'}</p>
+                    <p className="text-lg font-semibold text-slate-900">{storeProfile.storeName || storeName || 'N/A'}</p>
                   </div>
                   <div className="rounded-2xl bg-indigo-50 p-4">
                     <p className="text-xs text-indigo-600">Active Role View</p>
                     <p className="text-lg font-semibold text-indigo-900">{dashboardAccessRole}</p>
                   </div>
-                  <div className="rounded-2xl bg-emerald-50 p-4">
-                    <p className="text-xs text-emerald-600">Owner Name</p>
-                    <p className="text-lg font-semibold text-emerald-900">{storeProfile.ownerName || 'N/A'}</p>
-                  </div>
-                  <div className="rounded-2xl bg-blue-50 p-4">
-                    <p className="text-xs text-blue-600">Contact</p>
-                    <p className="text-lg font-semibold text-blue-900">{storeProfile.mobile || 'N/A'}</p>
-                    <p className="text-sm text-blue-700">{storeProfile.email || 'N/A'}</p>
-                  </div>
                 </div>
+
+                {!isEditingStoreProfile ? (
+                  <div className="space-y-4">
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <div className="rounded-2xl bg-emerald-50 p-4">
+                        <p className="text-xs text-emerald-600">Owner Name</p>
+                        <p className="text-lg font-semibold text-emerald-900">{storeProfile.ownerName || 'N/A'}</p>
+                      </div>
+                      <div className="rounded-2xl bg-blue-50 p-4">
+                        <p className="text-xs text-blue-600">Email</p>
+                        <p className="text-lg font-semibold text-blue-900">{storeProfile.email || 'N/A'}</p>
+                      </div>
+                      <div className="rounded-2xl bg-amber-50 p-4">
+                        <p className="text-xs text-amber-700">Contact</p>
+                        <p className="text-lg font-semibold text-amber-900">{`${storeProfile.countryCode || '+91'} ${storeProfile.mobile || 'N/A'}`}</p>
+                      </div>
+                      <div className="rounded-2xl bg-cyan-50 p-4">
+                        <p className="text-xs text-cyan-700">Location</p>
+                        <p className="text-sm font-semibold text-cyan-900">{[storeProfile.city, storeProfile.state, storeProfile.pincode].filter(Boolean).join(', ') || 'N/A'}</p>
+                      </div>
+                    </div>
+                    <div className="rounded-2xl bg-slate-50 p-4">
+                      <p className="text-xs text-slate-500">Address</p>
+                      <p className="text-sm font-semibold text-slate-900 mt-1">{storeProfile.address || 'N/A'}</p>
+                    </div>
+                    {dashboardAccessRole === 'Store Admin' ? (
+                      <button
+                        type="button"
+                        onClick={() => setIsEditingStoreProfile(true)}
+                        className="inline-flex items-center rounded-2xl bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-700"
+                      >
+                        Edit Store Details
+                      </button>
+                    ) : null}
+                  </div>
+                ) : (
+                  <form className="space-y-4" onSubmit={saveStoreProfile}>
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <div>
+                        <label className="block text-sm font-medium text-slate-700">Store Name</label>
+                        <input
+                          name="storeName"
+                          value={storeProfileDraft.storeName}
+                          onChange={handleStoreProfileDraftChange}
+                          className="mt-1 block w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-blue-500"
+                          required
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-slate-700">Owner Name</label>
+                        <input
+                          name="ownerName"
+                          value={storeProfileDraft.ownerName}
+                          onChange={handleStoreProfileDraftChange}
+                          className="mt-1 block w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-blue-500"
+                          required
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-slate-700">Email</label>
+                        <input
+                          name="email"
+                          value={storeProfileDraft.email}
+                          className="mt-1 block w-full cursor-not-allowed rounded-2xl border border-slate-200 bg-slate-100 px-4 py-3 text-slate-500"
+                          disabled
+                        />
+                      </div>
+                      <div className="grid grid-cols-[110px_1fr] gap-3">
+                        <div>
+                          <label className="block text-sm font-medium text-slate-700">Code</label>
+                          <input
+                            name="countryCode"
+                            value={storeProfileDraft.countryCode}
+                            onChange={handleStoreProfileDraftChange}
+                            className="mt-1 block w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-blue-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-slate-700">Mobile</label>
+                          <input
+                            name="mobile"
+                            value={storeProfileDraft.mobile}
+                            onChange={handleStoreProfileDraftChange}
+                            className="mt-1 block w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-blue-500"
+                            required
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-slate-700">City</label>
+                        <input
+                          name="city"
+                          value={storeProfileDraft.city}
+                          onChange={handleStoreProfileDraftChange}
+                          className="mt-1 block w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-blue-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-slate-700">State</label>
+                        <input
+                          name="state"
+                          value={storeProfileDraft.state}
+                          onChange={handleStoreProfileDraftChange}
+                          className="mt-1 block w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-blue-500"
+                        />
+                      </div>
+                      <div className="sm:col-span-2">
+                        <label className="block text-sm font-medium text-slate-700">Address</label>
+                        <input
+                          name="address"
+                          value={storeProfileDraft.address}
+                          onChange={handleStoreProfileDraftChange}
+                          className="mt-1 block w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-blue-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-slate-700">Pincode</label>
+                        <input
+                          name="pincode"
+                          value={storeProfileDraft.pincode}
+                          onChange={handleStoreProfileDraftChange}
+                          className="mt-1 block w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-blue-500"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex flex-wrap gap-3">
+                      <button
+                        type="submit"
+                        disabled={storeProfileSaving}
+                        className="inline-flex items-center rounded-2xl bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-blue-300"
+                      >
+                        {storeProfileSaving ? 'Saving...' : 'Save Changes'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setStoreProfileDraft(storeProfile);
+                          setIsEditingStoreProfile(false);
+                        }}
+                        className="inline-flex items-center rounded-2xl border border-slate-200 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </form>
+                )}
               </div>
             )}
 
@@ -3259,17 +3583,36 @@ const StoreDashboard = () => {
                     </div>
                   </div>
                 </div>
+                <div className="mb-6 flex flex-wrap gap-2">
+                  {orderFilterConfig.map((filter) => {
+                    const active = selectedOrderFilter === filter.key;
+                    const count = orderStatusCounts[filter.key] || 0;
+                    return (
+                      <button
+                        key={filter.key}
+                        type="button"
+                        onClick={() => setSelectedOrderFilter(filter.key)}
+                        className={`inline-flex items-center gap-2 rounded-full border px-3 py-2 text-xs font-semibold transition ${active ? 'border-sky-500 bg-sky-50 text-sky-700' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'}`}
+                      >
+                        <span>{filter.label}</span>
+                        <span className={`rounded-full px-2 py-0.5 text-[11px] ${active ? 'bg-sky-100 text-sky-700' : 'bg-slate-100 text-slate-600'}`}>
+                          {count}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
                 <div className="grid gap-6 lg:grid-cols-[300px_1fr]">
                   <div className="space-y-3">
                     {ordersLoading ? (
                       <div className="rounded-3xl border border-slate-200 bg-slate-50 p-8 text-center text-sm text-slate-500">
                         Loading orders...
                       </div>
-                    ) : orders.length === 0 ? (
+                    ) : filteredOrders.length === 0 ? (
                       <div className="rounded-3xl border border-slate-200 bg-slate-50 p-8 text-center text-sm text-slate-500">
-                        No orders available yet.
+                        {orders.length === 0 ? 'No orders available yet.' : 'No orders match this filter.'}
                       </div>
-                    ) : orders.map((order, index) => {
+                    ) : filteredOrders.map((order, index) => {
                       const active = order.id === selectedOrderId;
                       return (
                         <button
@@ -3502,7 +3845,7 @@ const StoreDashboard = () => {
                             {selectedPrescription.status?.charAt(0).toUpperCase() + selectedPrescription.status?.slice(1)}
                           </span>
                         </div>
-                        {selectedPrescription.filePath && String(selectedPrescription.status || '').toLowerCase() === 'pending' && (
+                        {selectedPrescriptionFileUrl && String(selectedPrescription.status || '').toLowerCase() === 'pending' && (
                           <div className="rounded-3xl border border-slate-200 bg-white p-5">
                             <div className="flex items-center justify-between gap-3">
                               <div>
@@ -3513,23 +3856,23 @@ const StoreDashboard = () => {
                             <div className="mt-4">
                               {String(selectedPrescription.mimeType || '').startsWith('image/') ? (
                                 <img
-                                  src={`${baseURL.replace('/api', '')}/${selectedPrescription.filePath.replace(/\\/g, '/')}`}
+                                  src={selectedPrescriptionFileUrl}
                                   alt={selectedPrescription.fileName}
                                   className="w-full rounded-3xl border border-slate-200 object-contain"
                                 />
                               ) : selectedPrescription.mimeType === 'application/pdf' ? (
                                 <div className="overflow-hidden rounded-3xl border border-slate-200">
-                                  <object data={`${baseURL.replace('/api', '')}/${selectedPrescription.filePath.replace(/\\/g, '/')}`} type="application/pdf" width="100%" height="320">
+                                  <object data={selectedPrescriptionFileUrl} type="application/pdf" width="100%" height="320">
                                     <div className="p-4 text-sm text-slate-500">
                                       PDF preview not available.{' '}
-                                      <a href={`${baseURL.replace('/api', '')}/${selectedPrescription.filePath.replace(/\\/g, '/')}`} target="_blank" rel="noreferrer" className="text-indigo-600 underline">
+                                      <a href={selectedPrescriptionFileUrl} target="_blank" rel="noreferrer" className="text-indigo-600 underline">
                                         Open document
                                       </a>
                                     </div>
                                   </object>
                                 </div>
                               ) : (
-                                <a href={`${baseURL.replace('/api', '')}/${selectedPrescription.filePath.replace(/\\/g, '/')}`} target="_blank" rel="noreferrer" className="inline-flex text-sm font-medium text-indigo-600 hover:text-indigo-700">
+                                <a href={selectedPrescriptionFileUrl} target="_blank" rel="noreferrer" className="inline-flex text-sm font-medium text-indigo-600 hover:text-indigo-700">
                                   View attachment
                                 </a>
                               )}
@@ -3774,47 +4117,88 @@ const StoreDashboard = () => {
             )}
 
             {selectedSection === 'reports' && (
-              <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-                <div className="flex items-center gap-3 mb-6">
-                  <BarChart3 className="text-slate-700" size={24} />
-                  <div>
-                    <h2 className="text-xl font-semibold text-slate-900">Reports</h2>
-                    <p className="text-sm text-slate-500">Store revenue and order performance.</p>
+              <div className="space-y-6">
+                <div className="rounded-3xl border border-slate-200 bg-gradient-to-r from-slate-900 via-slate-800 to-blue-900 p-6 text-white shadow-sm">
+                  <div className="flex items-center gap-3">
+                    <BarChart3 className="text-cyan-300" size={24} />
+                    <div>
+                      <h2 className="text-xl font-semibold">Revenue Command Center</h2>
+                      <p className="text-sm text-slate-200">Precise financial snapshot for Store Admin.</p>
+                    </div>
+                  </div>
+                  <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                    <div className="rounded-2xl border border-white/15 bg-white/10 p-4">
+                      <p className="text-xs uppercase tracking-wide text-cyan-100">Month-wise Revenue</p>
+                      <p className="mt-2 text-2xl font-bold text-white">{formatUSD(revenueSummary.monthly)}</p>
+                    </div>
+                    <div className="rounded-2xl border border-white/15 bg-white/10 p-4">
+                      <p className="text-xs uppercase tracking-wide text-cyan-100">Overall Orders Revenue</p>
+                      <p className="mt-2 text-2xl font-bold text-white">{formatUSD(reportTotalRevenue)}</p>
+                    </div>
+                    <div className="rounded-2xl border border-white/15 bg-white/10 p-4">
+                      <p className="text-xs uppercase tracking-wide text-cyan-100">Today&apos;s Revenue</p>
+                      <p className="mt-2 text-2xl font-bold text-white">{formatUSD(revenueSummary.revenueToday)}</p>
+                    </div>
+                    <div className="rounded-2xl border border-white/15 bg-white/10 p-4">
+                      <p className="text-xs uppercase tracking-wide text-cyan-100">Today&apos;s Orders</p>
+                      <p className="mt-2 text-2xl font-bold text-white">{todayOrdersCount}</p>
+                    </div>
                   </div>
                 </div>
-                <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-                  <div className="rounded-3xl bg-slate-50 p-5">
-                    <p className="text-sm text-slate-500">Monthly Revenue</p>
-                    <p className="mt-3 text-3xl font-semibold text-slate-900">{formatUSD(revenueSummary.monthly)}</p>
+
+                <div className="grid gap-6 xl:grid-cols-[1.25fr_0.9fr]">
+                  <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+                    <div className="mb-4 flex items-center justify-between">
+                      <h3 className="text-lg font-semibold text-slate-900">Monthly Order Revenue Trend</h3>
+                      <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">Last {monthWiseRevenue.length || 0} months</span>
+                    </div>
+
+                    {monthWiseRevenue.length === 0 ? (
+                      <div className="rounded-2xl border border-slate-200 bg-slate-50 p-8 text-center text-sm text-slate-500">
+                        No order data available for monthly breakdown yet.
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        {monthWiseRevenue.map((month) => (
+                          <div key={month.key} className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
+                            <div className="mb-2 flex items-center justify-between gap-3">
+                              <p className="text-sm font-semibold text-slate-900">{month.label}</p>
+                              <p className="text-sm font-semibold text-slate-900">{formatUSD(month.revenue)}</p>
+                            </div>
+                            <div className="h-2 overflow-hidden rounded-full bg-slate-200">
+                              <div
+                                className="h-full rounded-full bg-gradient-to-r from-sky-500 to-cyan-500"
+                                style={{ width: `${maxMonthRevenue > 0 ? Math.max(8, Math.round((month.revenue / maxMonthRevenue) * 100)) : 0}%` }}
+                              />
+                            </div>
+                            <p className="mt-2 text-xs text-slate-500">Orders: {month.orders}</p>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
-                  <div className="rounded-3xl bg-slate-50 p-5">
-                    <p className="text-sm text-slate-500">Weekly Revenue</p>
-                    <p className="mt-3 text-3xl font-semibold text-slate-900">{formatUSD(revenueSummary.weekly)}</p>
-                  </div>
-                  <div className="rounded-3xl bg-slate-50 p-5">
-                    <p className="text-sm text-slate-500">Today&apos;s Revenue</p>
-                    <p className="mt-3 text-3xl font-semibold text-slate-900">{formatUSD(revenueSummary.revenueToday)}</p>
-                  </div>
-                  <div className="rounded-3xl bg-slate-50 p-5">
-                    <p className="text-sm text-slate-500">Growth</p>
-                    <p className="mt-3 text-3xl font-semibold text-slate-900">{revenueSummary.growth}%</p>
-                  </div>
-                  <div className="rounded-3xl bg-slate-50 p-5">
-                    <p className="text-sm text-slate-500">Total Order Revenue</p>
-                    <p className="mt-3 text-3xl font-semibold text-slate-900">{formatUSD(reportTotalRevenue)}</p>
-                  </div>
-                  <div className="rounded-3xl bg-slate-50 p-5">
-                    <p className="text-sm text-slate-500">Average Order Value</p>
-                    <p className="mt-3 text-3xl font-semibold text-slate-900">{formatUSD(reportAverageOrderValue)}</p>
-                  </div>
-                  <div className="rounded-3xl bg-slate-50 p-5">
-                    <p className="text-sm text-slate-500">Order Completion Rate</p>
-                    <p className="mt-3 text-3xl font-semibold text-slate-900">{reportCompletionRate}%</p>
-                  </div>
-                  <div className="rounded-3xl bg-slate-50 p-5">
-                    <p className="text-sm text-slate-500">Operational Snapshot</p>
-                    <p className="mt-2 text-lg font-semibold text-slate-900">{reportCompletedOrders}/{reportOrdersTotal} completed</p>
-                    <p className="text-sm text-slate-600">{reportPendingOrders} pending • {reportUniqueCustomers} unique customers</p>
+
+                  <div className="space-y-4">
+                    <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+                      <p className="text-xs uppercase tracking-wide text-slate-500">Order Health</p>
+                      <p className="mt-2 text-2xl font-bold text-slate-900">{reportCompletionRate}%</p>
+                      <p className="mt-1 text-sm text-slate-600">Completion rate</p>
+                      <p className="mt-3 text-sm text-slate-700">{reportCompletedOrders} completed / {reportOrdersTotal} total orders</p>
+                    </div>
+
+                    <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+                      <p className="text-xs uppercase tracking-wide text-slate-500">Average Order Value</p>
+                      <p className="mt-2 text-2xl font-bold text-slate-900">{formatUSD(reportAverageOrderValue)}</p>
+                      <p className="mt-1 text-sm text-slate-600">Across all fulfilled and active orders</p>
+                    </div>
+
+                    <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+                      <p className="text-xs uppercase tracking-wide text-slate-500">Week-over-Week Growth</p>
+                      <p className={`mt-2 text-2xl font-bold ${revenueSummary.growth >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                        {revenueSummary.growth >= 0 ? '+' : ''}{revenueSummary.growth}%
+                      </p>
+                      <p className="mt-1 text-sm text-slate-600">Compared with the previous week</p>
+                    </div>
                   </div>
                 </div>
               </div>
