@@ -115,6 +115,23 @@ const resolvePrescriptionFileUrls = async (prescriptions) => {
     );
 };
 
+const resolveUserProfileImageUrl = async (user) => {
+    if (!user) return user;
+
+    const row = user?.toObject ? user.toObject() : { ...user };
+    if (!row?.profileImageKey || !isS3Ready()) {
+        return row;
+    }
+
+    try {
+        row.profileImageUrl = await getSignedS3Url(row.profileImageKey);
+    } catch (error) {
+        console.error('Failed to sign user profile image URL:', error?.message || error);
+    }
+
+    return row;
+};
+
 const escapeHtml = (value) =>
         String(value ?? '')
                 .replace(/&/g, '&amp;')
@@ -1009,7 +1026,7 @@ const fetchData = async (req, res) => {
             });
         }
 
-        const userData = await User.findById(decoded._id).select('-hash_password');
+        const userData = await User.findById(decoded._id).select('-hash_password').lean();
 
         if (!userData) {
             return res.status(404).json({
@@ -1017,9 +1034,11 @@ const fetchData = async (req, res) => {
             });
         }
 
+        const userDataWithProfile = await resolveUserProfileImageUrl(userData);
+
         return res.status(200).json({
             success: true,
-            userData,
+            userData: userDataWithProfile,
         });
 
     } catch (error) {
@@ -1220,6 +1239,11 @@ const UpdatePatientProfile = async (req, res) => {
             pincode,
         } = req.body;
 
+        const existingUser = await User.findById(userId).select('profileImageKey').lean();
+        if (!existingUser) {
+            return res.status(404).json({ message: 'Patient not found' });
+        }
+
         const updatePayload = {};
 
         if (typeof firstName === 'string') updatePayload.firstName = firstName.trim();
@@ -1244,19 +1268,53 @@ const UpdatePatientProfile = async (req, res) => {
             updatePayload.name = fullName;
         }
 
+        if (req.file) {
+            if (!String(req.file.mimetype || '').startsWith('image/')) {
+                return res.status(StatusCodes.BAD_REQUEST).json({
+                    message: 'Only image files are allowed for profile picture',
+                });
+            }
+
+            if (!isS3Ready()) {
+                return res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({
+                    message: 'S3 storage is not configured. Please set AWS_S3_BUCKET and AWS_REGION.',
+                });
+            }
+
+            const uploadResult = await uploadBufferToS3({
+                buffer: req.file.buffer,
+                contentType: req.file.mimetype,
+                originalName: req.file.originalname,
+                folder: 'profiles/patients',
+            });
+
+            updatePayload.profileImageUrl = uploadResult.url;
+            updatePayload.profileImageKey = uploadResult.key;
+
+            if (existingUser.profileImageKey) {
+                try {
+                    await deleteFileFromS3(existingUser.profileImageKey);
+                } catch (deleteError) {
+                    console.error('Failed to delete previous profile image from S3:', deleteError?.message || deleteError);
+                }
+            }
+        }
+
         const updatedPatient = await User.findByIdAndUpdate(
             userId,
             { $set: updatePayload },
             { new: true, runValidators: true }
-        ).select('-hash_password');
+        ).select('-hash_password').lean();
 
         if (!updatedPatient) {
             return res.status(404).json({ message: 'Patient not found' });
         }
 
+        const updatedPatientWithProfile = await resolveUserProfileImageUrl(updatedPatient);
+
         res.status(200).json({
             message: 'Patient profile updated successfully',
-            user: updatedPatient,
+            user: updatedPatientWithProfile,
         });
     } catch (error) {
         res.status(500).json({ message: 'Error updating patient profile', error });

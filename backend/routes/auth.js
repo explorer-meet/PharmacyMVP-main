@@ -68,6 +68,29 @@ const prescriptionUploadSingle = (req, res, next) => {
   });
 };
 
+const profileImageUpload = multer({
+  storage: multer.memoryStorage(),
+  fileFilter: function (req, file, cb) {
+    if (file.mimetype.startsWith('image/')) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only image files are allowed for profile picture'), false);
+    }
+  },
+  limits: {
+    fileSize: 5 * 1024 * 1024,
+  },
+});
+
+const profileImageUploadSingle = (req, res, next) => {
+  profileImageUpload.single('profileImage')(req, res, (err) => {
+    if (err) {
+      return res.status(400).json({ message: err.message || 'Invalid profile image upload' });
+    }
+    next();
+  });
+};
+
 const storeRequestStorage = multer.diskStorage({
   destination: function (req, file, cb) {
     ensureUploadsDir();
@@ -121,7 +144,7 @@ const patientsCsvUploadSingle = (req, res, next) => {
 router.post("/login", signIn);
 router.post("/forgot-password", forgotPassword);
 router.post("/signup", signUp);
-router.post("/patientprofile", verifyToken(["User"]), UpdatePatientProfile);
+router.post("/patientprofile", verifyToken(["User"]), profileImageUploadSingle, UpdatePatientProfile);
 router.get("/fetchdata", verifyToken(["User", "Store"]), fetchData);
 router.put("/store-profile", verifyToken(["Store"]), updateStoreProfile);
 router.get("/user-notifications", verifyToken(["User"]), getUserNotificationPreferences);

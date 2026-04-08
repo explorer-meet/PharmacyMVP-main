@@ -67,7 +67,8 @@ const Dashboard = () => {
         pincode: '',
     });
     const [profileErrors, setProfileErrors] = useState({});
-    const [profileImage, setProfileImage] = useState('');
+    const [profileImageFile, setProfileImageFile] = useState(null);
+    const [profileImagePreview, setProfileImagePreview] = useState('');
     const [queryForm, setQueryForm] = useState({ subject: '', message: '', storeId: '' });
     const [queryErrors, setQueryErrors] = useState({});
     const [showQueryForm, setShowQueryForm] = useState(false);
@@ -461,13 +462,8 @@ const Dashboard = () => {
         const file = e.target.files?.[0];
         if (!file || !file.type.startsWith('image/')) return;
 
-        const reader = new FileReader();
-        reader.onloadend = () => {
-            if (typeof reader.result === 'string') {
-                setProfileImage(reader.result);
-            }
-        };
-        reader.readAsDataURL(file);
+        setProfileImageFile(file);
+        setProfileImagePreview(URL.createObjectURL(file));
     };
 
     const handleProfileEdit = () => {
@@ -483,6 +479,8 @@ const Dashboard = () => {
             pincode: userData?.pincode || '',
         });
         setProfileErrors({});
+        setProfileImageFile(null);
+        setProfileImagePreview('');
         setIsEditingProfile(true);
     };
 
@@ -499,6 +497,8 @@ const Dashboard = () => {
             pincode: userData?.pincode || '',
         });
         setProfileErrors({});
+        setProfileImageFile(null);
+        setProfileImagePreview('');
         setIsEditingProfile(false);
     };
 
@@ -544,26 +544,27 @@ const Dashboard = () => {
 
         try {
             setIsProfileSaving(true);
-            const response = await axios.post(
-                `${baseURL}/patientprofile`,
-                {
-                    name: fullName,
-                    firstName: trimmedFirstName,
-                    middleName: trimmedMiddleName,
-                    lastName: trimmedLastName,
-                    email: trimmedEmail,
-                    mobile: trimmedMobile,
-                    address: trimmedAddress,
-                    city: trimmedCity,
-                    state: trimmedState,
-                    pincode: trimmedPincode,
+            const payload = new FormData();
+            payload.append('name', fullName);
+            payload.append('firstName', trimmedFirstName);
+            payload.append('middleName', trimmedMiddleName);
+            payload.append('lastName', trimmedLastName);
+            payload.append('email', trimmedEmail);
+            payload.append('mobile', trimmedMobile);
+            payload.append('address', trimmedAddress);
+            payload.append('city', trimmedCity);
+            payload.append('state', trimmedState);
+            payload.append('pincode', trimmedPincode);
+
+            if (profileImageFile) {
+                payload.append('profileImage', profileImageFile);
+            }
+
+            const response = await axios.post(`${baseURL}/patientprofile`, payload, {
+                headers: {
+                    Authorization: `Bearer ${token}`,
                 },
-                {
-                    headers: {
-                        Authorization: `Bearer ${token}`,
-                    },
-                }
-            );
+            });
 
             const updatedUser = response.data?.user;
             if (updatedUser) {
@@ -571,6 +572,8 @@ const Dashboard = () => {
                 localStorage.setItem('userData', JSON.stringify(updatedUser));
             }
             setProfileErrors({});
+            setProfileImageFile(null);
+            setProfileImagePreview('');
             setIsEditingProfile(false);
         } catch (error) {
             console.error('Error saving profile:', error.message);
@@ -1381,8 +1384,8 @@ const Dashboard = () => {
                         <div className="flex items-center gap-3">
                             <div className="relative flex-shrink-0">
                                 <div className="w-12 h-12 rounded-xl overflow-hidden bg-gradient-to-br from-cyan-500 to-teal-600 flex items-center justify-center text-white font-bold text-lg shadow-lg ring-2 ring-cyan-400/30">
-                                    {profileImage ? (
-                                        <img src={profileImage} alt="Profile" className="w-full h-full object-cover" />
+                                    {(profileImagePreview || userData?.profileImageUrl) ? (
+                                        <img src={profileImagePreview || userData?.profileImageUrl} alt="Profile" className="w-full h-full object-cover" />
                                     ) : (
                                         userData?.name?.charAt(0)?.toUpperCase() || 'U'
                                     )}

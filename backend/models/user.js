@@ -47,6 +47,16 @@ const userSchema = new mongoose.Schema({
    pincode: {
       type: String,
    },
+   profileImageUrl: {
+      type: String,
+      default: '',
+      trim: true,
+   },
+   profileImageKey: {
+      type: String,
+      default: '',
+      trim: true,
+   },
 
    // Authentication
    password: {
