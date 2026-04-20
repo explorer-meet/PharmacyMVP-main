@@ -6479,6 +6479,245 @@ const validatePublicCoupon = async (req, res) => {
     }
 };
 
+// ─── Insurance ───────────────────────────────────────────────────────────────
+const InsuranceProfile = require("../models/insuranceProfile");
+const PDFDocument = require("pdfkit");
+
+const getMyInsurancePolicies = async (req, res) => {
+    try {
+        const userId = req.user?.id || req.user?._id;
+        const policies = await InsuranceProfile.find({ userId }).sort({ isPrimary: -1, createdAt: -1 }).lean();
+        return res.status(200).json({ policies });
+    } catch (err) {
+        console.error("getMyInsurancePolicies error:", err);
+        return res.status(500).json({ message: "Failed to fetch insurance policies" });
+    }
+};
+
+const addInsurancePolicy = async (req, res) => {
+    try {
+        const userId = req.user?.id || req.user?._id;
+        const { provider, planName, policyNumber, groupNumber, holderName, relationship, coveragePercent, maxCoverageAmount, validFrom, validTo, isPrimary } = req.body;
+
+        if (!provider || !policyNumber || !holderName || !validFrom || !validTo) {
+            return res.status(400).json({ message: "provider, policyNumber, holderName, validFrom, validTo are required" });
+        }
+
+        // If this one is primary, unset existing primary
+        if (isPrimary) {
+            await InsuranceProfile.updateMany({ userId }, { isPrimary: false });
+        }
+
+        const policyDocument = req.file ? req.file.filename : '';
+
+        const policy = await InsuranceProfile.create({
+            userId, provider, planName, policyNumber, groupNumber, holderName,
+            relationship: relationship || "self",
+            coveragePercent: Number(coveragePercent) || 80,
+            maxCoverageAmount: Number(maxCoverageAmount) || 0,
+            validFrom: new Date(validFrom),
+            validTo: new Date(validTo),
+            isPrimary: !!isPrimary,
+            policyDocument,
+        });
+
+        return res.status(201).json({ message: "Insurance policy added", policy });
+    } catch (err) {
+        console.error("addInsurancePolicy error:", err);
+        return res.status(500).json({ message: "Failed to add insurance policy" });
+    }
+};
+
+const updateInsurancePolicy = async (req, res) => {
+    try {
+        const userId = req.user?.id || req.user?._id;
+        const { id } = req.params;
+        const updates = req.body;
+
+        const policy = await InsuranceProfile.findOne({ _id: id, userId });
+        if (!policy) return res.status(404).json({ message: "Policy not found" });
+
+        if (updates.isPrimary) {
+            await InsuranceProfile.updateMany({ userId, _id: { $ne: id } }, { isPrimary: false });
+        }
+
+        if (updates.validFrom) updates.validFrom = new Date(updates.validFrom);
+        if (updates.validTo) updates.validTo = new Date(updates.validTo);
+        
+        // Handle file upload if provided
+        if (req.file) {
+            updates.policyDocument = req.file.filename;
+        }
+
+        Object.assign(policy, updates);
+        await policy.save();
+
+        return res.status(200).json({ message: "Policy updated", policy });
+    } catch (err) {
+        console.error("updateInsurancePolicy error:", err);
+        return res.status(500).json({ message: "Failed to update policy" });
+    }
+};
+
+const deleteInsurancePolicy = async (req, res) => {
+    try {
+        const userId = req.user?.id || req.user?._id;
+        const { id } = req.params;
+
+        const deleted = await InsuranceProfile.findOneAndDelete({ _id: id, userId });
+        if (!deleted) return res.status(404).json({ message: "Policy not found" });
+
+        return res.status(200).json({ message: "Policy deleted" });
+    } catch (err) {
+        console.error("deleteInsurancePolicy error:", err);
+        return res.status(500).json({ message: "Failed to delete policy" });
+    }
+};
+
+const downloadInsurancePolicyPdf = async (req, res) => {
+    try {
+        const userId = req.user?.id || req.user?._id;
+        const { id } = req.params;
+
+        const policy = await InsuranceProfile.findOne({ _id: id, userId }).lean();
+        if (!policy) return res.status(404).json({ message: "Policy not found" });
+
+        const user = await User.findById(userId).select("firstName lastName name email mobile").lean();
+
+        const doc = new PDFDocument({ margin: 50, size: "A4" });
+
+        res.setHeader("Content-Type", "application/pdf");
+        res.setHeader("Content-Disposition", `attachment; filename="insurance_policy_${policy.policyNumber}.pdf"`);
+        doc.pipe(res);
+
+        // Header band
+        doc.rect(0, 0, doc.page.width, 90).fill("#1d4ed8");
+        doc.fillColor("white").fontSize(22).font("Helvetica-Bold")
+            .text("PharmacyMVP", 50, 28, { continued: true })
+            .font("Helvetica").fontSize(13).text("  |  Insurance Policy Summary", { continued: false });
+        doc.fontSize(10).fillColor("#bfdbfe").text("Confidential – For Patient Use Only", 50, 60);
+
+        doc.fillColor("#111827");
+        let y = 110;
+
+        const sectionTitle = (title, yPos) => {
+            doc.rect(50, yPos, doc.page.width - 100, 22).fill("#eff6ff");
+            doc.fillColor("#1d4ed8").font("Helvetica-Bold").fontSize(11).text(title, 58, yPos + 5);
+            doc.fillColor("#111827").font("Helvetica").fontSize(10);
+            return yPos + 32;
+        };
+
+        const row = (label, value, yPos) => {
+            doc.font("Helvetica-Bold").text(label + ":", 60, yPos, { continued: true, width: 160 });
+            doc.font("Helvetica").text(String(value ?? "—"), { continued: false });
+            return yPos + 18;
+        };
+
+        y = sectionTitle("Patient Information", y);
+        y = row("Name", user?.firstName ? `${user.firstName} ${user.lastName}` : user?.name, y);
+        y = row("Email", user?.email, y);
+        y = row("Mobile", user?.mobile, y);
+        y += 10;
+
+        y = sectionTitle("Insurance Policy Details", y);
+        y = row("Provider", policy.provider, y);
+        y = row("Plan Name", policy.planName || "—", y);
+        y = row("Policy Number", policy.policyNumber, y);
+        y = row("Group Number", policy.groupNumber || "—", y);
+        y = row("Policy Holder", policy.holderName, y);
+        y = row("Relationship", policy.relationship, y);
+        y += 10;
+
+        y = sectionTitle("Coverage Details", y);
+        y = row("Coverage %", `${policy.coveragePercent}%`, y);
+        y = row("Max Coverage", policy.maxCoverageAmount > 0 ? `$${policy.maxCoverageAmount.toLocaleString()}` : "Unlimited", y);
+        y = row("Valid From", new Date(policy.validFrom).toDateString(), y);
+        y = row("Valid To", new Date(policy.validTo).toDateString(), y);
+        y = row("Status", policy.isActive ? "Active" : "Inactive", y);
+        y = row("Primary Policy", policy.isPrimary ? "Yes" : "No", y);
+        y += 10;
+
+        const daysLeft = Math.ceil((new Date(policy.validTo) - new Date()) / (1000 * 60 * 60 * 24));
+        const expiryText = daysLeft > 0 ? `Policy expires in ${daysLeft} day(s)` : "Policy has expired";
+        const expiryColor = daysLeft <= 30 ? "#dc2626" : daysLeft <= 90 ? "#d97706" : "#16a34a";
+
+        doc.rect(50, y, doc.page.width - 100, 28).fill(daysLeft <= 30 ? "#fef2f2" : daysLeft <= 90 ? "#fffbeb" : "#f0fdf4");
+        doc.fillColor(expiryColor).font("Helvetica-Bold").fontSize(10).text(expiryText, 60, y + 8);
+        doc.fillColor("#111827");
+        y += 42;
+
+        doc.fontSize(8).fillColor("#6b7280")
+            .text(`Generated on ${new Date().toLocaleString()} — PharmacyMVP`, 50, y, { align: "center", width: doc.page.width - 100 });
+
+        doc.end();
+    } catch (err) {
+        console.error("downloadInsurancePolicyPdf error:", err);
+        if (!res.headersSent) return res.status(500).json({ message: "Failed to generate PDF" });
+    }
+};
+
+const checkInsuranceExpiryReminders = async (req, res) => {
+    try {
+        const userId = req.user?.id || req.user?._id;
+        const today = new Date();
+        const in30 = new Date(today); in30.setDate(today.getDate() + 30);
+        const in90 = new Date(today); in90.setDate(today.getDate() + 90);
+
+        const expiring = await InsuranceProfile.find({
+            userId,
+            isActive: true,
+            validTo: { $gte: today, $lte: in90 },
+        }).lean();
+
+        if (!expiring.length) {
+            return res.status(200).json({ message: "No policies expiring within 90 days.", reminders: [] });
+        }
+
+        const user = await User.findById(userId).select("firstName lastName name email").lean();
+        const userName = user?.firstName ? `${user.firstName} ${user.lastName}` : (user?.name || "Patient");
+
+        const reminders = expiring.map(p => {
+            const daysLeft = Math.ceil((new Date(p.validTo) - today) / (1000 * 60 * 60 * 24));
+            return { policyId: p._id, provider: p.provider, policyNumber: p.policyNumber, daysLeft };
+        });
+
+        // Send email notification
+        runInBackground("insurance-expiry-reminder", async () => {
+            const policyList = reminders.map(r =>
+                `• ${r.provider} (Policy: ${r.policyNumber}) — ${r.daysLeft} day(s) remaining`
+            ).join("\n");
+
+            await triggerUserNotifications({
+                userId,
+                emailSubject: "Insurance Policy Expiry Reminder — PharmacyMVP",
+                emailMessage: `Dear ${userName},\n\nThe following insurance ${reminders.length > 1 ? "policies are" : "policy is"} expiring soon:\n\n${policyList}\n\nPlease contact your insurance provider to renew.\n\n— PharmacyMVP Team`,
+                emailHtml: `
+                  <div style="font-family:sans-serif;max-width:600px;margin:auto">
+                    <div style="background:#1d4ed8;padding:24px;border-radius:8px 8px 0 0">
+                      <h2 style="color:#fff;margin:0">⚠️ Insurance Expiry Reminder</h2>
+                    </div>
+                    <div style="background:#f8fafc;padding:24px;border-radius:0 0 8px 8px">
+                      <p>Dear <strong>${userName}</strong>,</p>
+                      <p>The following insurance ${reminders.length > 1 ? "policies are" : "policy is"} expiring soon:</p>
+                      <table style="width:100%;border-collapse:collapse;margin:16px 0">
+                        <thead><tr style="background:#e0e7ff"><th style="padding:8px;text-align:left">Provider</th><th style="padding:8px;text-align:left">Policy #</th><th style="padding:8px;text-align:left">Days Left</th></tr></thead>
+                        <tbody>${reminders.map(r => `<tr><td style="padding:8px;border-bottom:1px solid #e5e7eb">${r.provider}</td><td style="padding:8px;border-bottom:1px solid #e5e7eb">${r.policyNumber}</td><td style="padding:8px;border-bottom:1px solid #e5e7eb;color:${r.daysLeft <= 30 ? "#dc2626" : "#d97706"};font-weight:bold">${r.daysLeft} days</td></tr>`).join("")}</tbody>
+                      </table>
+                      <p>Please contact your insurance provider to renew your policy.</p>
+                      <p style="color:#6b7280;font-size:12px">— PharmacyMVP Team</p>
+                    </div>
+                  </div>`,
+                notificationCategory: "orderUpdates",
+            });
+        });
+
+        return res.status(200).json({ message: `${reminders.length} expiry reminder(s) sent.`, reminders });
+    } catch (err) {
+        console.error("checkInsuranceExpiryReminders error:", err);
+        return res.status(500).json({ message: "Failed to check insurance reminders" });
+    }
+};
+
 module.exports = {
     signUp, signIn, forgotPassword, fetchData, updateStoreProfile, adminsignIn, AdminfetchData, uploadPrescriptionFile, UpdatePatientProfile, fetchpharmacymedicines, updateorderedmedicines, updatecartquantity, addmedicinetodb, decreaseupdatecartquantity, deletemedicine, finalitems, finaladdress, finalpayment, deletecartItems, createStoreApprovalRequest, getStoreApprovalRequests, reviewStoreApprovalRequest, getAllStores, updateStoreStatus, addStore, getUserNotificationPreferences, updateUserNotificationPreferences,
     uploadPrescriptionRequest, reuploadPrescriptionRequest, getMyPrescriptionRequests, getStorePrescriptionRequests, reviewPrescriptionRequest, getPrescriptionCheckout, placePrescriptionOrder,
@@ -6502,6 +6741,7 @@ module.exports = {
     getPublicPromotionalCampaigns, validatePublicCoupon,
     getStoreAuditLogs, exportStoreAuditLogsCsv,
     getDailyCloseReport, getPrescriptionTurnaroundReport, getInventoryRiskReport,
+    getMyInsurancePolicies, addInsurancePolicy, updateInsurancePolicy, deleteInsurancePolicy, downloadInsurancePolicyPdf, checkInsuranceExpiryReminders,
 };
 
 const STAFF_ROLE_PERMISSIONS = {

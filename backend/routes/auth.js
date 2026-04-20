@@ -4,7 +4,7 @@ const multer = require("multer");
 const fs = require("fs");
 const os = require("os");
 const path = require("path");
-const { signUp, signIn, forgotPassword, fetchData, updateStoreProfile, AdminfetchData, adminsignIn, uploadPrescriptionFile, UpdatePatientProfile, fetchpharmacymedicines, updateorderedmedicines, updatecartquantity, addmedicinetodb, decreaseupdatecartquantity, deletemedicine, finalitems, finaladdress, finalpayment, deletecartItems, createStoreApprovalRequest, getStoreApprovalRequests, reviewStoreApprovalRequest, getAllStores, updateStoreStatus, addStore, getUserNotificationPreferences, updateUserNotificationPreferences, uploadPrescriptionRequest, reuploadPrescriptionRequest, getMyPrescriptionRequests, getStorePrescriptionRequests, reviewPrescriptionRequest, getPrescriptionCheckout, placePrescriptionOrder, getStoreOrders, updateOrderTrackingStatus, getMyOrders, getOrderById, getStoreStaffMembers, createStoreStaffMember, updateStoreStaffMember, updateStoreStaffStatus, deleteStoreStaffMember, getCart, seedVaccinationMasterIfEmpty, upsertUserVaccination, getUserVaccinations, getVaccinationMaster, getUserVaccinationsForDashboard, updateUserVaccinationByMasterId, createUserQuery, getUserQueries, getStoreQueries, answerStoreQuery, importPatientsFromCsv, getMedicinesByStore, getStoreManufacturers, createStoreManufacturer, getStoreInventory, createStoreInventoryMedicine, updateStoreInventoryMedicine, deleteStoreInventoryMedicine, createReview, updateReview, deleteReview, getPublicReviews, getStoreReviews, getMyReviews, getMyStoreReviews, replyToReview, uploadPrescriptionForAutoFill, extractMedicinesFromUploadedPrescription, getUserPrescriptionUploads, addExtractedMedicinesToCart, getWishlist, addToWishlist, removeFromWishlist, createMedicineTracker, getMedicineTrackers, logMedicineIntake, checkDrugInteractions, getMedicalTimeline, exportHealthRecordsPdf, getPublicPromotionalCampaigns, validatePublicCoupon, getStoreAuditLogs, exportStoreAuditLogsCsv, getDailyCloseReport, getPrescriptionTurnaroundReport, getInventoryRiskReport } = require("../controllers/auth");
+const { signUp, signIn, forgotPassword, fetchData, updateStoreProfile, AdminfetchData, adminsignIn, uploadPrescriptionFile, UpdatePatientProfile, fetchpharmacymedicines, updateorderedmedicines, updatecartquantity, addmedicinetodb, decreaseupdatecartquantity, deletemedicine, finalitems, finaladdress, finalpayment, deletecartItems, createStoreApprovalRequest, getStoreApprovalRequests, reviewStoreApprovalRequest, getAllStores, updateStoreStatus, addStore, getUserNotificationPreferences, updateUserNotificationPreferences, uploadPrescriptionRequest, reuploadPrescriptionRequest, getMyPrescriptionRequests, getStorePrescriptionRequests, reviewPrescriptionRequest, getPrescriptionCheckout, placePrescriptionOrder, getStoreOrders, updateOrderTrackingStatus, getMyOrders, getOrderById, getStoreStaffMembers, createStoreStaffMember, updateStoreStaffMember, updateStoreStaffStatus, deleteStoreStaffMember, getCart, seedVaccinationMasterIfEmpty, upsertUserVaccination, getUserVaccinations, getVaccinationMaster, getUserVaccinationsForDashboard, updateUserVaccinationByMasterId, createUserQuery, getUserQueries, getStoreQueries, answerStoreQuery, importPatientsFromCsv, getMedicinesByStore, getStoreManufacturers, createStoreManufacturer, getStoreInventory, createStoreInventoryMedicine, updateStoreInventoryMedicine, deleteStoreInventoryMedicine, createReview, updateReview, deleteReview, getPublicReviews, getStoreReviews, getMyReviews, getMyStoreReviews, replyToReview, uploadPrescriptionForAutoFill, extractMedicinesFromUploadedPrescription, getUserPrescriptionUploads, addExtractedMedicinesToCart, getWishlist, addToWishlist, removeFromWishlist, createMedicineTracker, getMedicineTrackers, logMedicineIntake, checkDrugInteractions, getMedicalTimeline, exportHealthRecordsPdf, getPublicPromotionalCampaigns, validatePublicCoupon, getStoreAuditLogs, exportStoreAuditLogsCsv, getDailyCloseReport, getPrescriptionTurnaroundReport, getInventoryRiskReport, getMyInsurancePolicies, addInsurancePolicy, updateInsurancePolicy, deleteInsurancePolicy, downloadInsurancePolicyPdf, checkInsuranceExpiryReminders } = require("../controllers/auth");
 const {
   getStoreRolePermissions,
   createStaffPerformanceRecord,
@@ -124,6 +124,31 @@ const patientsCsvUpload = multer({
       cb(null, true);
     } else {
       cb(new Error('Only CSV files are allowed!'), false);
+    }
+  },
+  limits: {
+    fileSize: 5 * 1024 * 1024,
+  },
+});
+
+const insuranceDocStorage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    ensureUploadsDir();
+    cb(null, uploadsDir);
+  },
+  filename: function (req, file, cb) {
+    cb(null, Date.now() + '-insurance-' + file.originalname);
+  }
+});
+
+const insuranceDocUpload = multer({
+  storage: insuranceDocStorage,
+  fileFilter: function (req, file, cb) {
+    const allowedMimes = ['application/pdf', 'image/jpeg', 'image/png', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
+    if (allowedMimes.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only PDF, images, and Word documents are allowed!'), false);
     }
   },
   limits: {
@@ -283,5 +308,13 @@ router.put('/reviews/:id', verifyToken(['User']), updateReview);
 router.patch('/reviews/:id/reply', verifyToken(['Store']), replyToReview);
 router.delete('/reviews/:id', verifyToken(['User']), deleteReview);
 router.get('/reviews/me', verifyToken(['User']), getMyReviews);
+
+// Insurance
+router.get('/insurance', verifyToken(['User']), getMyInsurancePolicies);
+router.post('/insurance', verifyToken(['User']), insuranceDocUpload.single('policyDocument'), addInsurancePolicy);
+router.put('/insurance/:id', verifyToken(['User']), insuranceDocUpload.single('policyDocument'), updateInsurancePolicy);
+router.delete('/insurance/:id', verifyToken(['User']), deleteInsurancePolicy);
+router.get('/insurance/:id/download', verifyToken(['User']), downloadInsurancePolicyPdf);
+router.post('/insurance/check-reminders', verifyToken(['User']), checkInsuranceExpiryReminders);
 
 module.exports = router;

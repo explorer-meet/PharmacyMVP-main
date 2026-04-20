@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import axios from 'axios';
-import { Activity, Calendar, Pill, FileText, Clock, User, Menu, X, Home, CircleUser as UserCircle, ShoppingBag, Syringe, Bell, MessageSquare, Mail as MailIcon, Pencil, ClipboardList, DollarSign, Package, Truck, ChevronDown, ChevronUp, CreditCard, Plus, Minus, Trash2, CheckCircle2, Star, AlertTriangle, Info, Download } from 'lucide-react';
+import { Activity, Calendar, Pill, FileText, Clock, User, Menu, X, Home, CircleUser as UserCircle, ShoppingBag, Syringe, Bell, MessageSquare, Mail as MailIcon, Pencil, ClipboardList, DollarSign, Package, Truck, ChevronDown, ChevronUp, CreditCard, Plus, Minus, Trash2, CheckCircle2, Star, AlertTriangle, Info, Download, Search } from 'lucide-react';
 import { baseURL } from '../main';
 import Loader from '../components/Loader';
 import PrescriptionDialog from '../components/PrescriptionDialog';
@@ -20,6 +20,10 @@ const Dashboard = () => {
     const [showNotifications, setShowNotifications] = useState(false);
     const [showRaiseQuery, setShowRaiseQuery] = useState(false);
     const [showMyOrders, setShowMyOrders] = useState(false);
+    const [orderStatusFilter, setOrderStatusFilter] = useState('all');
+    const [orderSearchQuery, setOrderSearchQuery] = useState('');
+    const [ordersPage, setOrdersPage] = useState(1);
+    const ORDERS_PER_PAGE = 5;
     const [showMyVaccinations, setShowMyVaccinations] = useState(false);
     const [showHealthManagement, setShowHealthManagement] = useState(false);
     const [vaccinationMaster, setVaccinationMaster] = useState([]);
@@ -1551,6 +1555,24 @@ const Dashboard = () => {
                                     </div>
                                 </div>
                             </div>
+
+                            {/* Health tip strip */}
+                            <div className="relative z-10 mt-6 pt-5 border-t border-white/[0.08] flex items-center gap-3">
+                                <span className="shrink-0 inline-flex items-center gap-1.5 rounded-full bg-cyan-400/15 border border-cyan-400/20 px-3 py-1 text-[10px] font-bold uppercase tracking-widest text-cyan-300">
+                                    💡 Health Tip
+                                </span>
+                                <p className="text-sm text-slate-400 leading-relaxed">
+                                    {[
+                                        'Drink at least 8 glasses of water daily to keep your kidneys and skin healthy.',
+                                        'Take your medicines at the same time every day to maintain consistent blood levels.',
+                                        'A 30-minute walk 5 days a week significantly reduces your risk of heart disease.',
+                                        'Never stop antibiotics mid-course — always complete the full prescribed duration.',
+                                        'Check your blood pressure regularly, especially if you have a family history of hypertension.',
+                                        'Store medicines in a cool, dry place away from direct sunlight and humidity.',
+                                        'Get your annual flu vaccine before monsoon season for stronger immunity.',
+                                    ][new Date().getDay()]}
+                                </p>
+                            </div>
                         </div>
 
                         {/* Stats Cards */}
@@ -1575,7 +1597,9 @@ const Dashboard = () => {
                                             <p className="text-sm font-semibold text-slate-600">{stat.label}</p>
                                             {stat.change && <p className="text-xs text-slate-400 mt-1">{stat.change}</p>}
                                         </div>
-                                        <div className="absolute bottom-0 left-0 right-0 h-0.5 opacity-0 group-hover:opacity-100 transition bg-gradient-to-r from-transparent via-cyan-400 to-transparent" />
+                                        <div className="absolute bottom-0 left-0 right-0 h-1 opacity-0 group-hover:opacity-100 transition bg-gradient-to-r from-transparent via-cyan-400 to-transparent" />
+                                        {/* colored accent bar always visible */}
+                                        <div className={`absolute bottom-0 left-0 right-0 h-[3px] ${stat.color} opacity-30 group-hover:opacity-70 transition-opacity duration-300`} />
                                     </div>
                                 ))}
                             </div>
@@ -1632,17 +1656,23 @@ const Dashboard = () => {
 
                                     <div className="space-y-3 flex-1">
                                         {[
-                                            { label: 'Active Prescriptions', sub: 'In your account', value: prescriptionRequests.length, bg: 'bg-sky-50', text: 'text-sky-900', sub2: 'text-sky-600', val: 'text-sky-700', bar: 'bg-sky-400' },
-                                            { label: 'Orders in History', sub: 'Recent purchases', value: dashboardOrders.length, bg: 'bg-amber-50', text: 'text-amber-900', sub2: 'text-amber-600', val: 'text-amber-700', bar: 'bg-amber-400' },
-                                            { label: 'Vaccination Records', sub: 'Immunization entries', value: `${vaccinatedCount}/${vaccinationMaster.length}`, bg: 'bg-emerald-50', text: 'text-emerald-900', sub2: 'text-emerald-600', val: 'text-emerald-700', bar: 'bg-emerald-400' },
+                                            { label: 'Active Prescriptions', sub: 'In your account', value: prescriptionRequests.length, bg: 'bg-sky-50', text: 'text-sky-900', sub2: 'text-sky-600', val: 'text-sky-700', bar: 'bg-sky-400', emoji: '📋', onClick: () => { resetDashboardPanels(); setShowPrescriptions(true); fetchMyPrescriptionRequests(); } },
+                                            { label: 'Orders in History', sub: 'Recent purchases', value: dashboardOrders.length, bg: 'bg-amber-50', text: 'text-amber-900', sub2: 'text-amber-600', val: 'text-amber-700', bar: 'bg-amber-400', emoji: '📦', onClick: () => { resetDashboardPanels(); setShowMyOrders(true); } },
+                                            { label: 'Vaccination Records', sub: 'Immunization entries', value: `${vaccinatedCount}/${vaccinationMaster.length}`, bg: 'bg-emerald-50', text: 'text-emerald-900', sub2: 'text-emerald-600', val: 'text-emerald-700', bar: 'bg-emerald-400', emoji: '💉', onClick: () => { resetDashboardPanels(); setShowMyVaccinations(true); loadVaccinations(); } },
                                         ].map((row) => (
-                                            <div key={row.label} className={`flex items-center justify-between rounded-xl ${row.bg} px-4 py-3.5 group`}>
-                                                <div>
-                                                    <p className={`text-sm font-semibold ${row.text}`}>{row.label}</p>
-                                                    <p className={`text-xs ${row.sub2} mt-0.5`}>{row.sub}</p>
+                                            <button key={row.label} onClick={row.onClick} className={`w-full flex items-center justify-between rounded-xl ${row.bg} px-4 py-3.5 group hover:brightness-95 transition-all duration-150`}>
+                                                <div className="flex items-center gap-3">
+                                                    <span className="text-lg">{row.emoji}</span>
+                                                    <div className="text-left">
+                                                        <p className={`text-sm font-semibold ${row.text}`}>{row.label}</p>
+                                                        <p className={`text-xs ${row.sub2} mt-0.5`}>{row.sub}</p>
+                                                    </div>
                                                 </div>
-                                                <span className={`text-2xl font-black ${row.val}`}>{row.value}</span>
-                                            </div>
+                                                <div className="flex items-center gap-2">
+                                                    <span className={`text-2xl font-black ${row.val}`}>{row.value}</span>
+                                                    <ChevronDown className={`w-4 h-4 -rotate-90 ${row.val} opacity-50 group-hover:opacity-100 transition`} />
+                                                </div>
+                                            </button>
                                         ))}
                                     </div>
 
@@ -2658,38 +2688,87 @@ const Dashboard = () => {
                                 <div className="bg-gradient-to-br from-blue-800 via-blue-700 to-cyan-600 text-white p-6 md:p-7 relative overflow-hidden">
                                     <div className="absolute -top-16 -right-10 w-40 h-40 rounded-full bg-white/10 blur-2xl"></div>
                                     <div className="absolute -bottom-16 -left-10 w-48 h-48 rounded-full bg-cyan-300/10 blur-2xl"></div>
-                                    <div className="relative z-10 flex items-center justify-between gap-4 flex-wrap">
-                                        <div>
+                                    <div className="relative z-10 flex items-start justify-between gap-4 flex-wrap">
+                                        <div className="flex-1 min-w-0 pr-2">
                                             <h2 className="text-2xl font-bold">My Orders</h2>
                                             <p className="text-blue-100 text-sm mt-1">Track your medicine orders with full status updates</p>
                                         </div>
-                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 w-full md:w-auto">
-                                            <div className="bg-white/15 backdrop-blur rounded-2xl px-4 py-3 min-w-[150px] border border-white/20">
-                                                <p className="text-[11px] uppercase tracking-wide text-blue-100">Total Orders</p>
-                                                <p className="text-lg font-semibold flex items-center gap-1.5">
-                                                    <ClipboardList className="w-4 h-4" />
-                                                    {dashboardOrders.length}
-                                                </p>
+                                        <div className="flex items-start gap-3">
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 w-full md:w-auto">
+                                                <div className="bg-white/15 backdrop-blur rounded-2xl px-4 py-3 min-w-[150px] border border-white/20">
+                                                    <p className="text-[11px] uppercase tracking-wide text-blue-100">Total Orders</p>
+                                                    <p className="text-lg font-semibold flex items-center gap-1.5">
+                                                        <ClipboardList className="w-4 h-4" />
+                                                        {dashboardOrders.length}
+                                                    </p>
+                                                </div>
+                                                <div className="bg-white/15 backdrop-blur rounded-2xl px-4 py-3 min-w-[150px] border border-white/20">
+                                                    <p className="text-[11px] uppercase tracking-wide text-blue-100">Total Spent</p>
+                                                    <p className="text-lg font-semibold flex items-center gap-1.5">
+                                                        {formatUsd(dashboardOrders.reduce((sum, order) => sum + (order.totalAmount || 0), 0))}
+                                                    </p>
+                                                </div>
                                             </div>
-                                            <div className="bg-white/15 backdrop-blur rounded-2xl px-4 py-3 min-w-[150px] border border-white/20">
-                                                <p className="text-[11px] uppercase tracking-wide text-blue-100">Total Spent</p>
-                                                <p className="text-lg font-semibold flex items-center gap-1.5">
-                                                    {formatUsd(dashboardOrders.reduce((sum, order) => sum + (order.totalAmount || 0), 0))}
-                                                </p>
-                                            </div>
+                                            <button
+                                                onClick={() => setShowMyOrders(false)}
+                                                className="shrink-0 mt-0.5 flex h-8 w-8 items-center justify-center rounded-xl bg-white/20 hover:bg-white/30 border border-white/30 text-white transition"
+                                            >
+                                                <X size={16} />
+                                            </button>
                                         </div>
                                     </div>
-                                    <button
-                                        onClick={() => setShowMyOrders(false)}
-                                        className="absolute top-5 right-5 text-white/80 hover:text-white transition"
-                                    >
-                                        <X size={20} className="text-white/80 hover:text-white" />
-                                    </button>
                                 </div>
 
                                 {dashboardOrders && dashboardOrders.length > 0 ? (
                                     <div className="space-y-4 p-6">
-                                        {dashboardOrders.map((order, index) => (
+                                        {/* ── Filters + Search ── */}
+                                        <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center">
+                                            <div className="relative flex-1">
+                                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+                                                <input
+                                                    type="text"
+                                                    placeholder="Search by order ID or store…"
+                                                    value={orderSearchQuery}
+                                                    onChange={e => { setOrderSearchQuery(e.target.value); setOrdersPage(1); }}
+                                                    className="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-300 bg-gray-50 placeholder-gray-400"
+                                                />
+                                            </div>
+                                            <div className="flex gap-1.5 flex-wrap">
+                                                {['all', 'Order Placed', 'Packed', 'Out for Delivery', 'Delivered'].map(s => (
+                                                    <button
+                                                        key={s}
+                                                        onClick={() => { setOrderStatusFilter(s); setOrdersPage(1); }}
+                                                        className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition whitespace-nowrap ${
+                                                            orderStatusFilter === s
+                                                                ? 'bg-blue-600 text-white border-blue-600'
+                                                                : 'bg-white text-gray-600 border-gray-200 hover:border-blue-300 hover:text-blue-600'
+                                                        }`}
+                                                    >
+                                                        {s === 'all' ? 'All Orders' : s}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+
+                                        {/* ── Filtered + paginated list ── */}
+                                        {(() => {
+                                            const q = orderSearchQuery.toLowerCase();
+                                            const filtered = dashboardOrders.filter(o => {
+                                                const matchStatus = orderStatusFilter === 'all' || (o.trackingStatus || o.status || '') === orderStatusFilter;
+                                                const matchSearch = !q || String(o.id || '').toLowerCase().includes(q) || (o.storeName || '').toLowerCase().includes(q);
+                                                return matchStatus && matchSearch;
+                                            });
+                                            const totalPages = Math.max(1, Math.ceil(filtered.length / ORDERS_PER_PAGE));
+                                            const safePage = Math.min(ordersPage, totalPages);
+                                            const paged = filtered.slice((safePage - 1) * ORDERS_PER_PAGE, safePage * ORDERS_PER_PAGE);
+                                            return (
+                                                <>
+                                                {paged.length === 0 && (
+                                                    <div className="text-center py-10 text-gray-400 text-sm">
+                                                        No orders match your filters.
+                                                    </div>
+                                                )}
+                                        {paged.map((order, index) => (
                                             <div
                                                 key={`${order.id}-${index}`}
                                                 className="p-5 bg-white rounded-2xl shadow-sm border border-gray-200"
@@ -2883,6 +2962,45 @@ const Dashboard = () => {
                                                 )}
                                             </div>
                                         ))}
+                                                {totalPages > 1 && (
+                                                    <div className="flex items-center justify-between pt-2">
+                                                        <p className="text-xs text-gray-400">
+                                                            Showing {(safePage - 1) * ORDERS_PER_PAGE + 1}–{Math.min(safePage * ORDERS_PER_PAGE, filtered.length)} of {filtered.length} orders
+                                                        </p>
+                                                        <div className="flex items-center gap-1">
+                                                            <button
+                                                                disabled={safePage === 1}
+                                                                onClick={() => setOrdersPage(p => Math.max(1, p - 1))}
+                                                                className="px-3 py-1.5 rounded-xl border text-xs font-semibold disabled:opacity-40 hover:bg-gray-50 transition"
+                                                            >
+                                                                ← Prev
+                                                            </button>
+                                                            {Array.from({ length: totalPages }, (_, i) => i + 1).map(pg => (
+                                                                <button
+                                                                    key={pg}
+                                                                    onClick={() => setOrdersPage(pg)}
+                                                                    className={`w-8 h-8 rounded-xl text-xs font-bold border transition ${
+                                                                        pg === safePage
+                                                                            ? 'bg-blue-600 text-white border-blue-600'
+                                                                            : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
+                                                                    }`}
+                                                                >
+                                                                    {pg}
+                                                                </button>
+                                                            ))}
+                                                            <button
+                                                                disabled={safePage === totalPages}
+                                                                onClick={() => setOrdersPage(p => Math.min(totalPages, p + 1))}
+                                                                className="px-3 py-1.5 rounded-xl border text-xs font-semibold disabled:opacity-40 hover:bg-gray-50 transition"
+                                                            >
+                                                                Next →
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                )}
+                                                </>
+                                            );
+                                        })()}
                                     </div>
                                 ) : (
                                     <div className="text-center py-12 px-6">
@@ -2901,116 +3019,162 @@ const Dashboard = () => {
                         )}
                         {/* My Vaccinations Panel */}
                         {showMyVaccinations && (
-                            <div className="bg-white rounded-2xl shadow-lg p-6">
-                                <div className="flex items-center justify-between mb-6">
-                                    <div className="flex items-center gap-3">
-                                        <div className="w-10 h-10 rounded-xl bg-teal-100 flex items-center justify-center">
-                                            <Syringe className="text-teal-600" size={20} />
+                            <div className="overflow-hidden rounded-3xl shadow-xl border border-teal-100">
+                                {/* ── Gradient banner ── */}
+                                <div className="relative overflow-hidden bg-gradient-to-br from-teal-600 via-emerald-500 to-cyan-500 px-6 py-5 text-white">
+                                    <div className="absolute -right-8 -top-8 h-36 w-36 rounded-full bg-white/10 blur-2xl pointer-events-none" />
+                                    <div className="absolute left-0 bottom-0 h-24 w-40 rounded-full bg-emerald-300/20 blur-2xl pointer-events-none" />
+                                    <div className="relative z-10 flex items-center justify-between gap-4">
+                                        <div className="flex items-center gap-4">
+                                            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/20 backdrop-blur-sm border border-white/30 shadow-inner">
+                                                <Syringe size={22} className="text-white" />
+                                            </div>
+                                            <div>
+                                                <p className="text-[11px] uppercase tracking-widest text-teal-100 font-semibold">Immunisation Record</p>
+                                                <h2 className="text-xl font-black leading-tight">My Vaccinations</h2>
+                                                {!vacLoading && (
+                                                    <p className="text-sm text-teal-50 mt-0.5">
+                                                        {vaccinatedCount} of {vaccinationMaster.length} vaccines recorded
+                                                    </p>
+                                                )}
+                                            </div>
                                         </div>
-                                        <div>
-                                            <h2 className="text-xl font-bold text-gray-800">My Vaccinations</h2>
-                                            <p className="text-sm text-gray-500">
-                                                {vacLoading ? 'Loading…' : `${vaccinatedCount} of ${vaccinationMaster.length} vaccines recorded`}
-                                            </p>
-                                        </div>
+                                        <button
+                                            onClick={() => setShowMyVaccinations(false)}
+                                            className="flex h-9 w-9 items-center justify-center rounded-2xl bg-white/20 hover:bg-white/30 border border-white/30 text-white transition shrink-0"
+                                        >
+                                            <X size={18} />
+                                        </button>
                                     </div>
-                                    <button onClick={() => setShowMyVaccinations(false)} className="text-gray-400 hover:text-gray-600 transition">
-                                        <X size={20} />
-                                    </button>
+                                    {/* Progress bar */}
+                                    {!vacLoading && vaccinationMaster.length > 0 && (
+                                        <div className="relative z-10 mt-4">
+                                            <div className="flex justify-between text-xs text-teal-100 mb-1">
+                                                <span>Completion</span>
+                                                <span className="font-bold">{Math.round((vaccinatedCount / vaccinationMaster.length) * 100)}%</span>
+                                            </div>
+                                            <div className="h-2 w-full rounded-full bg-white/20 overflow-hidden">
+                                                <div
+                                                    className="h-full rounded-full bg-white/80 transition-all duration-700"
+                                                    style={{ width: `${Math.round((vaccinatedCount / vaccinationMaster.length) * 100)}%` }}
+                                                />
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
 
-                                {vacLoading ? (
-                                    <div className="flex justify-center py-12">
-                                        <svg className="animate-spin h-7 w-7 text-teal-400" viewBox="0 0 24 24" fill="none">
-                                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
-                                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
-                                        </svg>
-                                    </div>
-                                ) : vaccinationMaster.length === 0 ? (
-                                    <div className="text-center py-12">
-                                        <Syringe className="text-gray-300 mx-auto mb-3" size={40} />
-                                        <p className="text-gray-500 text-sm">No vaccination data available.</p>
-                                    </div>
-                                ) : (
-                                    <div className="overflow-x-auto">
-                                        <table className="w-full text-sm">
-                                            <thead className="bg-gray-50 border-b">
-                                                <tr className="text-gray-500 text-xs uppercase tracking-wider">
-                                                    <th className="p-3 text-left">Vaccine</th>
-                                                    <th className="p-3 text-left">Status</th>
-                                                    <th className="p-3 text-left">Date</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                {vaccinationMaster.map((vaccine, idx) => {
-                                                    const status = getVacStatus(vaccine._id);
-                                                    const date   = getVacDate(vaccine._id);
-                                                    const isSaving = !!vacSaving[vaccine._id];
-                                                    const isVaccinated = status === 'vaccinated';
-                                                    return (
-                                                        <tr key={vaccine._id} className={`border-b last:border-none ${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/40'} hover:bg-teal-50/20`}>
-                                                            <td className="p-3">
-                                                                <p className="font-medium text-gray-800">{vaccine.name}</p>
-                                                                <p className="text-xs text-gray-400">{vaccine.category}</p>
-                                                            </td>
-                                                            <td className="p-3">
-                                                                <div className="flex items-center gap-1.5">
-                                                                    <select
+                                {/* ── Body ── */}
+                                <div className="bg-white px-6 py-5">
+                                    {vacLoading ? (
+                                        <div className="flex flex-col items-center justify-center py-14 gap-3">
+                                            <svg className="animate-spin h-8 w-8 text-teal-400" viewBox="0 0 24 24" fill="none">
+                                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
+                                            </svg>
+                                            <p className="text-sm text-gray-400">Loading your vaccination records…</p>
+                                        </div>
+                                    ) : vaccinationMaster.length === 0 ? (
+                                        <div className="flex flex-col items-center justify-center py-14 gap-3">
+                                            <div className="flex h-16 w-16 items-center justify-center rounded-3xl bg-teal-50 border border-teal-100">
+                                                <Syringe className="text-teal-300" size={32} />
+                                            </div>
+                                            <p className="text-gray-500 text-sm font-medium">No vaccination data available.</p>
+                                        </div>
+                                    ) : (
+                                        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                                            {vaccinationMaster.map((vaccine) => {
+                                                const status = getVacStatus(vaccine._id);
+                                                const date   = getVacDate(vaccine._id);
+                                                const isSaving = !!vacSaving[vaccine._id];
+                                                const isVaccinated = status === 'vaccinated';
+                                                return (
+                                                    <div
+                                                        key={vaccine._id}
+                                                        className={`relative overflow-hidden rounded-2xl border p-4 transition-all duration-200 ${
+                                                            isVaccinated
+                                                                ? 'border-emerald-200 bg-gradient-to-br from-emerald-50 to-teal-50 shadow-sm'
+                                                                : 'border-slate-200 bg-white hover:border-teal-200 hover:shadow-sm'
+                                                        }`}
+                                                    >
+                                                        {/* Status ribbon */}
+                                                        <div className={`absolute top-0 right-0 px-2.5 py-1 text-[10px] font-bold uppercase rounded-bl-xl tracking-wide ${
+                                                            isVaccinated ? 'bg-emerald-500 text-white' : 'bg-slate-100 text-slate-500'
+                                                        }`}>
+                                                            {isVaccinated ? '✓ Done' : 'Pending'}
+                                                        </div>
+
+                                                        {/* Vaccine name + category */}
+                                                        <div className="pr-14 mb-3">
+                                                            <p className="font-bold text-gray-800 text-sm leading-snug">{vaccine.name}</p>
+                                                            {vaccine.category && (
+                                                                <p className="text-xs text-gray-400 mt-0.5">{vaccine.category}</p>
+                                                            )}
+                                                        </div>
+
+                                                        {/* Status select */}
+                                                        <div className="flex items-center gap-2">
+                                                            <div className="relative flex-1">
+                                                                <select
+                                                                    disabled={isSaving}
+                                                                    value={status}
+                                                                    onChange={e => handleVacStatusChange(vaccine._id, e.target.value)}
+                                                                    className={`w-full appearance-none pl-3 pr-7 py-1.5 rounded-xl text-xs font-semibold border focus:outline-none cursor-pointer disabled:opacity-50 transition-colors
+                                                                        ${isVaccinated ? 'bg-emerald-100 text-emerald-800 border-emerald-300' : 'bg-rose-50 text-rose-700 border-rose-200'}`}
+                                                                >
+                                                                    <option value="not_vaccinated">Not Vaccinated</option>
+                                                                    <option value="vaccinated">Vaccinated</option>
+                                                                </select>
+                                                            </div>
+                                                            {isSaving && (
+                                                                <svg className="animate-spin h-4 w-4 text-teal-400 shrink-0" viewBox="0 0 24 24" fill="none">
+                                                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                                                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
+                                                                </svg>
+                                                            )}
+                                                        </div>
+
+                                                        {/* Date picker / nudge */}
+                                                        <div className="mt-2">
+                                                            {isVaccinated ? (
+                                                                <div
+                                                                    role="button"
+                                                                    tabIndex={isSaving ? -1 : 0}
+                                                                    onClick={() => !isSaving && openVaccinationDatePicker(vaccine._id)}
+                                                                    onKeyDown={(e) => {
+                                                                        if (isSaving) return;
+                                                                        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openVaccinationDatePicker(vaccine._id); }
+                                                                    }}
+                                                                    className={`relative inline-flex items-center gap-1.5 border rounded-xl px-3 py-1.5 w-full cursor-pointer transition-colors ${
+                                                                        date ? 'bg-white border-slate-200 hover:border-teal-300' : 'bg-teal-50 border-teal-200 hover:bg-teal-100'
+                                                                    }`}
+                                                                >
+                                                                    <Calendar size={12} className="text-teal-500 shrink-0" />
+                                                                    <span className={`text-xs flex-1 ${isSaving ? 'opacity-50' : ''} ${date ? 'text-gray-700' : 'text-teal-700 font-semibold'}`}>
+                                                                        {formatVaccinationDateLabel(date)}
+                                                                    </span>
+                                                                    <input
+                                                                        id={`vac-date-${vaccine._id}`}
+                                                                        type="date"
                                                                         disabled={isSaving}
-                                                                        value={status}
-                                                                        onChange={e => handleVacStatusChange(vaccine._id, e.target.value)}
-                                                                        className={`appearance-none pl-2 pr-6 py-1 rounded-full text-xs font-semibold border focus:outline-none cursor-pointer disabled:opacity-50 transition-colors
-                                                                            ${isVaccinated ? 'bg-green-100 text-green-700 border-green-300' : 'bg-red-100 text-red-700 border-red-300'}`}
-                                                                    >
-                                                                        <option value="not_vaccinated">Not Vaccinated</option>
-                                                                        <option value="vaccinated">Vaccinated</option>
-                                                                    </select>
-                                                                    {isSaving && <svg className="animate-spin h-3.5 w-3.5 text-gray-400 shrink-0" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg>}
+                                                                        value={date}
+                                                                        max={new Date().toISOString().substring(0, 10)}
+                                                                        onChange={e => handleVacDateChange(vaccine._id, e.target.value)}
+                                                                        className="absolute inset-0 opacity-0 pointer-events-none"
+                                                                    />
                                                                 </div>
-                                                            </td>
-                                                            <td className="p-3">
-                                                                {isVaccinated ? (
-                                                                    <div
-                                                                        role="button"
-                                                                        tabIndex={isSaving ? -1 : 0}
-                                                                        onClick={() => !isSaving && openVaccinationDatePicker(vaccine._id)}
-                                                                        onKeyDown={(e) => {
-                                                                            if (isSaving) return;
-                                                                            if (e.key === 'Enter' || e.key === ' ') {
-                                                                                e.preventDefault();
-                                                                                openVaccinationDatePicker(vaccine._id);
-                                                                            }
-                                                                        }}
-                                                                        className={`relative flex items-center gap-1.5 border px-2 py-1 rounded-lg w-fit cursor-pointer ${date ? 'bg-gray-50' : 'bg-teal-50 border-teal-200'}`}
-                                                                    >
-                                                                        <Calendar size={13} className="text-gray-400 shrink-0" />
-                                                                        <span
-                                                                            className={`text-xs text-left ${isSaving ? 'opacity-50' : ''} ${date ? 'text-gray-700' : 'text-teal-700 font-semibold hover:underline'}`}
-                                                                        >
-                                                                            {formatVaccinationDateLabel(date)}
-                                                                        </span>
-                                                                        <input
-                                                                            id={`vac-date-${vaccine._id}`}
-                                                                            type="date"
-                                                                            disabled={isSaving}
-                                                                            value={date}
-                                                                            max={new Date().toISOString().substring(0, 10)}
-                                                                            onChange={e => handleVacDateChange(vaccine._id, e.target.value)}
-                                                                            className="absolute inset-0 opacity-0 pointer-events-none"
-                                                                        />
-                                                                    </div>
-                                                                ) : (
-                                                                    <span className="text-teal-500 text-xs">Stay protected — get vaccinated!</span>
-                                                                )}
-                                                            </td>
-                                                        </tr>
-                                                    );
-                                                })}
-                                            </tbody>
-                                        </table>
-                                        <p className="mt-4 text-xs text-gray-400">* Changes are saved automatically.</p>
-                                    </div>
-                                )}
+                                                            ) : (
+                                                                <p className="text-[11px] text-teal-600 font-medium mt-1">💉 Stay protected — get vaccinated!</p>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    )}
+                                    {!vacLoading && vaccinationMaster.length > 0 && (
+                                        <p className="mt-5 text-xs text-gray-400 text-center">✦ Changes are saved automatically.</p>
+                                    )}
+                                </div>
                             </div>
                         )}
 

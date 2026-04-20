@@ -1,0 +1,488 @@
+import { useState } from 'react';
+import { AlertCircle, CheckCircle2, Clock, ExternalLink, FileText, HeartPulse, ChevronDown, Search, Shield } from 'lucide-react';
+import CheckoutFooter from '../components/CheckoutFooter';
+
+const criticalDiseaseGuides = [
+  {
+    title: 'HIV / AIDS',
+    icon: Shield,
+    accent: 'from-rose-50 via-white to-pink-50',
+    headerBorder: 'border-rose-200',
+    iconClass: 'bg-rose-100 text-rose-700',
+    tagline: 'Viral infection affecting the immune system — manageable with early treatment.',
+    causes:
+      'HIV (Human Immunodeficiency Virus) attacks CD4 T-cells, weakening the immune system over time. It spreads through infected blood, unprotected sexual contact, contaminated needles, or from parent to child during pregnancy, delivery, or breastfeeding. Without treatment it progresses to AIDS, the final stage where the immune system is severely compromised.',
+    prevention: [
+      'Use condoms consistently during sexual activity',
+      'Never share needles or syringes',
+      'Get tested regularly if at risk',
+      'Pre-exposure prophylaxis (PrEP) for high-risk individuals',
+      'Pregnant women should be tested and treated if positive',
+    ],
+    symptoms: [
+      'Persistent fever and night sweats',
+      'Unexplained rapid weight loss',
+      'Swollen lymph nodes in neck, armpits or groin',
+      'Chronic diarrhoea lasting more than a week',
+      'Recurring mouth sores or thrush',
+      'Extreme fatigue not explained by other causes',
+    ],
+    treatment:
+      'Antiretroviral therapy (ART) is the standard of care. When started early and taken consistently, ART can reduce viral load to undetectable levels, allowing near-normal life expectancy. Treatment does not cure HIV but prevents progression to AIDS.',
+    note: 'Early testing and antiretroviral treatment can significantly improve long-term outcomes. Undetectable = Untransmittable (U=U) is a clinically proven fact.',
+    links: [
+      { label: 'WHO – HIV Overview', url: 'https://www.who.int/news-room/fact-sheets/detail/hiv-aids' },
+      { label: 'CDC – HIV Basics', url: 'https://www.cdc.gov/hiv/basics/index.html' },
+      { label: 'Google – HIV/AIDS', url: 'https://www.google.com/search?q=HIV+AIDS+disease+overview' },
+    ],
+  },
+  {
+    title: 'Post-Transplant Complications',
+    icon: HeartPulse,
+    accent: 'from-violet-50 via-white to-indigo-50',
+    headerBorder: 'border-violet-200',
+    iconClass: 'bg-violet-100 text-violet-700',
+    tagline: 'Complex post-surgical risks requiring lifelong specialist monitoring.',
+    causes:
+      'After organ transplantation, the body\'s immune system may recognise the new organ as foreign and attempt to destroy it — a process called rejection. Patients receive immunosuppressant drugs to prevent this, but these drugs themselves increase risk of serious infections, kidney damage, diabetes, and certain cancers. Medication non-adherence and graft dysfunction are other leading causes of complications.',
+    prevention: [
+      'Never miss immunosuppressant doses',
+      'Attend all follow-up appointments without fail',
+      'Avoid live vaccines unless approved by transplant team',
+      'Report any new symptom immediately to transplant coordinator',
+      'Maintain healthy blood pressure and blood sugar levels',
+    ],
+    symptoms: [
+      'Fever or chills — possible infection or rejection',
+      'Reduced urine output or swelling — kidney issues',
+      'Tenderness or pain near transplant site',
+      'Sudden increase in creatinine levels in blood tests',
+      'Fatigue, jaundice, or abnormal liver enzymes (liver transplant)',
+      'Shortness of breath or irregular heartbeat (heart transplant)',
+    ],
+    treatment:
+      'Management depends on the type of complication. Acute rejection is treated with high-dose corticosteroids or antibody therapies. Infections require appropriate antimicrobials. Chronic rejection may eventually necessitate re-transplantation.',
+    note: 'Transplant patients need urgent specialist review if new warning signs appear — do not wait and observe.',
+    links: [
+      { label: 'NIH – Organ Transplant', url: 'https://medlineplus.gov/organtransplantation.html' },
+      { label: 'Mayo Clinic – Transplant', url: 'https://www.mayoclinic.org/tests-procedures/organ-transplant/about/pac-20384854' },
+      { label: 'Google – Post-Transplant Complications', url: 'https://www.google.com/search?q=post+transplant+complications+overview' },
+    ],
+  },
+  {
+    title: 'Tuberculosis (TB)',
+    icon: FileText,
+    accent: 'from-amber-50 via-white to-orange-50',
+    headerBorder: 'border-amber-200',
+    iconClass: 'bg-amber-100 text-amber-700',
+    tagline: 'Airborne bacterial infection — curable but undertreated globally.',
+    causes:
+      'Tuberculosis is caused by Mycobacterium tuberculosis. It most commonly affects the lungs (pulmonary TB) but can spread to kidneys, spine, and brain (extrapulmonary TB). It spreads through tiny airborne droplets when an infected person coughs, sneezes, or speaks. Latent TB infection means the bacteria live in the body without causing active disease, but can reactivate if immunity drops.',
+    prevention: [
+      'BCG vaccination in early childhood (standard in many countries)',
+      'Avoid prolonged enclosed-space contact with active TB patients',
+      'Wear N95 masks in high-risk healthcare settings',
+      'Test and treat latent TB in HIV-positive individuals',
+      'Complete full treatment course to prevent drug-resistant TB',
+    ],
+    symptoms: [
+      'Persistent cough lasting 3 weeks or more',
+      'Coughing up blood or bloody mucus',
+      'Chest pain worsened by breathing or coughing',
+      'Unintentional weight loss and loss of appetite',
+      'Fatigue, fever, and chills',
+      'Profuse night sweats',
+    ],
+    treatment:
+      'Standard TB treatment involves a 6-month course of antibiotics: isoniazid, rifampicin, pyrazinamide, and ethambutol for 2 months, followed by isoniazid and rifampicin for 4 months. Drug-resistant TB (MDR-TB) requires 18–24 months of second-line drugs.',
+    note: 'Persistent respiratory symptoms need medical testing, not self-medication. Stopping treatment early causes drug resistance.',
+    links: [
+      { label: 'WHO – Tuberculosis Facts', url: 'https://www.who.int/news-room/fact-sheets/detail/tuberculosis' },
+      { label: 'CDC – TB Information', url: 'https://www.cdc.gov/tb/topic/basics/default.htm' },
+      { label: 'Google – Tuberculosis', url: 'https://www.google.com/search?q=tuberculosis+disease+overview+symptoms+treatment' },
+    ],
+  },
+  {
+    title: 'Hepatitis B & C',
+    icon: AlertCircle,
+    accent: 'from-cyan-50 via-white to-sky-50',
+    headerBorder: 'border-cyan-200',
+    iconClass: 'bg-cyan-100 text-cyan-700',
+    tagline: 'Viral liver infections — often silent until significant damage occurs.',
+    causes:
+      'Hepatitis B is caused by HBV virus and spreads through blood, sexual contact, or mother-to-child transmission. Hepatitis C (HCV) spreads primarily through blood-to-blood contact — shared needles, unscreened blood transfusions, or unsafe medical procedures. Both can progress to chronic liver disease, cirrhosis, and hepatocellular carcinoma (liver cancer) if untreated.',
+    prevention: [
+      'Hepatitis B vaccine is highly effective (3-dose series)',
+      'Use sterile needles and avoid sharing drug equipment',
+      'Practice safe sex; use condoms',
+      'Ensure blood products are screened before transfusion',
+      'No vaccine exists for Hepatitis C — prevention is harm reduction',
+    ],
+    symptoms: [
+      'Jaundice — yellowing of skin and eyes',
+      'Dark cola-coloured urine',
+      'Pale or clay-coloured stools',
+      'Nausea, vomiting, and loss of appetite',
+      'Right upper abdominal pain or tenderness',
+      'Extreme fatigue and joint pain',
+    ],
+    treatment:
+      'Chronic Hepatitis B is managed with antivirals (tenofovir, entecavir) — not cured but controlled. Hepatitis C can now be cured in over 95% of patients using direct-acting antiviral (DAA) therapy over 8–12 weeks.',
+    note: 'Many people have hepatitis B or C for years with no symptoms. Screening is essential, especially before symptoms appear.',
+    links: [
+      { label: 'WHO – Hepatitis B', url: 'https://www.who.int/news-room/fact-sheets/detail/hepatitis-b' },
+      { label: 'WHO – Hepatitis C', url: 'https://www.who.int/news-room/fact-sheets/detail/hepatitis-c' },
+      { label: 'Google – Hepatitis B C', url: 'https://www.google.com/search?q=hepatitis+B+C+symptoms+treatment+overview' },
+    ],
+  },
+  {
+    title: 'Stroke',
+    icon: Clock,
+    accent: 'from-red-50 via-white to-orange-50',
+    headerBorder: 'border-red-200',
+    iconClass: 'bg-red-100 text-red-700',
+    tagline: 'Medical emergency — "brain attack" where every minute counts.',
+    causes:
+      'A stroke occurs when blood supply to part of the brain is cut off. Ischaemic stroke (85% of cases) is caused by a blood clot blocking an artery. Haemorrhagic stroke is caused by a burst blood vessel. Risk factors include hypertension, diabetes, high cholesterol, atrial fibrillation, smoking, obesity, sleep apnoea, and prior TIA (mini-stroke).',
+    prevention: [
+      'Control blood pressure — the single most important risk factor',
+      'Manage blood sugar and cholesterol levels',
+      'Quit smoking and limit alcohol',
+      'Stay physically active for at least 150 min/week',
+      'Treat atrial fibrillation with anticoagulants if prescribed',
+    ],
+    symptoms: [
+      'Face drooping on one side — uneven smile',
+      'Arm weakness — one arm drifts downward',
+      'Speech difficulty — slurred or strange speech',
+      'Sudden severe headache with no known cause',
+      'Sudden confusion or trouble understanding',
+      'Vision problems in one or both eyes',
+    ],
+    treatment:
+      'Ischaemic stroke: IV thrombolysis (tPA) within 4.5 hours or mechanical thrombectomy up to 24 hours from onset. Haemorrhagic stroke: blood pressure control, surgery if indicated. Rehabilitation (physiotherapy, speech therapy) is critical for recovery.',
+    note: 'Use the FAST test — Face, Arms, Speech, Time. Call emergency services immediately. Every 30 minutes without treatment destroys ~2 million brain cells.',
+    links: [
+      { label: 'WHO – Stroke', url: 'https://www.who.int/news-room/fact-sheets/detail/the-top-10-causes-of-death' },
+      { label: 'American Stroke Association', url: 'https://www.stroke.org/en/about-stroke' },
+      { label: 'Google – Stroke Symptoms', url: 'https://www.google.com/search?q=stroke+symptoms+causes+treatment' },
+    ],
+  },
+  {
+    title: 'Sepsis',
+    icon: Shield,
+    accent: 'from-amber-50 via-white to-yellow-50',
+    headerBorder: 'border-yellow-200',
+    iconClass: 'bg-amber-100 text-amber-700',
+    tagline: 'Life-threatening organ failure triggered by infection — a medical emergency.',
+    causes:
+      'Sepsis is an extreme, dysregulated immune response to infection. Common origins include pneumonia, urinary tract infections, abdominal infections (appendicitis, peritonitis), skin wounds, catheter-related infections, and bloodstream infections. Bacteria are the most common cause, but fungi and viruses can also trigger sepsis. It can rapidly progress to septic shock with dangerously low blood pressure.',
+    prevention: [
+      'Keep vaccinations up to date (flu, pneumococcal)',
+      'Wash hands regularly and maintain wound hygiene',
+      'Follow up and complete antibiotic courses fully',
+      'Manage chronic illnesses like diabetes and kidney disease',
+      'Seek early care for infections — do not wait',
+    ],
+    symptoms: [
+      'Temperature above 38.3°C (101°F) or below 36°C (96.8°F)',
+      'Heart rate above 90 beats per minute',
+      'Respiratory rate above 20 breaths per minute',
+      'Sudden confusion, altered mental status',
+      'Mottled or discoloured skin',
+      'Decreased urine output — possible organ failure',
+    ],
+    treatment:
+      'Sepsis requires immediate hospitalisation. Treatment includes IV antibiotics within the first hour, IV fluid resuscitation, oxygen support, and vasopressors for septic shock. Source control (e.g., draining an abscess) is often necessary. ICU management is required in severe cases.',
+    note: 'Sepsis can worsen within hours. The "Sepsis Six" bundle — oxygen, blood cultures, antibiotics, fluids, lactate, urine output — saves lives when initiated promptly.',
+    links: [
+      { label: 'WHO – Sepsis', url: 'https://www.who.int/news-room/fact-sheets/detail/sepsis' },
+      { label: 'Sepsis Alliance', url: 'https://www.sepsis.org/sepsis-basics/what-is-sepsis/' },
+      { label: 'Google – Sepsis Overview', url: 'https://www.google.com/search?q=sepsis+symptoms+causes+treatment' },
+    ],
+  },
+  {
+    title: 'Cancer Warning Signs',
+    icon: Search,
+    accent: 'from-fuchsia-50 via-white to-rose-50',
+    headerBorder: 'border-fuchsia-200',
+    iconClass: 'bg-fuchsia-100 text-fuchsia-700',
+    tagline: 'Early detection dramatically improves survival outcomes across all cancer types.',
+    causes:
+      'Cancer develops when cells grow and divide uncontrollably due to damage or mutations in DNA. Risk factors include tobacco and alcohol use, chronic infections (HPV, H. pylori, HBV/HCV), inherited gene mutations (BRCA1/2), radiation exposure, unhealthy diet and obesity, physical inactivity, and prolonged occupational chemical exposure.',
+    prevention: [
+      'Do not smoke; avoid all forms of tobacco',
+      'Limit alcohol intake',
+      'Get vaccinated against HPV and Hepatitis B',
+      'Maintain a healthy weight and exercise regularly',
+      'Attend regular cancer screening programs (mammogram, colonoscopy, Pap smear)',
+    ],
+    symptoms: [
+      'Unexplained significant weight loss',
+      'A new lump or thickening anywhere in the body',
+      'Chronic fatigue unrelated to activity or illness',
+      'Skin changes \u2014 new moles, sores that won\u2019t heal',
+      'Persistent cough or hoarseness lasting weeks',
+      'Bleeding or discharge without obvious cause',
+    ],
+    treatment:
+      'Treatment depends on cancer type and stage: surgery, chemotherapy, radiation therapy, targeted therapy, immunotherapy, or hormonal therapy. Multidisciplinary team management is the current standard. Early-stage cancers generally have much higher cure rates.',
+    note: 'Not every persistent symptom means cancer, but unexplained or prolonged symptoms should never be self-monitored for more than 2–4 weeks without medical review.',
+    links: [
+      { label: 'WHO – Cancer', url: 'https://www.who.int/news-room/fact-sheets/detail/cancer' },
+      { label: 'National Cancer Institute', url: 'https://www.cancer.gov/about-cancer/understanding/what-is-cancer' },
+      { label: 'Google – Cancer Warning Signs', url: 'https://www.google.com/search?q=cancer+warning+signs+early+symptoms' },
+    ],
+  },
+  {
+    title: 'Diabetes Complications',
+    icon: HeartPulse,
+    accent: 'from-emerald-50 via-white to-lime-50',
+    headerBorder: 'border-emerald-200',
+    iconClass: 'bg-emerald-100 text-emerald-700',
+    tagline: 'Long-term high blood sugar silently damages nerves, vessels, and organs.',
+    causes:
+      'Diabetes is a chronic metabolic condition where insufficient insulin production (Type 1) or insulin resistance (Type 2) leads to elevated blood glucose. Prolonged hyperglycaemia damages blood vessels (macro and micro) across the body, leading to diabetic retinopathy (eyes), nephropathy (kidneys), neuropathy (nerves), cardiovascular disease, and poor wound healing leading to diabetic foot ulcers.',
+    prevention: [
+      'Monitor blood glucose regularly and stay in target range',
+      'Follow a low-glycaemic index diet and control portion sizes',
+      'Exercise for at least 150 minutes per week',
+      'Take medications or insulin as prescribed — never skip doses',
+      'Conduct daily foot checks and attend annual eye/kidney screening',
+    ],
+    symptoms: [
+      'Slow or non-healing wounds, especially on feet',
+      'Blurred or fluctuating vision',
+      'Numbness, tingling, or burning in feet and hands',
+      'Frequent urination and excessive thirst',
+      'Recurrent infections — skin, urinary, gum',
+      'Swelling in legs or around the eyes (kidney involvement)',
+    ],
+    treatment:
+      'Management includes lifestyle modification, oral hypoglycaemics (metformin, SGLT-2 inhibitors, GLP-1 agonists), and insulin therapy. Complications are treated specifically: ACE inhibitors for nephropathy, anti-VEGF injections for retinopathy, pain management for neuropathy, and wound care for foot ulcers.',
+    note: 'HbA1c below 7% is the typical target to prevent complications. Regular review every 3 months with your doctor is essential.',
+    links: [
+      { label: 'IDF – Diabetes Atlas', url: 'https://diabetesatlas.org/' },
+      { label: 'CDC – Diabetes Complications', url: 'https://www.cdc.gov/diabetes/complications/index.html' },
+      { label: 'Google – Diabetes Complications', url: 'https://www.google.com/search?q=diabetes+complications+symptoms+prevention' },
+    ],
+  },
+  {
+    title: 'Heart Disease (CAD)',
+    icon: HeartPulse,
+    accent: 'from-red-50 via-white to-rose-50',
+    headerBorder: 'border-red-200',
+    iconClass: 'bg-red-100 text-red-700',
+    tagline: 'The world\'s leading cause of death — largely preventable with lifestyle changes.',
+    causes:
+      'Coronary artery disease (CAD) results from the build-up of atherosclerotic plaques inside coronary arteries, narrowing or blocking blood flow to the heart muscle. Major risk factors include hypertension, high LDL cholesterol, smoking, diabetes, obesity, sedentary lifestyle, chronic stress, and a family history of heart disease. Plaque rupture can trigger a sudden heart attack (myocardial infarction).',
+    prevention: [
+      'Quit smoking — the single most impactful step',
+      'Control blood pressure below 130/80 mmHg',
+      'Keep LDL cholesterol under 100 mg/dL (or lower if high risk)',
+      'Exercise aerobically for 30 min on most days',
+      'Follow a heart-healthy diet (Mediterranean or DASH diet)',
+    ],
+    symptoms: [
+      'Chest pain, pressure, tightness, or squeezing (angina)',
+      'Pain radiating to left arm, jaw, neck, or back',
+      'Shortness of breath on exertion or at rest',
+      'Palpitations or irregular heartbeat',
+      'Unusual sweating, nausea with chest discomfort',
+      'Sudden dizziness or fainting',
+    ],
+    treatment:
+      'Stable CAD is managed with lifestyle changes, aspirin, statins, beta-blockers, and ACE inhibitors. Unstable angina or heart attack requires immediate PCI (angioplasty and stent) or CABG (bypass surgery). Cardiac rehabilitation is recommended after any major cardiac event.',
+    note: 'Women may present with atypical symptoms like jaw pain, fatigue, and nausea without classic chest pain. Do not dismiss these symptoms.',
+    links: [
+      { label: 'WHO – Cardiovascular Diseases', url: 'https://www.who.int/news-room/fact-sheets/detail/cardiovascular-diseases-(cvds)' },
+      { label: 'American Heart Association', url: 'https://www.heart.org/en/health-topics/heart-attack' },
+      { label: 'Google – Heart Disease', url: 'https://www.google.com/search?q=coronary+artery+disease+symptoms+causes+treatment' },
+    ],
+  },
+  {
+    title: 'Chronic Kidney Disease',
+    icon: AlertCircle,
+    accent: 'from-blue-50 via-white to-indigo-50',
+    headerBorder: 'border-blue-200',
+    iconClass: 'bg-blue-100 text-blue-700',
+    tagline: 'Silent progression from kidney damage to failure — early detection saves kidneys.',
+    causes:
+      'Chronic Kidney Disease (CKD) is the gradual loss of kidney function over months or years. Diabetes and hypertension are responsible for over 60% of CKD cases. Other causes include glomerulonephritis, polycystic kidney disease, lupus nephritis, repeated urinary tract infections, and long-term NSAID overuse. CKD progresses through 5 stages based on GFR (glomerular filtration rate).',
+    prevention: [
+      'Control blood sugar and blood pressure rigorously',
+      'Avoid overuse of NSAIDs and nephrotoxic medications',
+      'Stay well hydrated and maintain a healthy body weight',
+      'Get screened annually if diabetic or hypertensive',
+      'Quit smoking — it accelerates kidney function decline',
+    ],
+    symptoms: [
+      'Foamy or bubbly urine (protein leakage)',
+      'Swelling in ankles, feet, and around the eyes',
+      'Fatigue and reduced ability to concentrate',
+      'Poor appetite, nausea, or metallic taste in mouth',
+      'Frequent nighttime urination',
+      'Muscle cramps and restless legs',
+    ],
+    treatment:
+      'Early CKD is managed by controlling underlying causes (blood pressure, blood sugar). ACE inhibitors or ARBs are prescribed to protect kidneys. Advanced CKD requires dietary protein restriction, phosphate binders, and erythropoietin for anaemia. End-stage CKD needs dialysis or kidney transplantation.',
+    note: 'CKD is called a "silent disease" — most symptoms appear only in later stages. Annual urine and blood tests are critical for at-risk individuals.',
+    links: [
+      { label: 'WHO – Kidney Disease', url: 'https://www.who.int/news-room/fact-sheets/detail/chronic-kidney-disease' },
+      { label: 'NKF – Kidney Basics', url: 'https://www.kidney.org/kidney-topics/chronic-kidney-disease-ckd' },
+      { label: 'Google – Chronic Kidney Disease', url: 'https://www.google.com/search?q=chronic+kidney+disease+stages+symptoms+treatment' },
+    ],
+  },
+];
+
+export default function CriticalDiseaseGuide() {
+  const [expandedDiseaseTitle, setExpandedDiseaseTitle] = useState(null);
+
+  const toggle = (title) =>
+    setExpandedDiseaseTitle((prev) => (prev === title ? null : title));
+
+  return (
+    <div
+      className="min-h-screen px-4 pb-14 sm:px-6 lg:px-8"
+      style={{
+        paddingTop: 'calc(var(--app-navbar-offset, 88px) + 2rem)',
+        background: 'linear-gradient(180deg, #fff7fb 0%, #fff 35%, #f8fafc 100%)',
+      }}
+    >
+      <div className="mx-auto max-w-6xl">
+        {/* ── Hero header ── */}
+        <header className="relative overflow-hidden rounded-3xl border border-rose-100 bg-gradient-to-br from-rose-700 via-pink-600 to-orange-500 p-6 text-white shadow-xl sm:p-8">
+          <div className="absolute -right-10 -top-10 h-44 w-44 rounded-full bg-white/15 blur-2xl" />
+          <div className="absolute -left-12 bottom-0 h-40 w-40 rounded-full bg-orange-200/20 blur-2xl" />
+          <div className="relative z-10 grid gap-4 lg:grid-cols-[1fr_auto] lg:items-end">
+            <div>
+              <p className="text-xs uppercase tracking-[0.2em] text-rose-100">Clinical Awareness</p>
+              <h1 className="mt-3 text-3xl font-black leading-tight sm:text-4xl">Critical Disease Guide</h1>
+              <p className="mt-3 max-w-2xl text-sm text-rose-50 sm:text-base">
+                Detailed overview of high-risk conditions — causes, symptoms, prevention, treatment, and trusted references. Educational content only, not a medical diagnosis.
+              </p>
+            </div>
+            <div className="rounded-2xl border border-white/30 bg-white/10 px-4 py-3 text-sm font-semibold max-w-xs">
+              🚨 Seek immediate emergency care for severe breathing difficulty, sudden weakness, chest pain, or uncontrolled bleeding.
+            </div>
+          </div>
+        </header>
+
+        <p className="mt-5 text-sm text-slate-500 text-center">
+          Click any row to expand full details · Click again to collapse
+        </p>
+
+        {/* ── Disease cards ── */}
+        <main className="mt-4 space-y-3">
+          {criticalDiseaseGuides.map((guide) => {
+            const isExpanded = expandedDiseaseTitle === guide.title;
+            return (
+              <section
+                key={guide.title}
+                className={`overflow-hidden rounded-3xl border ${guide.headerBorder} bg-gradient-to-br ${guide.accent} shadow-sm transition-shadow duration-200 ${isExpanded ? 'shadow-md' : ''}`}
+              >
+                {/* ── Clickable header row ── */}
+                <button
+                  type="button"
+                  onClick={() => toggle(guide.title)}
+                  aria-expanded={isExpanded}
+                  className="w-full text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-rose-400"
+                >
+                  <div className={`flex items-center justify-between gap-4 px-5 py-4 md:px-6 transition-colors duration-150 ${isExpanded ? 'bg-white/60' : 'hover:bg-white/40'} cursor-pointer`}>
+                    <div className="flex items-center gap-4">
+                      <div className={`inline-flex rounded-2xl p-3 ${guide.iconClass} shrink-0`}>
+                        <guide.icon className="h-5 w-5" />
+                      </div>
+                      <div>
+                        <h2 className="text-xl font-black text-slate-900 md:text-2xl">{guide.title}</h2>
+                        <p className="mt-0.5 text-sm text-slate-500">{guide.tagline}</p>
+                      </div>
+                    </div>
+                    <div className="shrink-0 flex items-center gap-2">
+                      <div className={`inline-flex h-9 w-9 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-600 transition-transform duration-300 ${isExpanded ? 'rotate-180' : 'rotate-0'}`}>
+                        <ChevronDown className="h-5 w-5" />
+                      </div>
+                    </div>
+                  </div>
+                </button>
+
+                {/* ── Expanded detail panel ── */}
+                {isExpanded && (
+                  <div className="border-t border-slate-200/80 bg-white/80 px-5 py-6 md:px-6 space-y-5">
+
+                    {/* Causes + Symptoms */}
+                    <div className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
+                      <div className="rounded-2xl border border-slate-200 bg-white p-5">
+                        <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400 mb-2">Cause Overview</p>
+                        <p className="text-sm leading-7 text-slate-700">{guide.causes}</p>
+                      </div>
+                      <div className="rounded-2xl border border-slate-200 bg-white p-5">
+                        <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400 mb-3">Warning Symptoms</p>
+                        <div className="space-y-2">
+                          {guide.symptoms.map((symptom) => (
+                            <div key={symptom} className="flex items-start gap-2 rounded-xl bg-slate-50 px-3 py-2 text-sm text-slate-700">
+                              <CheckCircle2 className="h-4 w-4 text-emerald-500 mt-0.5 shrink-0" />
+                              {symptom}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Prevention + Treatment */}
+                    <div className="grid gap-4 lg:grid-cols-2">
+                      <div className="rounded-2xl border border-emerald-200 bg-emerald-50/60 p-5">
+                        <p className="text-xs font-bold uppercase tracking-[0.18em] text-emerald-700 mb-3">Prevention Steps</p>
+                        <ul className="space-y-2">
+                          {guide.prevention.map((step) => (
+                            <li key={step} className="flex items-start gap-2 text-sm text-emerald-900">
+                              <span className="mt-1.5 h-2 w-2 rounded-full bg-emerald-500 shrink-0" />
+                              {step}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                      <div className="rounded-2xl border border-blue-200 bg-blue-50/60 p-5">
+                        <p className="text-xs font-bold uppercase tracking-[0.18em] text-blue-700 mb-2">Treatment Overview</p>
+                        <p className="text-sm leading-7 text-blue-900">{guide.treatment}</p>
+                      </div>
+                    </div>
+
+                    {/* Clinical note */}
+                    <div className="rounded-2xl border border-cyan-200 bg-cyan-50 px-5 py-3 text-sm text-cyan-900">
+                      <span className="font-bold">📋 Clinical note: </span>{guide.note}
+                    </div>
+
+                    {/* External links */}
+                    <div>
+                      <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400 mb-2">Trusted References</p>
+                      <div className="flex flex-wrap gap-3">
+                        {guide.links.map((link) => (
+                          <a
+                            key={link.url}
+                            href={link.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={(e) => e.stopPropagation()}
+                            className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-blue-600 hover:bg-blue-50 hover:border-blue-300 transition-colors shadow-sm"
+                          >
+                            <ExternalLink className="h-3.5 w-3.5 shrink-0" />
+                            {link.label}
+                          </a>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </section>
+            );
+          })}
+        </main>
+      </div>
+
+      <div className="mt-10">
+        <CheckoutFooter />
+      </div>
+    </div>
+  );
+}

@@ -17,6 +17,7 @@ import HeartPrediction from './pages/HeartPrediction';
 import PatientProfile from './pages/PatientProfile';
 import StoreDashboard from './pages/StoreDashboard';
 import EmergencyCare from './pages/EmergencyCare';
+import CriticalDiseaseGuide from './pages/CriticalDiseaseGuide';
 import AddMedicine from './pages/AddMedicine';
 import DeleteMedicine from './pages/DeleteMedicine';
 import UpdateMedicine from './pages/UpdateMedicine';
@@ -96,6 +97,7 @@ function App() {
           />
           <Route path="/heart-disease" element={<HeartPrediction />} />
           <Route path="/emergencyguidelines" element={<EmergencyCare />} />
+          <Route path="/critical-disease-guide" element={<CriticalDiseaseGuide />} />
           <Route path="/addmedicine" element={<AddMedicine />} />
           <Route path="/updatemedicine" element={<UpdateMedicine />} />
           <Route path="/deletemedicine" element={<DeleteMedicine />} />

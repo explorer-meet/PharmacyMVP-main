@@ -26,13 +26,33 @@ import {
   Minus,
 } from "lucide-react";
 
+const FaqItem = ({ question, answer }) => {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className={`border rounded-2xl mb-3 overflow-hidden transition-all duration-200 ${open ? 'border-cyan-300 shadow-sm' : 'border-slate-200'}`}>
+      <button
+        type="button"
+        onClick={() => setOpen(p => !p)}
+        className="w-full flex items-center justify-between gap-4 px-5 py-4 text-left focus:outline-none"
+      >
+        <span className="text-sm font-bold text-slate-800">{question}</span>
+        <span className={`shrink-0 inline-flex h-7 w-7 items-center justify-center rounded-xl border transition-colors ${open ? 'border-cyan-300 bg-cyan-50 text-cyan-600' : 'border-slate-200 bg-white text-slate-500'}`}>
+          {open ? <Minus className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
+        </span>
+      </button>
+      {open && (
+        <div className="px-5 pb-4 text-sm leading-7 text-slate-600">{answer}</div>
+      )}
+    </div>
+  );
+};
+
 const Home = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const token = localStorage.getItem("medVisionToken");
   const [liveReviews, setLiveReviews] = useState([]);
   const [promotions, setPromotions] = useState([]);
-  const [expandedDiseaseTitle, setExpandedDiseaseTitle] = useState('HIV');
 
   useEffect(() => {
     axios.get(`${baseURL}/reviews?random=true&limit=8`)
@@ -55,81 +75,6 @@ const Home = () => {
       image: `https://ui-avatars.com/api/?name=${encodeURIComponent(r.name)}&background=0ea5e9&color=fff&size=64`,
     }))
     : staticTestimonials;
-
-  const criticalDiseaseGuides = [
-    {
-      title: 'HIV',
-      icon: Shield,
-      accent: 'from-rose-50 via-white to-pink-50',
-      iconClass: 'bg-rose-100 text-rose-700',
-      causes: 'Human immunodeficiency virus spreads through infected blood, unprotected sexual contact, contaminated needles, or from parent to child during pregnancy, birth, or breastfeeding.',
-      symptoms: ['Persistent fever', 'Weight loss', 'Night sweats', 'Swollen lymph nodes'],
-      note: 'Early testing and antiretroviral treatment can significantly improve long-term outcomes.',
-    },
-    {
-      title: 'Post-Transplant Complications',
-      icon: HeartPulse,
-      accent: 'from-violet-50 via-white to-indigo-50',
-      iconClass: 'bg-violet-100 text-violet-700',
-      causes: 'Complications can occur because of organ rejection, infection risk from immunosuppressant therapy, medication non-adherence, or graft dysfunction.',
-      symptoms: ['Fever or chills', 'Reduced urine output', 'Unusual swelling', 'Pain near transplant site'],
-      note: 'Transplant patients need urgent specialist review if new warning signs appear.',
-    },
-    {
-      title: 'Tuberculosis',
-      icon: FileText,
-      accent: 'from-amber-50 via-white to-orange-50',
-      iconClass: 'bg-amber-100 text-amber-700',
-      causes: 'Tuberculosis is caused by Mycobacterium tuberculosis and usually spreads through airborne droplets from a person with active lung infection.',
-      symptoms: ['Cough lasting weeks', 'Blood in sputum', 'Chest pain', 'Fatigue and fever'],
-      note: 'Persistent respiratory symptoms need medical testing rather than self-medication.',
-    },
-    {
-      title: 'Hepatitis B / C',
-      icon: AlertCircle,
-      accent: 'from-cyan-50 via-white to-sky-50',
-      iconClass: 'bg-cyan-100 text-cyan-700',
-      causes: 'These viral liver infections may spread through infected blood, unsafe injections, unsterile instruments, or from mother to child in some cases.',
-      symptoms: ['Jaundice', 'Dark urine', 'Nausea', 'Abdominal pain'],
-      note: 'Untreated viral hepatitis can lead to liver damage, so screening and follow-up matter.',
-    },
-    {
-      title: 'Stroke',
-      icon: Clock,
-      accent: 'from-red-50 via-white to-orange-50',
-      iconClass: 'bg-red-100 text-red-700',
-      causes: 'Stroke usually happens when blood flow to part of the brain is blocked by a clot or when a blood vessel ruptures, often linked to hypertension, diabetes, smoking, or heart rhythm disorders.',
-      symptoms: ['Face drooping', 'Arm weakness', 'Speech difficulty', 'Sudden confusion'],
-      note: 'Stroke symptoms are time-critical and need emergency evaluation immediately.',
-    },
-    {
-      title: 'Sepsis',
-      icon: Shield,
-      accent: 'from-amber-50 via-white to-yellow-50',
-      iconClass: 'bg-amber-100 text-amber-700',
-      causes: 'Sepsis is a life-threatening body response to infection and may follow pneumonia, urinary infections, abdominal infections, wounds, or bloodstream infections.',
-      symptoms: ['Very high or low temperature', 'Rapid breathing', 'Fast heart rate', 'Confusion or drowsiness'],
-      note: 'Sepsis can worsen rapidly, especially in elderly, immunocompromised, or post-surgical patients.',
-    },
-    {
-      title: 'Cancer Warning Signs',
-      icon: Search,
-      accent: 'from-fuchsia-50 via-white to-rose-50',
-      iconClass: 'bg-fuchsia-100 text-fuchsia-700',
-      causes: 'Cancer risk may be influenced by tobacco use, alcohol, chronic infections, inherited mutations, radiation exposure, unhealthy diet, or long-term environmental exposures.',
-      symptoms: ['Unexplained weight loss', 'Persistent lump or swelling', 'Long-lasting fatigue', 'Non-healing sores'],
-      note: 'Not all persistent symptoms mean cancer, but delayed evaluation should be avoided.',
-    },
-    {
-      title: 'Diabetes Complications',
-      icon: HeartPulse,
-      accent: 'from-emerald-50 via-white to-lime-50',
-      iconClass: 'bg-emerald-100 text-emerald-700',
-      causes: 'Complications may develop when blood sugar remains uncontrolled over time, affecting blood vessels, nerves, kidneys, eyes, and heart.',
-      symptoms: ['Slow wound healing', 'Blurred vision', 'Numbness in feet', 'Excessive thirst or urination'],
-      note: 'Regular blood sugar control and follow-up are important to reduce long-term damage.',
-    },
-  ];
 
   const handleOnlinePharmacy = () => navigate("/onlinepharmacy");
   const handleEmergencyPharmacy = () => navigate("/emergencyguidelines");
@@ -244,13 +189,16 @@ const Home = () => {
 
             <div className="grid grid-cols-3 gap-3 pt-5">
               {[
-                { val: '12K+', label: 'Orders Delivered', from: 'from-sky-500', to: 'to-cyan-500', bg: 'bg-sky-50', border: 'border-sky-100' },
-                { val: '1.5L+', label: 'Medicines Listed', from: 'from-cyan-500', to: 'to-teal-500', bg: 'bg-cyan-50', border: 'border-cyan-100' },
-                { val: '30 Min', label: 'Avg Dispatch', from: 'from-emerald-500', to: 'to-green-500', bg: 'bg-emerald-50', border: 'border-emerald-100' },
+                { val: '12K+', label: 'Orders Delivered', icon: '📦', from: 'from-sky-500', to: 'to-cyan-500', bg: 'bg-gradient-to-br from-sky-50 to-cyan-50', border: 'border-sky-200' },
+                { val: '1.5L+', label: 'Medicines Listed', icon: '💊', from: 'from-cyan-500', to: 'to-teal-500', bg: 'bg-gradient-to-br from-cyan-50 to-teal-50', border: 'border-cyan-200' },
+                { val: '30 Min', label: 'Avg Dispatch', icon: '⚡', from: 'from-emerald-500', to: 'to-green-500', bg: 'bg-gradient-to-br from-emerald-50 to-green-50', border: 'border-emerald-200' },
               ].map((s) => (
-                <div key={s.label} className={`rounded-2xl border ${s.border} ${s.bg} p-4 shadow-sm backdrop-blur-sm hover:shadow-md transition-shadow duration-200`}>
-                  <p className={`text-2xl font-black bg-gradient-to-r ${s.from} ${s.to} bg-clip-text text-transparent`}>{s.val}</p>
-                  <p className="mt-1 text-xs font-semibold text-slate-500">{s.label}</p>
+                <div key={s.label} className={`rounded-2xl border ${s.border} ${s.bg} p-4 shadow-sm hover:shadow-lg transition-all duration-200 hover:-translate-y-0.5`}>
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="text-xl">{s.icon}</span>
+                    <p className={`text-2xl font-black bg-gradient-to-r ${s.from} ${s.to} bg-clip-text text-transparent`}>{s.val}</p>
+                  </div>
+                  <p className="text-xs font-semibold text-slate-500 leading-snug">{s.label}</p>
                 </div>
               ))}
             </div>
@@ -310,31 +258,71 @@ const Home = () => {
       </section>
 
       {/* Trust strip marquee */}
-      <div className="overflow-hidden border-y border-slate-100 bg-white py-3">
+      <div className="overflow-hidden border-y border-slate-100 bg-gradient-to-r from-slate-50 via-white to-slate-50 py-3.5">
         <div className="flex animate-marquee whitespace-nowrap">
           {[
-            '✅ 100% Genuine Medicines',
-            '🚚 Fast Doorstep Delivery',
-            '🔒 SSL Secured Payments',
-            '📋 Easy Prescription Upload',
-            '⏰ 24/7 Order Support',
-            '💊 1.5 Lakh+ Medicines',
-            '⭐ Trusted by 50K+ Patients',
-            '🏥 Multiple Verified Stores',
-            '✅ 100% Genuine Medicines',
-            '🚚 Fast Doorstep Delivery',
-            '🔒 SSL Secured Payments',
-            '📋 Easy Prescription Upload',
-            '⏰ 24/7 Order Support',
-            '💊 1.5 Lakh+ Medicines',
+            { icon: '✅', text: '100% Genuine Medicines' },
+            { icon: '🚚', text: 'Fast Doorstep Delivery' },
+            { icon: '🔒', text: 'SSL Secured Payments' },
+            { icon: '📋', text: 'Easy Prescription Upload' },
+            { icon: '⏰', text: '24/7 Order Support' },
+            { icon: '💊', text: '1.5 Lakh+ Medicines' },
+            { icon: '⭐', text: 'Trusted by 50K+ Patients' },
+            { icon: '🏥', text: 'Multiple Verified Stores' },
+            { icon: '✅', text: '100% Genuine Medicines' },
+            { icon: '🚚', text: 'Fast Doorstep Delivery' },
+            { icon: '🔒', text: 'SSL Secured Payments' },
+            { icon: '📋', text: 'Easy Prescription Upload' },
+            { icon: '⏰', text: '24/7 Order Support' },
+            { icon: '💊', text: '1.5 Lakh+ Medicines' },
           ].map((item, i) => (
-            <span key={i} className="mx-6 text-xs font-semibold text-slate-600 tracking-wide">{item}</span>
+            <span key={i} className="mx-5 inline-flex items-center gap-1.5 text-xs font-semibold text-slate-600 tracking-wide">
+              <span>{item.icon}</span>
+              {item.text}
+              <span className="mx-3 h-3 w-px bg-slate-200" />
+            </span>
           ))}
         </div>
       </div>
 
+      {/* Health Categories Strip */}
       <section className="reveal-on-scroll px-4 sm:px-6 lg:px-16 py-10">
-        <div className="mx-auto grid max-w-7xl grid-cols-2 gap-4 md:grid-cols-4">
+        <div className="mx-auto max-w-7xl">
+          <div className="mb-6 text-center">
+            <p className="text-xs font-bold uppercase tracking-[0.2em] text-cyan-600">Browse by Health Need</p>
+            <h2 className="mt-2 text-2xl font-black text-slate-900">Shop by Category</h2>
+          </div>
+          <div className="grid grid-cols-4 sm:grid-cols-8 gap-3">
+            {[
+              { emoji: '🤒', label: 'Fever & Cold', bg: 'bg-orange-50', border: 'border-orange-100', hover: 'hover:border-orange-400 hover:bg-orange-100' },
+              { emoji: '💊', label: 'Vitamins', bg: 'bg-yellow-50', border: 'border-yellow-100', hover: 'hover:border-yellow-400 hover:bg-yellow-100' },
+              { emoji: '🫀', label: 'Heart Care', bg: 'bg-rose-50', border: 'border-rose-100', hover: 'hover:border-rose-400 hover:bg-rose-100' },
+              { emoji: '🩸', label: 'Diabetes', bg: 'bg-blue-50', border: 'border-blue-100', hover: 'hover:border-blue-400 hover:bg-blue-100' },
+              { emoji: '🌿', label: 'Ayurvedic', bg: 'bg-green-50', border: 'border-green-100', hover: 'hover:border-green-400 hover:bg-green-100' },
+              { emoji: '👶', label: 'Baby Care', bg: 'bg-pink-50', border: 'border-pink-100', hover: 'hover:border-pink-400 hover:bg-pink-100' },
+              { emoji: '🧴', label: 'Skin Care', bg: 'bg-violet-50', border: 'border-violet-100', hover: 'hover:border-violet-400 hover:bg-violet-100' },
+              { emoji: '🦷', label: 'Dental', bg: 'bg-cyan-50', border: 'border-cyan-100', hover: 'hover:border-cyan-400 hover:bg-cyan-100' },
+            ].map(cat => (
+              <button
+                key={cat.label}
+                onClick={handleOnlinePharmacy}
+                className={`flex flex-col items-center gap-2.5 rounded-2xl border ${cat.border} ${cat.bg} ${cat.hover} p-4 text-center shadow-sm transition-all duration-200 hover:-translate-y-1.5 hover:shadow-lg`}
+              >
+                <span className="text-3xl drop-shadow-sm">{cat.emoji}</span>
+                <span className="text-[11px] font-bold text-slate-600 leading-tight">{cat.label}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="reveal-on-scroll px-4 sm:px-6 lg:px-16 py-10">
+        <div className="mx-auto max-w-7xl">
+          <div className="mb-6 text-center">
+            <p className="text-xs font-bold uppercase tracking-[0.2em] text-emerald-600">Why MedVision</p>
+            <h2 className="mt-2 text-2xl font-black text-slate-900">Built for Trust &amp; Speed</h2>
+          </div>
+          <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
           {[
             { icon: Clock, label: '24/7 Order Support', sub: 'Always available', iconBg: 'bg-sky-100 text-sky-600', border: 'border-sky-100', delay: '0ms' },
             { icon: Shield, label: '100% Genuine Medicines', sub: 'Verified sources', iconBg: 'bg-cyan-100 text-cyan-600', border: 'border-cyan-100', delay: '80ms' },
@@ -353,6 +341,7 @@ const Home = () => {
               <p className="mt-1 text-xs text-slate-500">{feature.sub}</p>
             </div>
           ))}
+        </div>
         </div>
       </section>
 
@@ -488,85 +477,6 @@ const Home = () => {
         </div>
       </section>
 
-      <section className="reveal-on-scroll px-4 sm:px-6 lg:px-16 pb-14">
-        <div className="mx-auto max-w-7xl rounded-[2rem] border border-rose-100 bg-gradient-to-br from-rose-50 via-white to-slate-50 p-6 shadow-lg md:p-8">
-          <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
-            <div>
-              <p className="inline-flex items-center gap-2 rounded-full border border-rose-200 bg-white px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-rose-700">
-                <AlertCircle className="h-3.5 w-3.5" />
-                Critical Disease Guide
-              </p>
-              <h2 className="mt-4 text-3xl font-black text-slate-900 md:text-4xl">Understanding The Causes Of Critical Diseases</h2>
-              <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-600 md:text-base">
-                Review common warning signs and basic causes for high-risk conditions such as HIV, transplant complications, tuberculosis, and viral hepatitis. This section is educational and should not replace medical diagnosis.
-              </p>
-            </div>
-            <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-800">
-              Seek immediate clinical care for persistent fever, breathing difficulty, sudden weakness, or unexplained rapid decline.
-            </div>
-          </div>
-
-          <div className="mt-8 space-y-4">
-            {criticalDiseaseGuides.map((guide) => {
-              const isExpanded = expandedDiseaseTitle === guide.title;
-
-              return (
-                <div key={guide.title} className={`overflow-hidden rounded-3xl border border-slate-200 bg-gradient-to-br ${guide.accent} shadow-sm`}>
-                  <div className="flex items-center justify-between gap-4 px-5 py-4 md:px-6">
-                    <div className="flex items-center gap-4">
-                      <div className={`inline-flex rounded-2xl p-3 ${guide.iconClass}`}>
-                        <guide.icon className="h-5 w-5" />
-                      </div>
-                      <div>
-                        <h3 className="text-xl font-black text-slate-900 md:text-2xl">{guide.title}</h3>
-                        <p className="mt-1 text-sm text-slate-600">High-risk condition overview, symptoms, and cause summary.</p>
-                      </div>
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={() => setExpandedDiseaseTitle((prev) => (prev === guide.title ? '' : guide.title))}
-                      className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-700 transition hover:bg-slate-50"
-                      aria-expanded={isExpanded}
-                      aria-label={`${isExpanded ? 'Collapse' : 'Expand'} ${guide.title}`}
-                    >
-                      {isExpanded ? <Minus className="h-5 w-5" /> : <Plus className="h-5 w-5" />}
-                    </button>
-                  </div>
-
-                  {isExpanded && (
-                    <div className="border-t border-slate-200/80 bg-white/80 px-5 py-5 md:px-6">
-                      <div className="grid gap-4 lg:grid-cols-[1.15fr_0.85fr]">
-                        <div className="rounded-2xl border border-slate-200 bg-white p-4">
-                          <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">Cause Overview</p>
-                          <p className="mt-2 text-sm leading-7 text-slate-700">{guide.causes}</p>
-                        </div>
-
-                        <div className="rounded-2xl border border-slate-200 bg-white p-4">
-                          <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">Common Symptoms</p>
-                          <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-1">
-                            {guide.symptoms.map((symptom) => (
-                              <div key={symptom} className="flex items-center gap-2 rounded-xl bg-slate-50 px-3 py-2 text-sm text-slate-700">
-                                <CheckCircle2 className="h-4 w-4 text-emerald-600" />
-                                {symptom}
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="mt-4 rounded-2xl border border-cyan-200 bg-cyan-50 px-4 py-3 text-sm text-cyan-900">
-                        <span className="font-bold">Clinical note:</span> {guide.note}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      </section>
-
       {promotions.length > 0 && (
         <section className="reveal-on-scroll px-4 sm:px-6 lg:px-16 pb-14">
           <div className="mx-auto max-w-7xl rounded-[2rem] border border-fuchsia-100 bg-gradient-to-r from-fuchsia-50 via-white to-rose-50 p-6 shadow-lg md:p-8">
@@ -630,7 +540,7 @@ const Home = () => {
             </p>
           </div>
 
-          <div className="grid grid-cols-1 gap-7 md:grid-cols-2 lg:grid-cols-3">
+          <div className="grid grid-cols-1 gap-7 sm:grid-cols-2 lg:grid-cols-4">
             {[
               {
                 img: info,
@@ -668,6 +578,18 @@ const Home = () => {
                 cta: 'Open Emergency Help',
                 ctaColor: 'text-emerald-700',
               },
+              {
+                img: null,
+                title: 'Critical Disease Guide',
+                desc: 'Understand causes, symptoms, and warning signs for high-risk conditions like HIV, TB, and hepatitis.',
+                onClick: () => navigate('/critical-disease-guide'),
+                iconEl: <AlertCircle className="h-8 w-8 text-rose-600" />,
+                accent: 'from-rose-50 via-pink-50 to-white',
+                ring: 'ring-rose-200',
+                badge: '🩺',
+                cta: 'View Disease Guide',
+                ctaColor: 'text-rose-700',
+              },
             ].map((service, index) => (
               <button
                 type="button"
@@ -681,7 +603,10 @@ const Home = () => {
                 <div className="relative z-10">
                   <div className="mb-5 flex items-start justify-between">
                     <div className={`rounded-2xl ring-2 ${service.ring} bg-white p-2 shadow-sm`}>
-                      <img src={service.img} alt={service.title} className="h-12 w-12 object-contain" />
+                      {service.img
+                        ? <img src={service.img} alt={service.title} className="h-12 w-12 object-contain" />
+                        : <div className="h-12 w-12 flex items-center justify-center">{service.iconEl}</div>
+                      }
                     </div>
                     <span className="text-2xl">{service.badge}</span>
                   </div>
@@ -772,6 +697,27 @@ const Home = () => {
               </div>
             ))}
           </div>
+        </div>
+      </section>
+
+      {/* FAQ Section */}
+      <section className="reveal-on-scroll px-4 sm:px-6 lg:px-16 py-14 bg-gradient-to-b from-white to-slate-50/80">
+        <div className="mx-auto max-w-7xl">
+          <div className="text-center mb-10">
+            <p className="text-xs font-bold uppercase tracking-[0.2em] text-cyan-600">Got Questions?</p>
+            <h2 className="mt-3 text-3xl font-black text-slate-900 md:text-4xl">Frequently Asked Questions</h2>
+            <p className="mt-3 text-sm text-slate-500">Everything you need to know about orders, prescriptions, and delivery.</p>
+          </div>
+          {[
+            { q: 'How do I place an order?', a: 'Browse the online pharmacy, add medicines to your cart, upload a prescription if required, select your delivery address, and pay securely. You will receive order confirmation instantly.' },
+            { q: 'Are the medicines genuine and safe?', a: 'Yes. All medicines on MedVision are sourced from verified and licensed pharmacy stores. Every product goes through a quality validation process before being listed.' },
+            { q: 'What if I need a prescription medicine?', a: 'Upload your prescription during checkout. Our pharmacist team will verify it within a few minutes and confirm or guide you accordingly before dispatching your order.' },
+            { q: 'Can I track my order in real time?', a: 'Absolutely. After placing an order you can track its status — from Order Placed → Packed → Out for Delivery → Delivered — live from your Orders page or the tracking screen.' },
+            { q: 'What payment methods are accepted?', a: 'We accept UPI, Credit/Debit Cards, Net Banking, Wallets, and Cash on Delivery. All digital payments are processed over an SSL-secured gateway.' },
+            { q: 'How quickly will my order arrive?', a: 'Orders placed before 2 PM are typically dispatched the same day. Average dispatch time is 30 minutes. Delivery time depends on your location, usually within 2–4 hours across the city.' },
+          ].map((item, i) => (
+            <FaqItem key={i} question={item.q} answer={item.a} />
+          ))}
         </div>
       </section>
 

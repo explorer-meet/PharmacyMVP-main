@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { baseURL } from '../main';
 import { useNavigate } from 'react-router-dom';
-import { Package, Truck, ChevronDown, ChevronUp, ClipboardList, CreditCard } from 'lucide-react';
+import { Package, Truck, ChevronDown, ChevronUp, ClipboardList, CreditCard, Search } from 'lucide-react';
 import CheckoutFooter from '../components/CheckoutFooter';
 
 const Orders = () => {
@@ -41,6 +41,10 @@ const Orders = () => {
   }, []);
 
   const [expandedOrder, setExpandedOrder] = useState(null);
+  const [orderStatusFilter, setOrderStatusFilter] = useState('all');
+  const [orderSearchQuery, setOrderSearchQuery] = useState('');
+  const [ordersPage, setOrdersPage] = useState(1);
+  const ORDERS_PER_PAGE = 5;
   const formatUSD = (value) =>
     new Intl.NumberFormat('en-US', {
       style: 'currency',
@@ -127,9 +131,57 @@ const Orders = () => {
           </div>
         </div>
 
+        {/* ── Filters + Search ── */}
+        <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center mb-5">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+            <input
+              type="text"
+              placeholder="Search by order ID or store…"
+              value={orderSearchQuery}
+              onChange={e => { setOrderSearchQuery(e.target.value); setOrdersPage(1); }}
+              className="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-300 bg-gray-50 placeholder-gray-400"
+            />
+          </div>
+          <div className="flex gap-1.5 flex-wrap">
+            {['all', 'Order Placed', 'Packed', 'Out for Delivery', 'Delivered'].map(s => (
+              <button
+                key={s}
+                onClick={() => { setOrderStatusFilter(s); setOrdersPage(1); }}
+                className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition whitespace-nowrap ${
+                  orderStatusFilter === s
+                    ? 'bg-blue-600 text-white border-blue-600'
+                    : 'bg-white text-gray-600 border-gray-200 hover:border-blue-300 hover:text-blue-600'
+                }`}
+              >
+                {s === 'all' ? 'All Orders' : s}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {(() => {
+          const q = orderSearchQuery.toLowerCase();
+          const displayOrders = filteredOrders.filter(o => {
+            const matchStatus = orderStatusFilter === 'all' || (o.trackingStatus || o.status || '') === orderStatusFilter;
+            const matchSearch = !q || String(o.orderId || '').toLowerCase().includes(q) || (o.storeName || '').toLowerCase().includes(q);
+            return matchStatus && matchSearch;
+          });
+          const totalPages = Math.max(1, Math.ceil(displayOrders.length / ORDERS_PER_PAGE));
+          const safePage = Math.min(ordersPage, totalPages);
+          const paged = displayOrders.slice((safePage - 1) * ORDERS_PER_PAGE, safePage * ORDERS_PER_PAGE);
+          return (
+            <>
+              {displayOrders.length === 0 ? (
+                <div className="bg-white border border-gray-200 rounded-2xl p-8 text-center shadow-sm">
+                  <p className="text-gray-700 font-medium">No orders match your filters.</p>
+                  <p className="text-sm text-gray-500 mt-1">Try changing the status filter or search term.</p>
+                </div>
+              ) : (
+                <>
         {filteredOrders.length > 0 ? (
           <ul className="space-y-4">
-            {filteredOrders.map((order, index) => {
+            {paged.map((order, index) => {
               const amount = getOrderAmount(order);
               const itemCount = order.items?.length || 0;
               const paymentMeta = getPaymentMeta(order.payment);
@@ -221,6 +273,47 @@ const Orders = () => {
             <p className="text-sm text-gray-500 mt-1">Your confirmed orders will appear here.</p>
           </div>
         )}
+                  {totalPages > 1 && (
+                    <div className="flex items-center justify-between mt-5">
+                      <p className="text-xs text-gray-400">
+                        Showing {(safePage - 1) * ORDERS_PER_PAGE + 1}–{Math.min(safePage * ORDERS_PER_PAGE, displayOrders.length)} of {displayOrders.length} orders
+                      </p>
+                      <div className="flex items-center gap-1">
+                        <button
+                          disabled={safePage === 1}
+                          onClick={() => setOrdersPage(p => Math.max(1, p - 1))}
+                          className="px-3 py-1.5 rounded-xl border text-xs font-semibold disabled:opacity-40 hover:bg-gray-50 transition"
+                        >
+                          ← Prev
+                        </button>
+                        {Array.from({ length: totalPages }, (_, i) => i + 1).map(pg => (
+                          <button
+                            key={pg}
+                            onClick={() => setOrdersPage(pg)}
+                            className={`w-8 h-8 rounded-xl text-xs font-bold border transition ${
+                              pg === safePage
+                                ? 'bg-blue-600 text-white border-blue-600'
+                                : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
+                            }`}
+                          >
+                            {pg}
+                          </button>
+                        ))}
+                        <button
+                          disabled={safePage === totalPages}
+                          onClick={() => setOrdersPage(p => Math.min(totalPages, p + 1))}
+                          className="px-3 py-1.5 rounded-xl border text-xs font-semibold disabled:opacity-40 hover:bg-gray-50 transition"
+                        >
+                          Next →
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+            </>
+          );
+        })()}
       </div>
       <CheckoutFooter />
     </div>
