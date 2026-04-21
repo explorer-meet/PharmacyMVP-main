@@ -3,6 +3,7 @@ import axios from 'axios';
 import toast from 'react-hot-toast';
 import Navbar from '../components/Navbar';
 import { baseURL } from '../main';
+import { useLocationOptions } from '../hooks/useLocationOptions';
 import {
   Users,
   Package,
@@ -50,18 +51,6 @@ const MEDICINE_TYPE_OPTIONS = [
   'Inhaler',
   'Suspension',
   'Lotion',
-];
-
-const DEFAULT_MANUFACTURER_OPTIONS = [
-  'Sun Pharma',
-  'Cipla',
-  'Dr. Reddy\'s',
-  'Lupin',
-  'Mankind Pharma',
-  'Abbott',
-  'Alkem',
-  'Glenmark',
-  'Torrent Pharma',
 ];
 
 const PAGINATION_PAGE_SIZE_OPTIONS = [10, 20];
@@ -143,6 +132,7 @@ const StoreDashboard = () => {
     pincode: '',
   });
   const [storeProfileSaving, setStoreProfileSaving] = useState(false);
+  const { countryOptions, stateOptions: storeStateOptions } = useLocationOptions(storeProfileDraft.countryCode);
   const [loggedInAccount, setLoggedInAccount] = useState({
     staffId: '',
     name: '',
@@ -188,13 +178,12 @@ const StoreDashboard = () => {
   const [staffSearchContact, setStaffSearchContact] = useState('');
   const [staffSearchEmail, setStaffSearchEmail] = useState('');
   const [inventoryItems, setInventoryItems] = useState([]);
-  const [storeManufacturers, setStoreManufacturers] = useState([]);
-  const [manufacturerSaving, setManufacturerSaving] = useState(false);
-  const [newManufacturerName, setNewManufacturerName] = useState('');
+  const [providerMaster, setProviderMaster] = useState([]);
   const [inventoryLoading, setInventoryLoading] = useState(false);
   const [inventorySaving, setInventorySaving] = useState(false);
   const [newMedicine, setNewMedicine] = useState({
     name: '',
+    providerId: '',
     manufacturer: '',
     dosage: '',
     type: '',
@@ -204,22 +193,13 @@ const StoreDashboard = () => {
   const [editingMedicineId, setEditingMedicineId] = useState(null);
   const [editMedicine, setEditMedicine] = useState({
     name: '',
+    providerId: '',
     manufacturer: '',
     dosage: '',
     type: '',
     price: '',
     stock: '',
   });
-  const manufacturerDropdownOptions = useMemo(() => {
-    const masterManufacturers = (storeManufacturers || [])
-      .map((item) => String(item.name || '').trim())
-      .filter(Boolean);
-    const inventoryManufacturers = (inventoryItems || [])
-      .map((item) => String(item.manufacturer || '').trim())
-      .filter(Boolean);
-    return Array.from(new Set([...masterManufacturers, ...inventoryManufacturers, ...DEFAULT_MANUFACTURER_OPTIONS]))
-      .sort((a, b) => a.localeCompare(b));
-  }, [storeManufacturers, inventoryItems]);
   const [barcodeInput, setBarcodeInput] = useState('');
   const [barcodeScanning, setBarcodeScanning] = useState(false);
   const [barcodeLastCode, setBarcodeLastCode] = useState('');
@@ -1560,7 +1540,11 @@ const StoreDashboard = () => {
 
   const handleStoreProfileDraftChange = (event) => {
     const { name, value } = event.target;
-    setStoreProfileDraft((prev) => ({ ...prev, [name]: value }));
+    setStoreProfileDraft((prev) => ({
+      ...prev,
+      [name]: value,
+      ...(name === 'countryCode' ? { state: '' } : {}),
+    }));
   };
 
   const saveStoreProfile = async (event) => {
@@ -2407,51 +2391,16 @@ const StoreDashboard = () => {
     }
   };
 
-  const loadStoreManufacturers = async () => {
+  const loadProviderMaster = async () => {
     const config = authConfig();
     if (!config) return;
 
     try {
-      const response = await axios.get(`${baseURL}/manufacturers`, config);
-      setStoreManufacturers(response.data?.manufacturers || []);
+      const response = await axios.get(`${baseURL}/providers`, config);
+      setProviderMaster(response.data?.providers || []);
     } catch (error) {
-      console.error('Failed to load manufacturers:', error.message);
-      setStoreManufacturers([]);
-    }
-  };
-
-  const addStoreManufacturer = async (event) => {
-    event.preventDefault();
-
-    const name = String(newManufacturerName || '').trim();
-    if (!name) {
-      toast.error('Manufacturer name is required');
-      return;
-    }
-
-    const config = authConfig();
-    if (!config) return;
-
-    try {
-      setManufacturerSaving(true);
-      const response = await axios.post(`${baseURL}/manufacturers`, { name }, config);
-      const created = response.data?.manufacturer;
-      if (created) {
-        setStoreManufacturers((prev) => {
-          if (prev.some((item) => String(item.name || '').toLowerCase() === String(created.name || '').toLowerCase())) {
-            return prev;
-          }
-          return [...prev, created].sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')));
-        });
-        setNewMedicine((prev) => ({ ...prev, manufacturer: created.name || prev.manufacturer }));
-      }
-      setNewManufacturerName('');
-      toast.success('Manufacturer added successfully');
-    } catch (error) {
-      console.error('Failed to add manufacturer:', error.message);
-      toast.error(error.response?.data?.message || 'Failed to add manufacturer');
-    } finally {
-      setManufacturerSaving(false);
+      console.error('Failed to load provider master:', error.message);
+      setProviderMaster([]);
     }
   };
 
@@ -2473,7 +2422,7 @@ const StoreDashboard = () => {
         loadStoreReviews(),
         loadStoreStaffMembers(),
         loadStoreInventory(),
-        loadStoreManufacturers(),
+        loadProviderMaster(),
       ]);
 
       if (allowedSectionKeys.includes('financialManagement')) {
@@ -2497,6 +2446,15 @@ const StoreDashboard = () => {
 
   const handleNewMedicineChange = (e) => {
     const { name, value } = e.target;
+    if (name === 'providerId') {
+      const matched = (providerMaster || []).find((provider) => provider._id === value);
+      setNewMedicine((prev) => ({
+        ...prev,
+        providerId: value,
+        manufacturer: matched?.name || '',
+      }));
+      return;
+    }
     setNewMedicine((prev) => ({ ...prev, [name]: value }));
   };
 
@@ -2513,6 +2471,7 @@ const StoreDashboard = () => {
         `${baseURL}/store-inventory`,
         {
           name: newMedicine.name.trim(),
+          providerId: newMedicine.providerId || undefined,
           manufacturer: newMedicine.manufacturer.trim(),
           dosage: newMedicine.dosage.trim(),
           type: newMedicine.type.trim(),
@@ -2526,7 +2485,7 @@ const StoreDashboard = () => {
       if (created) {
         setInventoryItems((prev) => [created, ...prev]);
       }
-      setNewMedicine({ name: '', manufacturer: '', dosage: '', type: '', price: '', stock: '' });
+      setNewMedicine({ name: '', providerId: '', manufacturer: '', dosage: '', type: '', price: '', stock: '' });
       toast.success('Medicine added to inventory');
     } catch (error) {
       console.error('Failed to add medicine:', error.message);
@@ -2540,6 +2499,7 @@ const StoreDashboard = () => {
     setEditingMedicineId(item._id);
     setEditMedicine({
       name: item.name || '',
+      providerId: item.providerId || '',
       manufacturer: item.manufacturer || '',
       dosage: item.dosage || '',
       type: item.type || '',
@@ -2550,6 +2510,15 @@ const StoreDashboard = () => {
 
   const handleEditMedicineChange = (e) => {
     const { name, value } = e.target;
+    if (name === 'providerId') {
+      const matched = (providerMaster || []).find((provider) => provider._id === value);
+      setEditMedicine((prev) => ({
+        ...prev,
+        providerId: value,
+        manufacturer: matched?.name || '',
+      }));
+      return;
+    }
     setEditMedicine((prev) => ({ ...prev, [name]: value }));
   };
 
@@ -2565,6 +2534,7 @@ const StoreDashboard = () => {
         `${baseURL}/store-inventory/${id}`,
         {
           name: editMedicine.name.trim(),
+          providerId: editMedicine.providerId || undefined,
           manufacturer: editMedicine.manufacturer.trim(),
           dosage: editMedicine.dosage.trim(),
           type: editMedicine.type.trim(),
@@ -2579,7 +2549,7 @@ const StoreDashboard = () => {
         setInventoryItems((prev) => prev.map((item) => (item._id === id ? updated : item)));
       }
       setEditingMedicineId(null);
-      setEditMedicine({ name: '', manufacturer: '', dosage: '', type: '', price: '', stock: '' });
+      setEditMedicine({ name: '', providerId: '', manufacturer: '', dosage: '', type: '', price: '', stock: '' });
       toast.success('Medicine updated');
     } catch (error) {
       console.error('Failed to update medicine:', error.message);
@@ -2591,7 +2561,7 @@ const StoreDashboard = () => {
 
   const cancelEditMedicine = () => {
     setEditingMedicineId(null);
-    setEditMedicine({ name: '', manufacturer: '', dosage: '', type: '', price: '', stock: '' });
+    setEditMedicine({ name: '', providerId: '', manufacturer: '', dosage: '', type: '', price: '', stock: '' });
   };
 
   const updateMedicineStock = async (item, delta) => {
@@ -2776,7 +2746,7 @@ const StoreDashboard = () => {
     }
     if (selectedSection === 'inventory' && allowedSectionKeys.includes('inventory')) {
       loadStoreInventory();
-      loadStoreManufacturers();
+      loadProviderMaster();
     }
     if (selectedSection === 'financialManagement' && allowedSectionKeys.includes('financialManagement')) {
       loadFinance();
@@ -3799,13 +3769,17 @@ const StoreDashboard = () => {
                       </div>
                       <div className="grid grid-cols-[110px_1fr] gap-3">
                         <div>
-                          <label className="block text-sm font-medium text-slate-700">Code</label>
-                          <input
+                          <label className="block text-sm font-medium text-slate-700">Country</label>
+                          <select
                             name="countryCode"
                             value={storeProfileDraft.countryCode}
                             onChange={handleStoreProfileDraftChange}
                             className="mt-1 block w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-blue-500"
-                          />
+                          >
+                            {countryOptions.map((option) => (
+                              <option key={option.code} value={option.code}>{option.label}</option>
+                            ))}
+                          </select>
                         </div>
                         <div>
                           <label className="block text-sm font-medium text-slate-700">Mobile</label>
@@ -3829,12 +3803,18 @@ const StoreDashboard = () => {
                       </div>
                       <div>
                         <label className="block text-sm font-medium text-slate-700">State</label>
-                        <input
+                        <select
                           name="state"
                           value={storeProfileDraft.state}
                           onChange={handleStoreProfileDraftChange}
+                          disabled={!storeStateOptions.length}
                           className="mt-1 block w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-blue-500"
-                        />
+                        >
+                          <option value="">Select state</option>
+                          {storeStateOptions.map((stateName) => (
+                            <option key={`store-profile-${stateName}`} value={stateName}>{stateName}</option>
+                          ))}
+                        </select>
                       </div>
                       <div className="sm:col-span-2">
                         <label className="block text-sm font-medium text-slate-700">Address</label>
@@ -5219,17 +5199,14 @@ const StoreDashboard = () => {
                               <div>
                                 <label className="block text-sm font-medium text-slate-700">Manufacturer</label>
                                 <select
-                                  name="manufacturer"
-                                  value={editMedicine.manufacturer}
+                                  name="providerId"
+                                  value={editMedicine.providerId}
                                   onChange={handleEditMedicineChange}
                                   className="mt-1 block w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-blue-500"
                                 >
                                   <option value="">Select Manufacturer</option>
-                                  {editMedicine.manufacturer && !manufacturerDropdownOptions.includes(editMedicine.manufacturer) ? (
-                                    <option value={editMedicine.manufacturer}>{editMedicine.manufacturer}</option>
-                                  ) : null}
-                                  {manufacturerDropdownOptions.map((manufacturer) => (
-                                    <option key={`edit-manufacturer-${manufacturer}`} value={manufacturer}>{manufacturer}</option>
+                                  {providerMaster.map((provider) => (
+                                    <option key={`edit-provider-${provider._id}`} value={provider._id}>{provider.name}</option>
                                   ))}
                                 </select>
                               </div>
@@ -5369,28 +5346,6 @@ const StoreDashboard = () => {
                       <p className="text-sm text-slate-500">Create new inventory entries quickly.</p>
                     </div>
                   </div>
-                  {dashboardAccessRole === 'Store Admin' && (
-                    <form className="mb-5 rounded-2xl border border-indigo-200 bg-indigo-50 p-4" onSubmit={addStoreManufacturer}>
-                      <p className="text-sm font-semibold text-indigo-900">Manufacturer Master (Store Admin)</p>
-                      <p className="mt-1 text-xs text-indigo-700">Add manufacturer names once and reuse them in medicine dropdown.</p>
-                      <div className="mt-3 flex gap-2">
-                        <input
-                          type="text"
-                          value={newManufacturerName}
-                          onChange={(event) => setNewManufacturerName(event.target.value)}
-                          placeholder="Enter manufacturer name"
-                          className="block w-full rounded-xl border border-indigo-200 bg-white px-3 py-2 text-sm text-slate-900 focus:border-indigo-500 focus:outline-none focus:ring-indigo-500"
-                        />
-                        <button
-                          type="submit"
-                          disabled={manufacturerSaving}
-                          className="inline-flex items-center justify-center rounded-xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
-                        >
-                          {manufacturerSaving ? 'Adding...' : 'Add'}
-                        </button>
-                      </div>
-                    </form>
-                  )}
                   <form className="space-y-4" onSubmit={addMedicine}>
                     <div>
                       <label className="block text-sm font-medium text-slate-700">Medicine Name</label>
@@ -5407,14 +5362,14 @@ const StoreDashboard = () => {
                       <div>
                         <label className="block text-sm font-medium text-slate-700">Manufacturer</label>
                         <select
-                          name="manufacturer"
-                          value={newMedicine.manufacturer}
+                          name="providerId"
+                          value={newMedicine.providerId}
                           onChange={handleNewMedicineChange}
                           className="mt-1 block w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-blue-500"
                         >
                           <option value="">Select Manufacturer</option>
-                          {manufacturerDropdownOptions.map((manufacturer) => (
-                            <option key={`new-manufacturer-${manufacturer}`} value={manufacturer}>{manufacturer}</option>
+                          {providerMaster.map((provider) => (
+                            <option key={`new-provider-${provider._id}`} value={provider._id}>{provider.name}</option>
                           ))}
                         </select>
                       </div>

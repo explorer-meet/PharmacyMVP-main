@@ -1,10 +1,10 @@
 const mongoose = require('mongoose');
 
-const storeManufacturerSchema = new mongoose.Schema(
+const stateMasterSchema = new mongoose.Schema(
   {
-    storeId: {
+    countryId: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: 'Store',
+      ref: 'CountryMaster',
       required: true,
       index: true,
     },
@@ -18,22 +18,26 @@ const storeManufacturerSchema = new mongoose.Schema(
       required: true,
       trim: true,
       lowercase: true,
-      index: true,
     },
-    notes: {
+    code: {
       type: String,
-      default: '',
       trim: true,
+      uppercase: true,
+      default: '',
     },
     isActive: {
       type: Boolean,
       default: true,
       index: true,
     },
+    sortOrder: {
+      type: Number,
+      default: 0,
+    },
   },
   { timestamps: true }
 );
 
-storeManufacturerSchema.index({ storeId: 1, normalizedName: 1 }, { unique: true });
+stateMasterSchema.index({ countryId: 1, normalizedName: 1 }, { unique: true });
 
-module.exports = mongoose.model('StoreManufacturer', storeManufacturerSchema);
+module.exports = mongoose.model('StateMaster', stateMasterSchema);

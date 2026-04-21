@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
-import { Store, PlusSquare, ShieldCheck, BarChart3, ClipboardCheck, FileText } from 'lucide-react';
+import { Store, PlusSquare, ShieldCheck, BarChart3, ClipboardCheck, FileText, Building2 } from 'lucide-react';
 import { baseURL } from '../main';
+import { useLocationOptions } from '../hooks/useLocationOptions';
 
 const AdminDashboard = () => {
   const navigate = useNavigate();
@@ -15,6 +16,24 @@ const AdminDashboard = () => {
 
   const [storeRequests, setStoreRequests] = useState([]);
   const [requestsLoading, setRequestsLoading] = useState(false);
+  const [providers, setProviders] = useState([]);
+  const [providersLoading, setProvidersLoading] = useState(false);
+  const [providerSaving, setProviderSaving] = useState(false);
+  const [showProviderForm, setShowProviderForm] = useState(false);
+  const [providerForm, setProviderForm] = useState({
+    name: '',
+    supportEmail: '',
+    supportPhone: '',
+    website: '',
+    addressLine1: '',
+    addressLine2: '',
+    city: '',
+    state: '',
+    country: '',
+    pincode: '',
+    notes: '',
+  });
+  const [editingProviderId, setEditingProviderId] = useState(null);
 
   const [editingStoreId, setEditingStoreId] = useState(null);
   const [storeForm, setStoreForm] = useState({
@@ -37,6 +56,15 @@ const AdminDashboard = () => {
   const activeStores = stores.filter((store) => store.status === 'Active').length;
   const inactiveStores = stores.length - activeStores;
   const pendingRequests = storeRequests.filter((req) => req.status === 'pending').length;
+  const activeProviders = providers.length;
+  const { countryOptions, stateOptions: storeStateOptions } = useLocationOptions(storeForm.countryCode);
+  const providerCountries = countryOptions.map((option) => ({
+    name: option.label.replace(/\s*\([^)]*\)\s*$/, ''),
+    code: option.code,
+  }));
+  const selectedProviderCountryCode =
+    providerCountries.find((country) => country.name === providerForm.country)?.code || '';
+  const { stateOptions: providerStateOptions } = useLocationOptions(selectedProviderCountryCode);
 
   const resetStoreForm = () => {
     setStoreForm({
@@ -86,6 +114,33 @@ const AdminDashboard = () => {
     fetchStoreRequests();
   }, [refreshCounter]);
 
+  const fetchProviders = async () => {
+    const token = localStorage.getItem('medVisionToken');
+    if (!token) return;
+
+    try {
+      setProvidersLoading(true);
+      const response = await axios.get(`${baseURL}/providers`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const rows = response.data?.providers || [];
+      setProviders(rows);
+      if (rows.length === 0) {
+        setShowProviderForm(true);
+      }
+    } catch (error) {
+      console.error('Failed to fetch providers:', error);
+      setProviders([]);
+      setShowProviderForm(true);
+    } finally {
+      setProvidersLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchProviders();
+  }, [refreshCounter]);
+
   const openStoreForm = () => {
     setEditingStoreId(null);
     setActivePanel('addStore');
@@ -95,7 +150,11 @@ const AdminDashboard = () => {
   // Handle form input changes for store details
   const handleStoreChange = (e) => {
     const { name, value } = e.target;
-    setStoreForm((prev) => ({ ...prev, [name]: value }));
+    setStoreForm((prev) => ({
+      ...prev,
+      [name]: value,
+      ...(name === 'countryCode' ? { state: '' } : {}),
+    }));
   };
 
   const handleStoreLicenceUpload = (e) => {
@@ -272,9 +331,129 @@ const AdminDashboard = () => {
     getAllStores();
   }, [refreshCounter]);
 
+  const handleProviderSubmit = async (e) => {
+    e.preventDefault();
+
+    const token = localStorage.getItem('medVisionToken');
+    if (!token) return;
+
+    const name = String(providerForm.name || '').trim();
+    if (!name) {
+      setToast({ show: true, message: 'Provider name is required', type: 'error' });
+      return;
+    }
+
+    const payload = {
+      ...providerForm,
+      name,
+      supportEmail: String(providerForm.supportEmail || '').trim().toLowerCase(),
+    };
+
+    try {
+      setProviderSaving(true);
+
+      if (editingProviderId) {
+        await axios.put(
+          `${baseURL}/providers/${editingProviderId}`,
+          payload,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        setToast({ show: true, message: 'Provider updated successfully', type: 'success' });
+      } else {
+        await axios.post(
+          `${baseURL}/providers`,
+          payload,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        setToast({ show: true, message: 'Provider added successfully', type: 'success' });
+      }
+
+      setProviderForm({
+        name: '',
+        supportEmail: '',
+        supportPhone: '',
+        website: '',
+        addressLine1: '',
+        addressLine2: '',
+        city: '',
+        state: '',
+        country: '',
+        pincode: '',
+        notes: '',
+      });
+      setEditingProviderId(null);
+      setShowProviderForm(false);
+      fetchProviders();
+    } catch (error) {
+      setToast({
+        show: true,
+        message: error?.response?.data?.message || 'Failed to save provider',
+        type: 'error',
+      });
+    } finally {
+      setProviderSaving(false);
+    }
+  };
+
+  const handleProviderEdit = (provider) => {
+    setActivePanel('providers');
+    setShowProviderForm(true);
+    setEditingProviderId(provider._id);
+    setProviderForm({
+      name: provider.name || '',
+      supportEmail: provider.supportEmail || '',
+      supportPhone: provider.supportPhone || '',
+      website: provider.website || '',
+      addressLine1: provider.addressLine1 || '',
+      addressLine2: provider.addressLine2 || '',
+      city: provider.city || '',
+      state: provider.state || '',
+      country: provider.country || '',
+      pincode: provider.pincode || '',
+      notes: provider.notes || '',
+    });
+  };
+
+  const handleProviderDelete = async (providerId) => {
+    const token = localStorage.getItem('medVisionToken');
+    if (!token) return;
+
+    try {
+      await axios.delete(`${baseURL}/providers/${providerId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setToast({ show: true, message: 'Provider deleted successfully', type: 'success' });
+      if (editingProviderId === providerId) {
+        setEditingProviderId(null);
+        setProviderForm({
+          name: '',
+          supportEmail: '',
+          supportPhone: '',
+          website: '',
+          addressLine1: '',
+          addressLine2: '',
+          city: '',
+          state: '',
+          country: '',
+          pincode: '',
+          notes: '',
+        });
+        setShowProviderForm(false);
+      }
+      fetchProviders();
+    } catch (error) {
+      setToast({
+        show: true,
+        message: error?.response?.data?.message || 'Failed to delete provider',
+        type: 'error',
+      });
+    }
+  };
+
   const sidebarItems = [
     { key: 'stores', icon: Store, text: 'Stores List' },
     { key: 'addStore', icon: PlusSquare, text: 'Add Store' },
+    { key: 'providers', icon: Building2, text: 'Providers' },
     { key: 'requests', icon: ClipboardCheck, text: 'Store Approval Requests' },
   ];
 
@@ -347,7 +526,7 @@ const AdminDashboard = () => {
           </aside>
 
           <main className="space-y-6">
-            <div className="grid gap-4 md:grid-cols-4">
+            <div className="grid gap-4 md:grid-cols-5">
               <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
                 <div className="inline-flex rounded-xl bg-blue-100 p-2 text-blue-700">
                   <Store size={18} />
@@ -375,6 +554,13 @@ const AdminDashboard = () => {
                 </div>
                 <p className="mt-3 text-sm text-slate-500">Pending Requests</p>
                 <p className="mt-2 text-3xl font-semibold text-slate-900">{pendingRequests}</p>
+              </div>
+              <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+                <div className="inline-flex rounded-xl bg-cyan-100 p-2 text-cyan-700">
+                  <Building2 size={18} />
+                </div>
+                <p className="mt-3 text-sm text-slate-500">Active Providers</p>
+                <p className="mt-2 text-3xl font-semibold text-slate-900">{activeProviders}</p>
               </div>
             </div>
 
@@ -484,10 +670,9 @@ const AdminDashboard = () => {
                         onChange={handleStoreChange}
                         className="mt-1 block w-full rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3 text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-blue-500"
                       >
-                        <option value="+91">+91</option>
-                        <option value="+1">+1</option>
-                        <option value="+44">+44</option>
-                        <option value="+61">+61</option>
+                        {countryOptions.map((option) => (
+                          <option key={option.code} value={option.code}>{option.label}</option>
+                        ))}
                       </select>
                     </div>
                     <div>
@@ -561,14 +746,19 @@ const AdminDashboard = () => {
                   <div className="grid gap-4 sm:grid-cols-2">
                     <div>
                       <label className="block text-sm font-medium text-slate-700">State</label>
-                      <input
+                      <select
                         name="state"
                         value={storeForm.state}
                         onChange={handleStoreChange}
+                        disabled={!storeStateOptions.length}
                         className="mt-1 block w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-blue-500"
-                        placeholder="Enter state"
                         required
-                      />
+                      >
+                        <option value="">Select state</option>
+                        {storeStateOptions.map((stateName) => (
+                          <option key={`admin-store-${stateName}`} value={stateName}>{stateName}</option>
+                        ))}
+                      </select>
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-slate-700">Pincode</label>
@@ -614,6 +804,218 @@ const AdminDashboard = () => {
                     {editingStoreId ? 'Update Store' : 'Add Store'}
                   </button>
                 </form>
+              </div>
+            )}
+
+            {activePanel === 'providers' && (
+              <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+                <div className="flex items-center justify-between mb-6">
+                  <div>
+                    <h2 className="text-xl font-semibold text-slate-900">Provider List</h2>
+                    <p className="text-sm text-slate-500">Add, edit and delete providers used in medicine forms.</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {providers.length > 0 && !showProviderForm && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditingProviderId(null);
+                          setProviderForm({
+                            name: '',
+                            supportEmail: '',
+                            supportPhone: '',
+                            website: '',
+                            addressLine1: '',
+                            addressLine2: '',
+                            city: '',
+                            state: '',
+                            country: '',
+                            pincode: '',
+                            notes: '',
+                          });
+                          setShowProviderForm(true);
+                        }}
+                        className="rounded-2xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 transition"
+                      >
+                        Add Provider
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={fetchProviders}
+                      className="rounded-2xl bg-slate-100 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-200 transition"
+                    >
+                      Refresh
+                    </button>
+                  </div>
+                </div>
+
+                {showProviderForm && (
+                  <form className="mb-6 rounded-2xl border border-slate-200 bg-slate-50 p-4" onSubmit={handleProviderSubmit}>
+                    <p className="text-sm font-semibold text-slate-900">{editingProviderId ? 'Edit Provider' : 'Add Provider'}</p>
+                    <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2">
+                      <input
+                        type="text"
+                        value={providerForm.name}
+                        onChange={(e) => setProviderForm((prev) => ({ ...prev, name: e.target.value }))}
+                        placeholder="Enter provider name"
+                        className="w-full rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm text-slate-900 focus:border-blue-500 focus:outline-none md:col-span-2"
+                        required
+                      />
+                      <input
+                        type="email"
+                        value={providerForm.supportEmail}
+                        onChange={(e) => setProviderForm((prev) => ({ ...prev, supportEmail: e.target.value }))}
+                        placeholder="Support email"
+                        className="w-full rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm text-slate-900 focus:border-blue-500 focus:outline-none"
+                      />
+                      <input
+                        type="text"
+                        value={providerForm.supportPhone}
+                        onChange={(e) => setProviderForm((prev) => ({ ...prev, supportPhone: e.target.value }))}
+                        placeholder="Support phone"
+                        className="w-full rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm text-slate-900 focus:border-blue-500 focus:outline-none"
+                      />
+                      <input
+                        type="text"
+                        value={providerForm.website}
+                        onChange={(e) => setProviderForm((prev) => ({ ...prev, website: e.target.value }))}
+                        placeholder="Website"
+                        className="w-full rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm text-slate-900 focus:border-blue-500 focus:outline-none md:col-span-2"
+                      />
+                      <input
+                        type="text"
+                        value={providerForm.addressLine1}
+                        onChange={(e) => setProviderForm((prev) => ({ ...prev, addressLine1: e.target.value }))}
+                        placeholder="Address line 1"
+                        className="w-full rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm text-slate-900 focus:border-blue-500 focus:outline-none md:col-span-2"
+                      />
+                      <input
+                        type="text"
+                        value={providerForm.addressLine2}
+                        onChange={(e) => setProviderForm((prev) => ({ ...prev, addressLine2: e.target.value }))}
+                        placeholder="Address line 2"
+                        className="w-full rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm text-slate-900 focus:border-blue-500 focus:outline-none md:col-span-2"
+                      />
+                      <input
+                        type="text"
+                        value={providerForm.city}
+                        onChange={(e) => setProviderForm((prev) => ({ ...prev, city: e.target.value }))}
+                        placeholder="City"
+                        className="w-full rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm text-slate-900 focus:border-blue-500 focus:outline-none"
+                      />
+                      <select
+                        value={providerForm.country}
+                        onChange={(e) => setProviderForm((prev) => ({ ...prev, country: e.target.value, state: '' }))}
+                        className="w-full rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm text-slate-900 focus:border-blue-500 focus:outline-none"
+                      >
+                        <option value="">Select country</option>
+                        {providerCountries.map((country) => (
+                          <option key={country.name} value={country.name}>{country.name}</option>
+                        ))}
+                      </select>
+                      <select
+                        value={providerForm.state}
+                        onChange={(e) => setProviderForm((prev) => ({ ...prev, state: e.target.value }))}
+                        disabled={!selectedProviderCountryCode}
+                        className="w-full rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm text-slate-900 focus:border-blue-500 focus:outline-none disabled:bg-slate-100"
+                      >
+                        <option value="">{selectedProviderCountryCode ? 'Select state' : 'Select country first'}</option>
+                        {providerStateOptions.map((state) => (
+                          <option key={state} value={state}>{state}</option>
+                        ))}
+                      </select>
+                      <input
+                        type="text"
+                        value={providerForm.pincode}
+                        onChange={(e) => setProviderForm((prev) => ({ ...prev, pincode: e.target.value }))}
+                        placeholder="Pincode"
+                        className="w-full rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm text-slate-900 focus:border-blue-500 focus:outline-none"
+                      />
+                      <textarea
+                        value={providerForm.notes}
+                        onChange={(e) => setProviderForm((prev) => ({ ...prev, notes: e.target.value }))}
+                        placeholder="Notes"
+                        rows={2}
+                        className="w-full rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm text-slate-900 focus:border-blue-500 focus:outline-none md:col-span-2"
+                      />
+                    </div>
+                    <div className="mt-3 flex flex-col gap-3 sm:flex-row">
+                      <button
+                        type="submit"
+                        disabled={providerSaving}
+                        className="rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:opacity-60"
+                      >
+                        {providerSaving ? 'Saving...' : editingProviderId ? 'Update' : 'Add'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditingProviderId(null);
+                          setProviderForm({
+                            name: '',
+                            supportEmail: '',
+                            supportPhone: '',
+                            website: '',
+                            addressLine1: '',
+                            addressLine2: '',
+                            city: '',
+                            state: '',
+                            country: '',
+                            pincode: '',
+                            notes: '',
+                          });
+                          setShowProviderForm(false);
+                        }}
+                        className="rounded-xl bg-slate-200 px-4 py-2 text-sm font-semibold text-slate-800 transition hover:bg-slate-300"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </form>
+                )}
+
+                {providersLoading ? (
+                  <div className="rounded-2xl border border-slate-200 bg-slate-50 p-6 text-sm text-slate-500">
+                    Loading providers...
+                  </div>
+                ) : providers.length === 0 ? (
+                  <div className="rounded-2xl border border-slate-200 bg-slate-50 p-6 text-sm text-slate-500">
+                    No providers found. Add your first provider above.
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {providers.map((provider) => (
+                      <div key={provider._id} className="flex flex-col gap-3 rounded-2xl border border-slate-200 p-4 sm:flex-row sm:items-center sm:justify-between">
+                        <div>
+                          <p className="text-sm font-semibold text-slate-900">{provider.name}</p>
+                          <p className="text-xs text-slate-500">
+                            {[provider.supportEmail, provider.supportPhone].filter(Boolean).join(' • ') || 'No support contact'}
+                          </p>
+                          <p className="text-xs text-slate-500">
+                            {[provider.addressLine1, provider.city, provider.state, provider.country, provider.pincode].filter(Boolean).join(', ') || 'No address'}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => handleProviderEdit(provider)}
+                            className="rounded-xl bg-slate-100 px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-200"
+                          >
+                            Edit
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleProviderDelete(provider._id)}
+                            className="rounded-xl bg-red-100 px-3 py-2 text-xs font-semibold text-red-700 transition hover:bg-red-200"
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
 

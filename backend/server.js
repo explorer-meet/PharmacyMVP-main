@@ -70,6 +70,8 @@ const start = async () => {
       // Seed vaccination master data
       const { seedVaccinationMasterIfEmpty } = require("./controllers/auth");
       await seedVaccinationMasterIfEmpty();
+      const { seedLocationMasterIfEmpty } = require("./controllers/locationMaster");
+      await seedLocationMasterIfEmpty();
     }
     else {
       console.log("Error connecting to database");

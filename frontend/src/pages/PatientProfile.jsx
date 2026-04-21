@@ -2,6 +2,7 @@ import { useState } from 'react';
 import toast from 'react-hot-toast';
 import axios from 'axios';
 import { baseURL } from '../main';
+import { useLocationOptions } from '../hooks/useLocationOptions';
 
 const PatientProfile = () => {
     const [, setShowStatus] = useState(false);
@@ -18,13 +19,16 @@ const PatientProfile = () => {
         pincode: '',
         sex: ''
     });
+    const { countryOptions, stateOptions } = useLocationOptions(formData.countryCode);
 
     const handleChange = (e) => {
         const { name, value, type, files } = e.target;
-        setFormData({
-            ...formData,
-            [name]: type === 'file' ? files[0] : value,
-        });
+        const nextValue = type === 'file' ? files[0] : value;
+        setFormData((prev) => ({
+            ...prev,
+            [name]: nextValue,
+            ...(name === 'countryCode' ? { state: '' } : {}),
+        }));
     };
 
 
@@ -127,11 +131,9 @@ const PatientProfile = () => {
                                                 onChange={handleChange}
                                                 className="rounded-l-md border border-r-0 border-gray-300 bg-white py-2 px-3 text-sm text-gray-700 focus:border-indigo-500 focus:outline-none focus:ring-indigo-500"
                                             >
-                                                <option value="+1">🇺🇸 +1</option>
-                                                <option value="+44">🇬🇧 +44</option>
-                                                <option value="+61">🇦🇺 +61</option>
-                                                <option value="+91">🇮🇳 +91</option>
-                                                <option value="+81">🇯🇵 +81</option>
+                                                {countryOptions.map((option) => (
+                                                    <option key={option.code} value={option.code}>{option.label}</option>
+                                                ))}
                                             </select>
                                             <input
                                                 type="tel"
@@ -181,16 +183,13 @@ const PatientProfile = () => {
                                             id="state"
                                             value={formData.state}
                                             onChange={handleChange}
+                                            disabled={!stateOptions.length}
                                             className="mt-1 block w-full rounded-md border-gray-300 bg-white py-2 px-3 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-indigo-500 sm:text-sm"
                                         >
                                             <option value="">Select state</option>
-                                            <option value="California">California</option>
-                                            <option value="Texas">Texas</option>
-                                            <option value="New York">New York</option>
-                                            <option value="Florida">Florida</option>
-                                            <option value="Maharashtra">Maharashtra</option>
-                                            <option value="Karnataka">Karnataka</option>
-                                            <option value="Delhi">Delhi</option>
+                                            {stateOptions.map((stateName) => (
+                                                <option key={stateName} value={stateName}>{stateName}</option>
+                                            ))}
                                         </select>
                                     </div>
                                     <div>

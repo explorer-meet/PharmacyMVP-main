@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Plus } from 'lucide-react';
 import axios from 'axios';
 import { baseURL } from '../../main';
@@ -10,6 +10,7 @@ const MEDICINE_TYPES = [
 export function MedicineForm() {
   const [formData, setFormData] = useState({
     name: '',
+    providerId: '',
     manufacturer: '',
     dosage: '',
     type: '',
@@ -17,10 +18,44 @@ export function MedicineForm() {
     stock: ''
   });
   const [isLoading, setIsLoading] = useState(false);
+  const [providers, setProviders] = useState([]);
+  const [providersLoading, setProvidersLoading] = useState(false);
   const [message, setMessage] = useState({ text: '', type: '' });
+
+  const loadProviders = async () => {
+    const token = localStorage.getItem('medVisionToken');
+    if (!token) return;
+
+    try {
+      setProvidersLoading(true);
+      const response = await axios.get(`${baseURL}/providers`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setProviders(response.data?.providers || []);
+    } catch {
+      setProviders([]);
+    } finally {
+      setProvidersLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadProviders();
+  }, []);
+
+  const selectedProvider = providers.find((provider) => provider._id === formData.providerId);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
+    if (name === 'providerId') {
+      const matched = providers.find((provider) => provider._id === value);
+      setFormData((prev) => ({
+        ...prev,
+        providerId: value,
+        manufacturer: matched?.name || '',
+      }));
+      return;
+    }
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
@@ -39,6 +74,7 @@ export function MedicineForm() {
         setMessage({ text: 'Medicine added successfully!', type: 'success' });
         setFormData({
           name: '',
+          providerId: '',
           manufacturer: '',
           dosage: '',
           type: '',
@@ -77,15 +113,49 @@ export function MedicineForm() {
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700">Manufacturer</label>
-          <input
-            type="text"
-            name="manufacturer"
-            value={formData.manufacturer}
-            onChange={handleChange}
-            className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-            required
-          />
+          <label className="block text-sm font-medium text-gray-700">Provider</label>
+          {providers.length > 0 ? (
+            <select
+              name="providerId"
+              value={formData.providerId}
+              onChange={handleChange}
+              className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              required
+            >
+              <option value="">Select provider</option>
+              {providers.map((provider) => (
+                <option key={provider._id} value={provider._id}>
+                  {provider.name}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <input
+              type="text"
+              name="manufacturer"
+              value={formData.manufacturer}
+              onChange={handleChange}
+              placeholder={providersLoading ? 'Loading providers...' : 'No providers found. Enter manually.'}
+              className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              required
+            />
+          )}
+          {selectedProvider && (
+            <div className="mt-2 rounded-md border border-blue-100 bg-blue-50 px-3 py-2 text-xs text-blue-900">
+              <p>{[selectedProvider.supportEmail, selectedProvider.supportPhone].filter(Boolean).join(' | ') || 'No support contact details'}</p>
+              <p>{[selectedProvider.addressLine1, selectedProvider.city, selectedProvider.state, selectedProvider.country, selectedProvider.pincode].filter(Boolean).join(', ') || 'No address available'}</p>
+            </div>
+          )}
+          <div className="mt-1 flex items-center justify-between">
+            <p className="text-xs text-gray-500">Providers are managed from Admin Dashboard.</p>
+            <button
+              type="button"
+              onClick={loadProviders}
+              className="text-xs font-medium text-blue-600 hover:text-blue-700"
+            >
+              Refresh
+            </button>
+          </div>
         </div>
 
         <div>

@@ -17,6 +17,11 @@ const pharmacySchema = new mongoose.Schema({
     //   require: true,
     //   unique: true,
   },
+  providerId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Provider',
+    default: null,
+  },
   dosage: {
     type: String,
     //  require: true

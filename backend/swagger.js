@@ -1528,37 +1528,6 @@ const options = {
           responses: { 200: { description: "Medicine removed from inventory" } },
         },
       },
-      // ─── Manufacturers ────────────────────────────────────────────────────────
-      "/api/manufacturers": {
-        get: {
-          tags: ["Inventory"],
-          summary: "Get store manufacturers",
-          security: [{ bearerAuth: [] }],
-          responses: { 200: { description: "Manufacturer list" } },
-        },
-        post: {
-          tags: ["Inventory"],
-          summary: "Create a manufacturer",
-          security: [{ bearerAuth: [] }],
-          requestBody: {
-            required: true,
-            content: {
-              "application/json": {
-                schema: {
-                  type: "object",
-                  required: ["name"],
-                  properties: {
-                    name: { type: "string" },
-                    country: { type: "string" },
-                    contactEmail: { type: "string" },
-                  },
-                },
-              },
-            },
-          },
-          responses: { 201: { description: "Manufacturer created" } },
-        },
-      },
       // ─── Wishlist ─────────────────────────────────────────────────────────────
       "/api/wishlist": {
         get: {

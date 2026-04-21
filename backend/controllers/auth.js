@@ -20,7 +20,7 @@ const PrescriptionRequest = require("../models/prescriptionRequest");
 const Prescription = require("../models/prescription");
 const Cart = require("../models/cart");
 const AuditLog = require("../models/auditLog");
-const StoreManufacturer = require("../models/storeManufacturer");
+const Provider = require("../models/provider");
 const { sendUserNotification, sendEmailNotification } = require("../utils/notificationService");
 const {
     isS3Ready,
@@ -1632,12 +1632,28 @@ const deletemedicine = async (req, res) => {
 };
 
 const addmedicinetodb = async (req, res) => {
-    const { name, manufacturer, dosage, type, price, stock } = req.body;
+    const { name, manufacturer, providerId, dosage, type, price, stock } = req.body;
 
     try {
         // Validate the request body
-        if (!name || !manufacturer || !dosage || !type || !price || !stock) {
-            return res.status(400).json({ error: 'All fields are required' });
+        if (!name || !dosage || !type || !price || !stock) {
+            return res.status(400).json({ error: 'Medicine name, dosage, type, price and stock are required' });
+        }
+
+        let resolvedProviderId = null;
+        let resolvedManufacturer = String(manufacturer || '').trim();
+
+        if (providerId) {
+            const provider = await Provider.findOne({ _id: providerId, isActive: true }).lean();
+            if (!provider) {
+                return res.status(StatusCodes.NOT_FOUND).json({ message: 'Selected provider not found' });
+            }
+            resolvedProviderId = provider._id;
+            resolvedManufacturer = provider.name;
+        }
+
+        if (!resolvedManufacturer) {
+            return res.status(400).json({ error: 'Provider selection or manufacturer name is required' });
         }
 
         // Attach storeId from authenticated store owner token if available
@@ -1646,7 +1662,8 @@ const addmedicinetodb = async (req, res) => {
         // Create a new medicine document
         const newMedicine = new Pharmacy({
             name,
-            manufacturer,
+            manufacturer: resolvedManufacturer,
+            providerId: resolvedProviderId,
             dosage,
             type,
             price,
@@ -1661,6 +1678,180 @@ const addmedicinetodb = async (req, res) => {
     } catch (error) {
         console.error('Error adding medicine:', error.message);
         res.status(500).json({ error: 'Failed to add medicine' });
+    }
+};
+
+const mapProviderResponse = (item) => ({
+    _id: item._id,
+    name: item.name,
+    supportEmail: item.supportEmail || '',
+    supportPhone: item.supportPhone || '',
+    website: item.website || '',
+    addressLine1: item.addressLine1 || '',
+    addressLine2: item.addressLine2 || '',
+    city: item.city || '',
+    state: item.state || '',
+    country: item.country || '',
+    pincode: item.pincode || '',
+    notes: item.notes || '',
+    createdAt: item.createdAt,
+    updatedAt: item.updatedAt,
+});
+
+const normalizeProviderPayload = (payload = {}) => ({
+    name: String(payload.name || '').trim(),
+    supportEmail: String(payload.supportEmail || '').trim().toLowerCase(),
+    supportPhone: String(payload.supportPhone || '').trim(),
+    website: String(payload.website || '').trim(),
+    addressLine1: String(payload.addressLine1 || '').trim(),
+    addressLine2: String(payload.addressLine2 || '').trim(),
+    city: String(payload.city || '').trim(),
+    state: String(payload.state || '').trim(),
+    country: String(payload.country || '').trim(),
+    pincode: String(payload.pincode || '').trim(),
+    notes: String(payload.notes || '').trim(),
+});
+
+const getProviders = async (req, res) => {
+    try {
+        const rows = await Provider.find({ isActive: true })
+            .sort({ name: 1 })
+            .lean();
+
+        return res.status(StatusCodes.OK).json({
+            providers: rows.map((item) => mapProviderResponse(item)),
+        });
+    } catch (error) {
+        console.error('getProviders error:', error);
+        return res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({ message: 'Failed to fetch providers' });
+    }
+};
+
+const createProvider = async (req, res) => {
+    try {
+        const payload = normalizeProviderPayload(req.body);
+        const trimmedName = payload.name;
+
+        if (!trimmedName) {
+            return res.status(StatusCodes.BAD_REQUEST).json({ message: 'Provider name is required' });
+        }
+
+        if (payload.supportEmail && !/^\S+@\S+\.\S+$/.test(payload.supportEmail)) {
+            return res.status(StatusCodes.BAD_REQUEST).json({ message: 'Invalid support email format' });
+        }
+
+        const normalizedName = trimmedName.toLowerCase();
+        const existing = await Provider.findOne({ normalizedName, isActive: true }).lean();
+        if (existing) {
+            return res.status(StatusCodes.CONFLICT).json({ message: 'Provider already exists' });
+        }
+
+        const provider = await Provider.create({
+            name: trimmedName,
+            normalizedName,
+            supportEmail: payload.supportEmail,
+            supportPhone: payload.supportPhone,
+            website: payload.website,
+            addressLine1: payload.addressLine1,
+            addressLine2: payload.addressLine2,
+            city: payload.city,
+            state: payload.state,
+            country: payload.country,
+            pincode: payload.pincode,
+            notes: payload.notes,
+            createdBy: req.user?._id || null,
+            isActive: true,
+        });
+
+        return res.status(StatusCodes.CREATED).json({
+            message: 'Provider created successfully',
+            provider: mapProviderResponse(provider),
+        });
+    } catch (error) {
+        if (error?.code === 11000) {
+            return res.status(StatusCodes.CONFLICT).json({ message: 'Provider already exists' });
+        }
+        console.error('createProvider error:', error);
+        return res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({ message: 'Failed to create provider' });
+    }
+};
+
+const updateProvider = async (req, res) => {
+    try {
+        const { providerId } = req.params;
+        const payload = normalizeProviderPayload(req.body);
+        const trimmedName = payload.name;
+
+        if (!trimmedName) {
+            return res.status(StatusCodes.BAD_REQUEST).json({ message: 'Provider name is required' });
+        }
+
+        if (payload.supportEmail && !/^\S+@\S+\.\S+$/.test(payload.supportEmail)) {
+            return res.status(StatusCodes.BAD_REQUEST).json({ message: 'Invalid support email format' });
+        }
+
+        const normalizedName = trimmedName.toLowerCase();
+        const existing = await Provider.findOne({ normalizedName, _id: { $ne: providerId }, isActive: true }).lean();
+        if (existing) {
+            return res.status(StatusCodes.CONFLICT).json({ message: 'Provider already exists' });
+        }
+
+        const provider = await Provider.findOneAndUpdate(
+            { _id: providerId, isActive: true },
+            {
+                $set: {
+                    name: trimmedName,
+                    normalizedName,
+                    supportEmail: payload.supportEmail,
+                    supportPhone: payload.supportPhone,
+                    website: payload.website,
+                    addressLine1: payload.addressLine1,
+                    addressLine2: payload.addressLine2,
+                    city: payload.city,
+                    state: payload.state,
+                    country: payload.country,
+                    pincode: payload.pincode,
+                    notes: payload.notes,
+                },
+            },
+            { new: true }
+        ).lean();
+
+        if (!provider) {
+            return res.status(StatusCodes.NOT_FOUND).json({ message: 'Provider not found' });
+        }
+
+        return res.status(StatusCodes.OK).json({
+            message: 'Provider updated successfully',
+            provider: mapProviderResponse(provider),
+        });
+    } catch (error) {
+        if (error?.code === 11000) {
+            return res.status(StatusCodes.CONFLICT).json({ message: 'Provider already exists' });
+        }
+        console.error('updateProvider error:', error);
+        return res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({ message: 'Failed to update provider' });
+    }
+};
+
+const deleteProvider = async (req, res) => {
+    try {
+        const { providerId } = req.params;
+
+        const provider = await Provider.findOneAndUpdate(
+            { _id: providerId, isActive: true },
+            { $set: { isActive: false } },
+            { new: true }
+        ).lean();
+
+        if (!provider) {
+            return res.status(StatusCodes.NOT_FOUND).json({ message: 'Provider not found' });
+        }
+
+        return res.status(StatusCodes.OK).json({ message: 'Provider deleted successfully' });
+    } catch (error) {
+        console.error('deleteProvider error:', error);
+        return res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({ message: 'Failed to delete provider' });
     }
 };
 
@@ -1691,101 +1882,10 @@ const getStoreInventory = async (req, res) => {
     }
 };
 
-const getStoreManufacturers = async (req, res) => {
-    try {
-        const storeId = req.user?._id;
-        if (!storeId) {
-            return res.status(StatusCodes.UNAUTHORIZED).json({ message: 'Unauthorized store access' });
-        }
-
-        const rows = await StoreManufacturer.find({ storeId, isActive: true })
-            .sort({ name: 1 })
-            .lean();
-
-        return res.status(StatusCodes.OK).json({
-            manufacturers: rows.map((item) => ({
-                _id: item._id,
-                name: item.name,
-                notes: item.notes || '',
-                createdAt: item.createdAt,
-            })),
-        });
-    } catch (error) {
-        console.error('getStoreManufacturers error:', error);
-        return res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({ message: 'Failed to fetch manufacturers' });
-    }
-};
-
-const createStoreManufacturer = async (req, res) => {
-    try {
-        const storeId = req.user?._id;
-        const roleCode = Number(req.user?.roleCode || ROLE_CODES.STORE_ADMIN);
-        const { name = '', notes = '' } = req.body;
-
-        if (!storeId) {
-            return res.status(StatusCodes.UNAUTHORIZED).json({ message: 'Unauthorized store access' });
-        }
-
-        if (roleCode !== ROLE_CODES.STORE_ADMIN) {
-            return res.status(StatusCodes.FORBIDDEN).json({ message: 'Only Store Admin can add manufacturer details' });
-        }
-
-        const trimmedName = String(name || '').trim();
-        if (!trimmedName) {
-            return res.status(StatusCodes.BAD_REQUEST).json({ message: 'Manufacturer name is required' });
-        }
-
-        const normalizedName = trimmedName.toLowerCase();
-        const existing = await StoreManufacturer.findOne({ storeId, normalizedName }).lean();
-        if (existing) {
-            return res.status(StatusCodes.CONFLICT).json({ message: 'Manufacturer already exists' });
-        }
-
-        const manufacturer = await StoreManufacturer.create({
-            storeId,
-            name: trimmedName,
-            normalizedName,
-            notes: String(notes || '').trim(),
-            isActive: true,
-        });
-
-        await logStoreAuditEvent({
-            req,
-            storeId,
-            action: 'MANUFACTURER_CREATE',
-            entityType: 'Manufacturer',
-            entityId: manufacturer._id,
-            description: `Added manufacturer ${manufacturer.name}`,
-            changes: {
-                current: {
-                    name: manufacturer.name,
-                    notes: manufacturer.notes,
-                },
-            },
-        });
-
-        return res.status(StatusCodes.CREATED).json({
-            message: 'Manufacturer added successfully',
-            manufacturer: {
-                _id: manufacturer._id,
-                name: manufacturer.name,
-                notes: manufacturer.notes,
-                createdAt: manufacturer.createdAt,
-            },
-        });
-    } catch (error) {
-        if (error?.code === 11000) {
-            return res.status(StatusCodes.CONFLICT).json({ message: 'Manufacturer already exists' });
-        }
-        console.error('createStoreManufacturer error:', error);
-        return res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({ message: 'Failed to add manufacturer' });
-    }
-};
-
 const createStoreInventoryMedicine = async (req, res) => {
     try {
         const storeId = req.user?._id;
-        const { name, manufacturer = '', dosage = '', type = '', price = 0, stock = 0 } = req.body;
+        const { name, manufacturer = '', providerId, dosage = '', type = '', price = 0, stock = 0 } = req.body;
 
         if (!storeId) {
             return res.status(StatusCodes.UNAUTHORIZED).json({ message: 'Unauthorized store access' });
@@ -1798,10 +1898,22 @@ const createStoreInventoryMedicine = async (req, res) => {
         const normalizedStock = Math.max(0, Number(stock) || 0);
         const normalizedPrice = Math.max(0, Number(price) || 0);
 
+        let resolvedProviderId = null;
+        let resolvedManufacturer = String(manufacturer || '').trim();
+        if (providerId) {
+            const provider = await Provider.findOne({ _id: providerId, isActive: true }).lean();
+            if (!provider) {
+                return res.status(StatusCodes.NOT_FOUND).json({ message: 'Selected provider not found' });
+            }
+            resolvedProviderId = provider._id;
+            resolvedManufacturer = provider.name;
+        }
+
         const medicine = await Pharmacy.create({
             storeId,
             name: String(name).trim(),
-            manufacturer: String(manufacturer || '').trim(),
+            manufacturer: resolvedManufacturer,
+            providerId: resolvedProviderId,
             dosage: String(dosage || '').trim(),
             type: String(type || '').trim(),
             price: normalizedPrice,
@@ -1845,7 +1957,7 @@ const updateStoreInventoryMedicine = async (req, res) => {
     try {
         const storeId = req.user?._id;
         const { medicineId } = req.params;
-        const { name, manufacturer, dosage, type, price, stock } = req.body;
+        const { name, manufacturer, providerId, dosage, type, price, stock } = req.body;
 
         if (!storeId) {
             return res.status(StatusCodes.UNAUTHORIZED).json({ message: 'Unauthorized store access' });
@@ -1858,6 +1970,19 @@ const updateStoreInventoryMedicine = async (req, res) => {
         if (type !== undefined) updatePayload.type = String(type || '').trim();
         if (price !== undefined) updatePayload.price = Math.max(0, Number(price) || 0);
         if (stock !== undefined) updatePayload.stock = Math.max(0, Number(stock) || 0);
+
+        if (providerId !== undefined) {
+            if (providerId) {
+                const provider = await Provider.findOne({ _id: providerId, isActive: true }).lean();
+                if (!provider) {
+                    return res.status(StatusCodes.NOT_FOUND).json({ message: 'Selected provider not found' });
+                }
+                updatePayload.providerId = provider._id;
+                updatePayload.manufacturer = provider.name;
+            } else {
+                updatePayload.providerId = null;
+            }
+        }
 
         if (updatePayload.name !== undefined && !updatePayload.name) {
             return res.status(StatusCodes.BAD_REQUEST).json({ message: 'Medicine name is required' });
@@ -6723,7 +6848,7 @@ module.exports = {
     uploadPrescriptionRequest, reuploadPrescriptionRequest, getMyPrescriptionRequests, getStorePrescriptionRequests, reviewPrescriptionRequest, getPrescriptionCheckout, placePrescriptionOrder,
     getStoreOrders, updateOrderTrackingStatus, getMyOrders, getOrderById, getStoreStaffMembers, createStoreStaffMember, updateStoreStaffMember, updateStoreStaffStatus, deleteStoreStaffMember, getCart, seedVaccinationMasterIfEmpty, upsertUserVaccination, getUserVaccinations, getVaccinationMaster, getUserVaccinationsForDashboard, updateUserVaccinationByMasterId, createUserQuery, getUserQueries, getStoreQueries, answerStoreQuery, importPatientsFromCsv,
     getMedicinesByStore,
-    getStoreManufacturers, createStoreManufacturer,
+    getProviders, createProvider, updateProvider, deleteProvider,
     getStoreInventory, createStoreInventoryMedicine, updateStoreInventoryMedicine, deleteStoreInventoryMedicine,
     createReview, updateReview, deleteReview, getPublicReviews, getStoreReviews, getMyReviews, getMyStoreReviews, replyToReview,
     uploadPrescriptionForAutoFill, extractMedicinesFromUploadedPrescription, getUserPrescriptionUploads, addExtractedMedicinesToCart,

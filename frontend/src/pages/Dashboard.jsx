@@ -7,6 +7,7 @@ import Loader from '../components/Loader';
 import PrescriptionDialog from '../components/PrescriptionDialog';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
+import { useLocationOptions } from '../hooks/useLocationOptions';
 
 const Dashboard = () => {
     const latestOrderStorageKey = 'medVisionLatestOrderId';
@@ -63,6 +64,7 @@ const Dashboard = () => {
         firstName: '',
         middleName: '',
         lastName: '',
+        countryCode: '+91',
         email: '',
         mobile: '',
         address: '',
@@ -70,6 +72,7 @@ const Dashboard = () => {
         state: '',
         pincode: '',
     });
+    const { countryOptions, stateOptions: profileStateOptions, getCountryLabelByDialCode } = useLocationOptions(profileForm.countryCode);
     const [profileErrors, setProfileErrors] = useState({});
     const [profileImageFile, setProfileImageFile] = useState(null);
     const [profileImagePreview, setProfileImagePreview] = useState('');
@@ -463,7 +466,11 @@ const Dashboard = () => {
 
     const handleProfileChange = (e) => {
         const { name, value } = e.target;
-        setProfileForm((prev) => ({ ...prev, [name]: value }));
+        setProfileForm((prev) => ({
+            ...prev,
+            [name]: value,
+            ...(name === 'countryCode' ? { state: '' } : {}),
+        }));
         setProfileErrors((prev) => ({ ...prev, [name]: undefined }));
     };
 
@@ -480,6 +487,7 @@ const Dashboard = () => {
             firstName: userData?.firstName || '',
             middleName: userData?.middleName || '',
             lastName: userData?.lastName || '',
+            countryCode: userData?.countryCode || '+91',
             email: userData?.email || '',
             mobile: userData?.mobile || '',
             address: userData?.address || '',
@@ -498,6 +506,7 @@ const Dashboard = () => {
             firstName: userData?.firstName || '',
             middleName: userData?.middleName || '',
             lastName: userData?.lastName || '',
+            countryCode: userData?.countryCode || '+91',
             email: userData?.email || '',
             mobile: userData?.mobile || '',
             address: userData?.address || '',
@@ -559,6 +568,7 @@ const Dashboard = () => {
             payload.append('middleName', trimmedMiddleName);
             payload.append('lastName', trimmedLastName);
             payload.append('email', trimmedEmail);
+            payload.append('countryCode', profileForm.countryCode);
             payload.append('mobile', trimmedMobile);
             payload.append('address', trimmedAddress);
             payload.append('city', trimmedCity);
@@ -1066,6 +1076,7 @@ const Dashboard = () => {
             firstName: userData.firstName || '',
             middleName: userData.middleName || '',
             lastName: userData.lastName || '',
+            countryCode: userData.countryCode || '+91',
             email: userData.email || '',
             mobile: userData.mobile || '',
             address: userData.address || '',
@@ -2569,11 +2580,18 @@ const Dashboard = () => {
                                             <label className="block text-sm font-medium text-gray-700 mb-2">Mobile Number</label>
                                             {isEditingProfile ? (
                                                 <>
-                                                    <input name="mobile" value={profileForm.mobile} onChange={handleProfileChange} className={`w-full px-4 py-3 rounded-xl border bg-white text-gray-800 focus:outline-none focus:ring-2 focus:ring-green-500 ${profileErrors.mobile ? 'border-red-400' : 'border-gray-200'}`} placeholder="Enter mobile number" />
+                                                    <div className="grid grid-cols-[200px_1fr] gap-3">
+                                                        <select name="countryCode" value={profileForm.countryCode} onChange={handleProfileChange} className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-white text-gray-800 focus:outline-none focus:ring-2 focus:ring-green-500">
+                                                            {countryOptions.map((option) => (
+                                                                <option key={option.code} value={option.code}>{option.label}</option>
+                                                            ))}
+                                                        </select>
+                                                        <input name="mobile" value={profileForm.mobile} onChange={handleProfileChange} className={`w-full px-4 py-3 rounded-xl border bg-white text-gray-800 focus:outline-none focus:ring-2 focus:ring-green-500 ${profileErrors.mobile ? 'border-red-400' : 'border-gray-200'}`} placeholder="Enter mobile number" />
+                                                    </div>
                                                     {profileErrors.mobile && <p className="text-red-500 text-xs mt-1">{profileErrors.mobile}</p>}
                                                 </>
                                             ) : (
-                                                <div className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-gray-50 text-gray-800">{userData?.mobile || 'Not provided'}</div>
+                                                <div className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-gray-50 text-gray-800">{`${userData?.countryCode || '+91'} ${userData?.mobile || ''}`.trim() || 'Not provided'}</div>
                                             )}
                                         </div>
 
@@ -2603,9 +2621,27 @@ const Dashboard = () => {
                                         </div>
 
                                         <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-2">Country</label>
+                                            {isEditingProfile ? (
+                                                <select name="countryCode" value={profileForm.countryCode} onChange={handleProfileChange} className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-white text-gray-800 focus:outline-none focus:ring-2 focus:ring-green-500">
+                                                    {countryOptions.map((option) => (
+                                                        <option key={`profile-country-${option.code}`} value={option.code}>{option.label}</option>
+                                                    ))}
+                                                </select>
+                                            ) : (
+                                                <div className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-gray-50 text-gray-800">{getCountryLabelByDialCode(userData?.countryCode || '+91')}</div>
+                                            )}
+                                        </div>
+
+                                        <div>
                                             <label className="block text-sm font-medium text-gray-700 mb-2">State</label>
                                             {isEditingProfile ? (
-                                                <input name="state" value={profileForm.state} onChange={handleProfileChange} className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-white text-gray-800 focus:outline-none focus:ring-2 focus:ring-green-500" placeholder="Enter state" />
+                                                <select name="state" value={profileForm.state} onChange={handleProfileChange} className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-white text-gray-800 focus:outline-none focus:ring-2 focus:ring-green-500" disabled={!profileStateOptions.length}>
+                                                    <option value="">Select state</option>
+                                                    {profileStateOptions.map((stateName) => (
+                                                        <option key={`profile-state-${stateName}`} value={stateName}>{stateName}</option>
+                                                    ))}
+                                                </select>
                                             ) : (
                                                 <div className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-gray-50 text-gray-800">{userData?.state || 'Not provided'}</div>
                                             )}

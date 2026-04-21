@@ -4,7 +4,7 @@ const multer = require("multer");
 const fs = require("fs");
 const os = require("os");
 const path = require("path");
-const { signUp, signIn, forgotPassword, fetchData, updateStoreProfile, AdminfetchData, adminsignIn, uploadPrescriptionFile, UpdatePatientProfile, fetchpharmacymedicines, updateorderedmedicines, updatecartquantity, addmedicinetodb, decreaseupdatecartquantity, deletemedicine, finalitems, finaladdress, finalpayment, deletecartItems, createStoreApprovalRequest, getStoreApprovalRequests, reviewStoreApprovalRequest, getAllStores, updateStoreStatus, addStore, getUserNotificationPreferences, updateUserNotificationPreferences, uploadPrescriptionRequest, reuploadPrescriptionRequest, getMyPrescriptionRequests, getStorePrescriptionRequests, reviewPrescriptionRequest, getPrescriptionCheckout, placePrescriptionOrder, getStoreOrders, updateOrderTrackingStatus, getMyOrders, getOrderById, getStoreStaffMembers, createStoreStaffMember, updateStoreStaffMember, updateStoreStaffStatus, deleteStoreStaffMember, getCart, seedVaccinationMasterIfEmpty, upsertUserVaccination, getUserVaccinations, getVaccinationMaster, getUserVaccinationsForDashboard, updateUserVaccinationByMasterId, createUserQuery, getUserQueries, getStoreQueries, answerStoreQuery, importPatientsFromCsv, getMedicinesByStore, getStoreManufacturers, createStoreManufacturer, getStoreInventory, createStoreInventoryMedicine, updateStoreInventoryMedicine, deleteStoreInventoryMedicine, createReview, updateReview, deleteReview, getPublicReviews, getStoreReviews, getMyReviews, getMyStoreReviews, replyToReview, uploadPrescriptionForAutoFill, extractMedicinesFromUploadedPrescription, getUserPrescriptionUploads, addExtractedMedicinesToCart, getWishlist, addToWishlist, removeFromWishlist, createMedicineTracker, getMedicineTrackers, logMedicineIntake, checkDrugInteractions, getMedicalTimeline, exportHealthRecordsPdf, getPublicPromotionalCampaigns, validatePublicCoupon, getStoreAuditLogs, exportStoreAuditLogsCsv, getDailyCloseReport, getPrescriptionTurnaroundReport, getInventoryRiskReport, getMyInsurancePolicies, addInsurancePolicy, updateInsurancePolicy, deleteInsurancePolicy, downloadInsurancePolicyPdf, checkInsuranceExpiryReminders } = require("../controllers/auth");
+const { signUp, signIn, forgotPassword, fetchData, updateStoreProfile, AdminfetchData, adminsignIn, uploadPrescriptionFile, UpdatePatientProfile, fetchpharmacymedicines, updateorderedmedicines, updatecartquantity, addmedicinetodb, decreaseupdatecartquantity, deletemedicine, finalitems, finaladdress, finalpayment, deletecartItems, createStoreApprovalRequest, getStoreApprovalRequests, reviewStoreApprovalRequest, getAllStores, updateStoreStatus, addStore, getUserNotificationPreferences, updateUserNotificationPreferences, uploadPrescriptionRequest, reuploadPrescriptionRequest, getMyPrescriptionRequests, getStorePrescriptionRequests, reviewPrescriptionRequest, getPrescriptionCheckout, placePrescriptionOrder, getStoreOrders, updateOrderTrackingStatus, getMyOrders, getOrderById, getStoreStaffMembers, createStoreStaffMember, updateStoreStaffMember, updateStoreStaffStatus, deleteStoreStaffMember, getCart, seedVaccinationMasterIfEmpty, upsertUserVaccination, getUserVaccinations, getVaccinationMaster, getUserVaccinationsForDashboard, updateUserVaccinationByMasterId, createUserQuery, getUserQueries, getStoreQueries, answerStoreQuery, importPatientsFromCsv, getMedicinesByStore, getProviders, createProvider, updateProvider, deleteProvider, getStoreInventory, createStoreInventoryMedicine, updateStoreInventoryMedicine, deleteStoreInventoryMedicine, createReview, updateReview, deleteReview, getPublicReviews, getStoreReviews, getMyReviews, getMyStoreReviews, replyToReview, uploadPrescriptionForAutoFill, extractMedicinesFromUploadedPrescription, getUserPrescriptionUploads, addExtractedMedicinesToCart, getWishlist, addToWishlist, removeFromWishlist, createMedicineTracker, getMedicineTrackers, logMedicineIntake, checkDrugInteractions, getMedicalTimeline, exportHealthRecordsPdf, getPublicPromotionalCampaigns, validatePublicCoupon, getStoreAuditLogs, exportStoreAuditLogsCsv, getDailyCloseReport, getPrescriptionTurnaroundReport, getInventoryRiskReport, getMyInsurancePolicies, addInsurancePolicy, updateInsurancePolicy, deleteInsurancePolicy, downloadInsurancePolicyPdf, checkInsuranceExpiryReminders } = require("../controllers/auth");
 const {
   getStoreRolePermissions,
   createStaffPerformanceRecord,
@@ -35,6 +35,7 @@ const {
   updatePromotionalCampaignStatus,
   deletePromotionalCampaign,
 } = require("../controllers/auth");
+const { getCountries, getStatesByCountry } = require("../controllers/locationMaster");
 const verifyToken  = require("../middleware/authMiddleware");  
 
 const uploadsDir = process.env.UPLOADS_DIR || path.join(os.tmpdir(), "medvision-uploads");
@@ -273,8 +274,12 @@ router.get("/vaccination-master", verifyToken(["User"]), getVaccinationMaster);
 router.get("/user-vaccinations", verifyToken(["User"]), getUserVaccinationsForDashboard);
 router.put("/user-vaccinations/:vaccinationId", verifyToken(["User"]), updateUserVaccinationByMasterId);
 router.get('/medicines-by-store/:storeId', getMedicinesByStore);
-router.get('/manufacturers', verifyToken(['Store']), getStoreManufacturers);
-router.post('/manufacturers', verifyToken(['Store']), createStoreManufacturer);
+router.get('/locations/countries', getCountries);
+router.get('/locations/states', getStatesByCountry);
+router.get('/providers', verifyToken(['Store', 'admin']), getProviders);
+router.post('/providers', verifyToken(['admin']), createProvider);
+router.put('/providers/:providerId', verifyToken(['admin']), updateProvider);
+router.delete('/providers/:providerId', verifyToken(['admin']), deleteProvider);
 router.get('/store-inventory', verifyToken(['Store']), getStoreInventory);
 router.post('/store-inventory', verifyToken(['Store']), createStoreInventoryMedicine);
 router.put('/store-inventory/:medicineId', verifyToken(['Store']), updateStoreInventoryMedicine);

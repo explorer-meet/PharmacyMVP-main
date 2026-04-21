@@ -5,6 +5,7 @@ import { useNavigate } from "react-router-dom";
 import Loader from "../components/Loader";
 import Navbar from "../components/Navbar";
 import { baseURL } from "../main";
+import { useLocationOptions } from "../hooks/useLocationOptions";
 
 import {
   Mail,
@@ -52,15 +53,17 @@ const Signup = () => {
   });
 
   const [loading, setLoading] = useState(false);
+  const { countryOptions, stateOptions } = useLocationOptions(formData.countryCode);
 
   const navigate = useNavigate();
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData({
-      ...formData,
+    setFormData((prev) => ({
+      ...prev,
       [name]: value,
-    });
+      ...(name === 'countryCode' ? { state: '' } : {}),
+    }));
   };
 
   const submitHandler = async (e) => {
@@ -464,10 +467,9 @@ const Signup = () => {
                               onChange={handleChange}
                               className="mr-3 bg-transparent text-slate-800 outline-none"
                             >
-                              <option value="+91">+91</option>
-                              <option value="+1">+1</option>
-                              <option value="+44">+44</option>
-                              <option value="+61">+61</option>
+                              {countryOptions.map((option) => (
+                                <option key={option.code} value={option.code}>{option.label}</option>
+                              ))}
                             </select>
                             <input
                               type="tel"
@@ -642,29 +644,14 @@ const Signup = () => {
                               name="state"
                               value={formData.state}
                               onChange={handleChange}
+                              disabled={!stateOptions.length}
                               required
                               className="w-full bg-transparent text-slate-800 outline-none"
                             >
                               <option value="">Select state</option>
-                              <option value="Maharashtra">Maharashtra</option>
-                              <option value="Karnataka">Karnataka</option>
-                              <option value="Delhi">Delhi</option>
-                              <option value="Gujarat">Gujarat</option>
-                              <option value="Tamil Nadu">Tamil Nadu</option>
-                              <option value="Uttar Pradesh">Uttar Pradesh</option>
-                              <option value="Rajasthan">Rajasthan</option>
-                              <option value="West Bengal">West Bengal</option>
-                              <option value="Andhra Pradesh">Andhra Pradesh</option>
-                              <option value="Punjab">Punjab</option>
-                              <option value="Haryana">Haryana</option>
-                              <option value="Bihar">Bihar</option>
-                              <option value="Chhattisgarh">Chhattisgarh</option>
-                              <option value="Odisha">Odisha</option>
-                              <option value="Kerala">Kerala</option>
-                              <option value="Jharkhand">Jharkhand</option>
-                              <option value="Assam">Assam</option>
-                              <option value="Himachal Pradesh">Himachal Pradesh</option>
-                              <option value="Uttarakhand">Uttarakhand</option>
+                              {stateOptions.map((stateName) => (
+                                <option key={`patient-${stateName}`} value={stateName}>{stateName}</option>
+                              ))}
                             </select>
                           </div>
                         </div>
@@ -703,10 +690,9 @@ const Signup = () => {
                               onChange={handleChange}
                               className="mr-3 bg-transparent text-slate-800 outline-none"
                             >
-                              <option value="+91">+91</option>
-                              <option value="+1">+1</option>
-                              <option value="+44">+44</option>
-                              <option value="+61">+61</option>
+                              {countryOptions.map((option) => (
+                                <option key={option.code} value={option.code}>{option.label}</option>
+                              ))}
                             </select>
                             <input
                               type="tel"
@@ -800,29 +786,14 @@ const Signup = () => {
                               name="state"
                               value={formData.state}
                               onChange={handleChange}
+                              disabled={!stateOptions.length}
                               required
                               className="w-full bg-transparent text-slate-800 outline-none"
                             >
                               <option value="">Select state</option>
-                              <option value="Maharashtra">Maharashtra</option>
-                              <option value="Karnataka">Karnataka</option>
-                              <option value="Delhi">Delhi</option>
-                              <option value="Gujarat">Gujarat</option>
-                              <option value="Tamil Nadu">Tamil Nadu</option>
-                              <option value="Uttar Pradesh">Uttar Pradesh</option>
-                              <option value="Rajasthan">Rajasthan</option>
-                              <option value="West Bengal">West Bengal</option>
-                              <option value="Andhra Pradesh">Andhra Pradesh</option>
-                              <option value="Punjab">Punjab</option>
-                              <option value="Haryana">Haryana</option>
-                              <option value="Bihar">Bihar</option>
-                              <option value="Chhattisgarh">Chhattisgarh</option>
-                              <option value="Odisha">Odisha</option>
-                              <option value="Kerala">Kerala</option>
-                              <option value="Jharkhand">Jharkhand</option>
-                              <option value="Assam">Assam</option>
-                              <option value="Himachal Pradesh">Himachal Pradesh</option>
-                              <option value="Uttarakhand">Uttarakhand</option>
+                              {stateOptions.map((stateName) => (
+                                <option key={`store-${stateName}`} value={stateName}>{stateName}</option>
+                              ))}
                             </select>
                           </div>
                         </div>
