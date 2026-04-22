@@ -38,6 +38,7 @@ import {
   Clock,
   Eye,
   RefreshCw,
+  RotateCcw,
 } from 'lucide-react';
 
 const MEDICINE_TYPE_OPTIONS = [
@@ -55,6 +56,25 @@ const MEDICINE_TYPE_OPTIONS = [
 ];
 
 const PAGINATION_PAGE_SIZE_OPTIONS = [10, 20];
+
+const STORE_RETURN_STATUS_FILTERS = [
+  { value: 'all', label: 'All', icon: RotateCcw },
+  { value: 'open', label: 'Open', icon: Clock },
+  { value: 'evidence_requested', label: 'Evidence Needed', icon: AlertCircle },
+  { value: 'store_review', label: 'Store Review', icon: RefreshCw },
+  { value: 'approved', label: 'Approved', icon: CheckCircle2 },
+  { value: 'rejected', label: 'Rejected', icon: XCircle },
+  { value: 'refunded', label: 'Refunded', icon: CheckCircle2 },
+  { value: 'closed', label: 'Closed', icon: XCircle },
+];
+
+const matchesStoreReturnStatus = (status, filter) => {
+  if (filter === 'all') return true;
+  if (filter === 'store_review') {
+    return ['store_review', 'evidence_submitted'].includes(status);
+  }
+  return status === filter;
+};
 
 const getQueryPatientDisplayName = (query) => {
   const user = query?.userId;
@@ -722,6 +742,16 @@ const StoreDashboard = () => {
   const selectedQuery = queries.find((item) => item._id === selectedQueryId);
   const [storeReviews, setStoreReviews] = useState([]);
   const [storeReviewsLoading, setStoreReviewsLoading] = useState(false);
+
+  // Returns & Refunds
+  const [storeReturns, setStoreReturns] = useState([]);
+  const [storeReturnsLoading, setStoreReturnsLoading] = useState(false);
+  const [returnsStatusFilter, setReturnsStatusFilter] = useState('all');
+  const [selectedReturnId, setSelectedReturnId] = useState(null);
+  const [returnActionNote, setReturnActionNote] = useState('');
+  const [returnRefundMode, setReturnRefundMode] = useState('wallet_credit');
+  const [returnRefundAmount, setReturnRefundAmount] = useState('');
+  const [returnActionSubmitting, setReturnActionSubmitting] = useState(false);
   const [selectedReviewId, setSelectedReviewId] = useState(null);
   const [reviewReplyText, setReviewReplyText] = useState('');
   const [reviewReplySubmitting, setReviewReplySubmitting] = useState(false);
@@ -2165,6 +2195,7 @@ const StoreDashboard = () => {
     { key: 'importPatients', label: 'Import Patients', icon: FileUp },
     { key: 'inventory', label: 'Inventory', icon: Package },
     { key: 'orders', label: 'Orders', icon: ShoppingBag },
+    { key: 'returns', label: 'Returns & Refunds', icon: RotateCcw },
     { key: 'financialManagement', label: 'Financial Management', icon: Landmark },
     { key: 'prescription', label: 'Prescription', icon: ClipboardList },
     { key: 'queries', label: 'Queries', icon: MessageSquare },
@@ -2174,16 +2205,16 @@ const StoreDashboard = () => {
   ];
 
   const roleSectionAccess = {
-    'Store Admin': ['home', 'auditTrail', 'staff', 'promotions', 'importPatients', 'inventory', 'orders', 'financialManagement', 'prescription', 'queries', 'reviews', 'myProfile', 'reports'],
-    Pharmacist: ['home', 'prescription', 'inventory', 'orders', 'queries', 'reviews', 'myProfile'],
-    Operator: ['home', 'prescription', 'inventory', 'orders', 'queries', 'reviews', 'myProfile'],
+    'Store Admin': ['home', 'auditTrail', 'staff', 'promotions', 'importPatients', 'inventory', 'orders', 'returns', 'financialManagement', 'prescription', 'queries', 'reviews', 'myProfile', 'reports'],
+    Pharmacist: ['home', 'prescription', 'inventory', 'orders', 'returns', 'queries', 'reviews', 'myProfile'],
+    Operator: ['home', 'prescription', 'inventory', 'orders', 'returns', 'queries', 'reviews', 'myProfile'],
   };
 
   const allowedSectionKeys = roleSectionAccess[dashboardAccessRole] || roleSectionAccess['Store Admin'];
   const visibleSectionConfig = sectionConfig.filter((section) => allowedSectionKeys.includes(section.key));
   const sectionGroupConfig = useMemo(() => ([
     { title: 'Overview', keys: ['home', 'reports', 'auditTrail'] },
-    { title: 'Operations', keys: ['inventory', 'orders', 'prescription', 'financialManagement'] },
+    { title: 'Operations', keys: ['inventory', 'orders', 'returns', 'prescription', 'financialManagement'] },
     { title: 'People & Communication', keys: ['staff', 'queries', 'reviews'] },
     { title: 'Growth & Setup', keys: ['promotions', 'importPatients', 'myProfile'] },
   ]), []);
@@ -2797,6 +2828,14 @@ const StoreDashboard = () => {
     }
     if (selectedSection === 'reviews' && allowedSectionKeys.includes('reviews')) {
       loadStoreReviews();
+    }
+    if (selectedSection === 'returns' && allowedSectionKeys.includes('returns')) {
+      setStoreReturnsLoading(true);
+      const token = localStorage.getItem('medVisionToken');
+      axios.get(`${baseURL}/returns/store/queue`, { headers: { Authorization: `Bearer ${token}` } })
+        .then(res => setStoreReturns(res.data.returns || []))
+        .catch(() => toast.error('Failed to load returns'))
+        .finally(() => setStoreReturnsLoading(false));
     }
     if (selectedSection === 'staffCompliance' && allowedSectionKeys.includes('staff')) {
       loadStoreStaffMembers();
@@ -6260,6 +6299,262 @@ const StoreDashboard = () => {
                     )}
                   </div>
                 </div>
+              </div>
+            )}
+
+            {selectedSection === 'returns' && (
+              <div className="space-y-5">
+                {/* Header */}
+                <div className="rounded-3xl bg-gradient-to-r from-rose-600 via-rose-500 to-orange-500 p-5 text-white shadow-xl">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-white/20">
+                      <RotateCcw className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <h2 className="text-lg font-bold">Returns & Refunds Queue</h2>
+                      <p className="text-xs text-rose-100">Review and action patient return requests.</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Filters + Refresh */}
+                <div className="flex flex-wrap items-center gap-2">
+                  {STORE_RETURN_STATUS_FILTERS.map((filter) => {
+                    const FilterIcon = filter.icon;
+                    const count = storeReturns.filter((item) => matchesStoreReturnStatus(item.status, filter.value)).length;
+                    return (
+                    <button key={filter.value}
+                      onClick={() => setReturnsStatusFilter(filter.value)}
+                      className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border transition ${
+                        returnsStatusFilter === filter.value
+                          ? 'bg-rose-600 text-white border-rose-600'
+                          : 'bg-white text-slate-600 border-slate-200 hover:border-rose-300'
+                      }`}
+                    >
+                      <FilterIcon className="h-3.5 w-3.5" />
+                      <span>{filter.label}</span>
+                      <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-bold ${returnsStatusFilter === filter.value ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-500'}`}>
+                        {count}
+                      </span>
+                    </button>
+                    );
+                  })}
+                  <button
+                    onClick={async () => {
+                      setStoreReturnsLoading(true);
+                      try {
+                        const token = localStorage.getItem('medVisionToken');
+                        const res = await axios.get(`${baseURL}/returns/store/queue`, { headers: { Authorization: `Bearer ${token}` } });
+                        setStoreReturns(res.data.returns || []);
+                      } catch { toast.error('Failed to load returns'); }
+                      finally { setStoreReturnsLoading(false); }
+                    }}
+                    className="ml-auto flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition"
+                  >
+                    <RefreshCw className="h-3.5 w-3.5" /> Refresh
+                  </button>
+                </div>
+
+                {storeReturnsLoading ? (
+                  <div className="flex justify-center py-12">
+                    <div className="h-8 w-8 animate-spin rounded-full border-4 border-rose-200 border-t-rose-500" />
+                  </div>
+                ) : (() => {
+                  const filtered = storeReturns.filter((r) => matchesStoreReturnStatus(r.status, returnsStatusFilter));
+                  const selected = storeReturns.find(r => r._id === selectedReturnId);
+                  const REASON_LABELS = { wrong_item:'Wrong item',damaged_pack:'Damaged packaging',delayed_delivery:'Delayed delivery',other:'Other' };
+                  const formatD = (d) => d ? new Date(d).toLocaleString('en-IN', { day:'numeric', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' }) : '—';
+                  const slaColor = (deadline) => {
+                    if (!deadline) return 'text-slate-400';
+                    const h = (new Date(deadline) - Date.now()) / 3600000;
+                    if (h < 0) return 'text-red-600 font-bold';
+                    if (h < 2) return 'text-rose-600 font-semibold';
+                    if (h < 8) return 'text-amber-600';
+                    return 'text-emerald-600';
+                  };
+                  return (
+                    <div className="grid gap-5 lg:grid-cols-[360px_1fr]">
+                      {/* List */}
+                      <div className="rounded-3xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+                        <div className="border-b border-slate-100 px-5 py-3">
+                          <p className="text-sm font-semibold text-slate-700">Queue ({filtered.length})</p>
+                        </div>
+                        <div className="max-h-[560px] overflow-y-auto divide-y divide-slate-100">
+                          {filtered.length === 0 ? (
+                            <p className="px-5 py-8 text-center text-sm text-slate-400">No returns found.</p>
+                          ) : filtered.map(r => (
+                            <button key={r._id} onClick={() => { setSelectedReturnId(r._id); setReturnActionNote(''); setReturnRefundAmount(''); }}
+                              className={`w-full text-left px-5 py-4 transition ${ selectedReturnId === r._id ? 'bg-rose-50 border-l-4 border-rose-500' : 'hover:bg-slate-50 border-l-4 border-transparent' }`}
+                            >
+                              <div className="flex items-center justify-between gap-2">
+                                <span className="text-xs font-bold text-slate-800">#{String(r._id).slice(-6).toUpperCase()}</span>
+                                <span className={`text-[10px] rounded-full border px-2 py-0.5 capitalize ${
+                                  r.status === 'approved' ? 'border-emerald-200 bg-emerald-50 text-emerald-700' :
+                                  r.status === 'rejected' ? 'border-rose-200 bg-rose-50 text-rose-700' :
+                                  r.status === 'open' ? 'border-sky-200 bg-sky-50 text-sky-700' :
+                                  'border-amber-200 bg-amber-50 text-amber-700'
+                                }`}>{r.status.replace(/_/g,' ')}</span>
+                              </div>
+                              <p className="mt-1 text-xs text-slate-600 truncate">{r.userId?.name || r.userId?.firstName || 'Patient'}</p>
+                              <p className="text-[10px] text-slate-400">{REASON_LABELS[r.reason] || r.reason}</p>
+                              {r.slaFirstResponseDeadline && (
+                                <p className={`text-[10px] mt-0.5 ${slaColor(r.slaFirstResponseDeadline)}`}>
+                                  SLA: {formatD(r.slaFirstResponseDeadline)}
+                                </p>
+                              )}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Detail + Actions */}
+                      <div className="rounded-3xl border border-slate-200 bg-white shadow-sm p-6">
+                        {!selected ? (
+                          <div className="flex h-64 items-center justify-center">
+                            <p className="text-sm text-slate-400">Select a return from the list to review.</p>
+                          </div>
+                        ) : (
+                          <div className="space-y-5">
+                            <div className="flex items-start justify-between gap-3 flex-wrap">
+                              <div>
+                                <h3 className="text-base font-bold text-slate-900">Return #{String(selected._id).slice(-6).toUpperCase()}</h3>
+                                <p className="text-xs text-slate-500">Order #{selected.orderRefId}</p>
+                                <p className="text-xs text-slate-500 mt-0.5">Patient: {selected.userId?.name || selected.userId?.firstName || 'Patient'}</p>
+                              </div>
+                              <span className={`text-xs rounded-full border px-3 py-1 capitalize font-semibold ${
+                                selected.status === 'approved' ? 'border-emerald-200 bg-emerald-50 text-emerald-700' :
+                                selected.status === 'rejected' ? 'border-rose-200 bg-rose-50 text-rose-700' :
+                                selected.status === 'open' ? 'border-sky-200 bg-sky-50 text-sky-700' :
+                                'border-amber-200 bg-amber-50 text-amber-700'
+                              }`}>{selected.status.replace(/_/g,' ')}</span>
+                            </div>
+
+                            <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4 space-y-2">
+                              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Reason</p>
+                              <p className="text-sm text-slate-800">{REASON_LABELS[selected.reason] || selected.reason}</p>
+                              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mt-2">Description</p>
+                              <p className="text-sm text-slate-700">{selected.description}</p>
+                            </div>
+
+                            {selected.items?.length > 0 && (
+                              <div>
+                                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Items</p>
+                                <div className="space-y-1.5">
+                                  {selected.items.map((item, i) => (
+                                    <div key={i} className="flex items-center justify-between rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm">
+                                      <span>{item.name}</span>
+                                      <span className="text-xs text-slate-500">Qty {item.quantity}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+
+                            {selected.evidenceUrls?.length > 0 && (
+                              <div>
+                                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Evidence</p>
+                                {selected.evidenceUrls.map((url, i) => (
+                                  <a key={i} href={url} target="_blank" rel="noopener noreferrer"
+                                    className="block truncate text-xs text-cyan-700 underline hover:text-cyan-900">{url}</a>
+                                ))}
+                              </div>
+                            )}
+
+                            {/* Action Panel */}
+                            {['open','evidence_requested','evidence_submitted','store_review','approved','rejected','refunded'].includes(selected.status) && (
+                              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 space-y-3">
+                                <p className="text-sm font-semibold text-slate-700">Take Action</p>
+                                <div>
+                                  <label className="block text-xs font-semibold text-slate-600 mb-1">Note to Patient</label>
+                                  <textarea value={returnActionNote} onChange={e => setReturnActionNote(e.target.value)}
+                                    rows={2} placeholder="Explain your decision or request…"
+                                    className="w-full resize-none rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-rose-300 focus:ring-2 focus:ring-rose-100"
+                                  />
+                                </div>
+                                <div className="grid grid-cols-2 gap-2">
+                                  <div>
+                                    <label className="block text-xs font-semibold text-slate-600 mb-1">Refund Mode</label>
+                                    <select value={returnRefundMode} onChange={e => setReturnRefundMode(e.target.value)}
+                                      className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-rose-300"
+                                    >
+                                      <option value="wallet_credit">Wallet Credit</option>
+                                      <option value="original_payment">Original Payment</option>
+                                    </select>
+                                  </div>
+                                  <div>
+                                    <label className="block text-xs font-semibold text-slate-600 mb-1">Refund Amount (₹)</label>
+                                    <input type="number" min="0" value={returnRefundAmount}
+                                      onChange={e => setReturnRefundAmount(e.target.value)}
+                                      className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-rose-300"
+                                      placeholder="0.00"
+                                    />
+                                  </div>
+                                </div>
+                                <div className="flex flex-wrap gap-2">
+                                  {(
+                                    selected.status === 'approved'
+                                      ? ['mark_refunded', 'close']
+                                      : selected.status === 'rejected' || selected.status === 'refunded'
+                                        ? ['close']
+                                        : ['request_evidence', 'approve', 'reject']
+                                  ).map(action => {
+                                    const meta = action === 'approve' ? { label:'Approve', cls:'bg-emerald-600 hover:bg-emerald-700 text-white' } :
+                                                 action === 'reject'  ? { label:'Reject', cls:'bg-rose-600 hover:bg-rose-700 text-white' } :
+                                                 action === 'mark_refunded' ? { label:'Mark Refunded', cls:'bg-teal-600 hover:bg-teal-700 text-white' } :
+                                                 action === 'close' ? { label:'Close Request', cls:'bg-slate-700 hover:bg-slate-800 text-white' } :
+                                                                        { label:'Request Evidence', cls:'bg-amber-500 hover:bg-amber-600 text-white' };
+                                    return (
+                                      <button key={action}
+                                        disabled={returnActionSubmitting}
+                                        onClick={async () => {
+                                          setReturnActionSubmitting(true);
+                                          try {
+                                            const token = localStorage.getItem('medVisionToken');
+                                            await axios.patch(`${baseURL}/returns/${selected._id}/review`, {
+                                              action,
+                                              note: returnActionNote,
+                                              refundMode: returnRefundMode,
+                                              refundAmount: Number(returnRefundAmount) || 0,
+                                            }, { headers: { Authorization: `Bearer ${token}` } });
+                                            toast.success('Action applied');
+                                            setSelectedReturnId(null);
+                                            const res = await axios.get(`${baseURL}/returns/store/queue`, { headers: { Authorization: `Bearer ${token}` } });
+                                            setStoreReturns(res.data.returns || []);
+                                          } catch (err) { toast.error(err?.response?.data?.message || 'Action failed'); }
+                                          finally { setReturnActionSubmitting(false); }
+                                        }}
+                                        className={`rounded-xl px-4 py-2 text-xs font-semibold transition disabled:opacity-50 ${meta.cls}`}
+                                      >
+                                        {returnActionSubmitting ? '…' : meta.label}
+                                      </button>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Timeline */}
+                            {selected.timeline?.length > 0 && (
+                              <div>
+                                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Timeline</p>
+                                <ol className="relative border-l border-slate-200 ml-2 space-y-3">
+                                  {selected.timeline.map((ev, i) => (
+                                    <li key={i} className="ml-4">
+                                      <div className="absolute -left-1.5 mt-0.5 h-3 w-3 rounded-full border border-slate-300 bg-white" />
+                                      <p className="text-xs font-semibold text-slate-800">{ev.action}</p>
+                                      {ev.note && <p className="text-xs text-slate-500 mt-0.5">{ev.note}</p>}
+                                      <p className="text-[10px] text-slate-400">{formatD(ev.timestamp)}</p>
+                                    </li>
+                                  ))}
+                                </ol>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })()}
               </div>
             )}
 

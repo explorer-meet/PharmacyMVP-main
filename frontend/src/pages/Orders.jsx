@@ -2,9 +2,10 @@ import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { baseURL } from '../main';
 import { useNavigate } from 'react-router-dom';
-import { Package, Truck, ChevronDown, ChevronUp, ClipboardList, CreditCard, Search } from 'lucide-react';
+import { Package, Truck, ChevronDown, ChevronUp, ClipboardList, CreditCard, Search, RotateCcw } from 'lucide-react';
 import CheckoutFooter from '../components/CheckoutFooter';
 import StatusBadge from '../components/StatusBadge';
+import ReturnRequestModal from '../components/ReturnRequestModal';
 
 const Orders = () => {
   const [userdata, setUserData] = useState([]);
@@ -42,6 +43,7 @@ const Orders = () => {
   }, []);
 
   const [expandedOrder, setExpandedOrder] = useState(null);
+  const [returnModalOrder, setReturnModalOrder] = useState(null);
   const [orderStatusFilter, setOrderStatusFilter] = useState('all');
   const [orderSearchQuery, setOrderSearchQuery] = useState('');
   const [ordersPage, setOrdersPage] = useState(1);
@@ -231,6 +233,13 @@ const Orders = () => {
                         Track Order
                       </button>
                       <button
+                        className="inline-flex items-center gap-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 py-2.5 px-4 rounded-xl shadow-sm transition-colors text-sm font-semibold"
+                        onClick={() => setReturnModalOrder(order)}
+                      >
+                        <RotateCcw className="w-4 h-4" />
+                        Return / Refund
+                      </button>
+                      <button
                         className="bg-gray-100 hover:bg-gray-200 text-gray-800 py-2.5 px-4 rounded-xl shadow transition-colors inline-flex items-center gap-1.5"
                         onClick={() => toggleDropdown(order.orderId)}
                       >
@@ -317,6 +326,13 @@ const Orders = () => {
         })()}
       </div>
       <CheckoutFooter />
+      {returnModalOrder && (
+        <ReturnRequestModal
+          order={returnModalOrder}
+          onClose={() => setReturnModalOrder(null)}
+          onSuccess={() => setReturnModalOrder(null)}
+        />
+      )}
     </div>
   );
 };

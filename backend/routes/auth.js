@@ -37,6 +37,14 @@ const {
 } = require("../controllers/auth");
 const { getCountries, getStatesByCountry, createCountry, createState } = require("../controllers/locationMaster");
 const { getPincodeDetails } = require("../controllers/pincodeLookup");
+const {
+  createReturnRequest,
+  getMyReturnRequests,
+  getReturnRequestById,
+  getStoreReturnRequests,
+  reviewReturnRequest,
+  submitReturnEvidence,
+} = require("../controllers/returnController");
 const verifyToken  = require("../middleware/authMiddleware");  
 
 const uploadsDir = process.env.UPLOADS_DIR || path.join(os.tmpdir(), "medvision-uploads");
@@ -325,5 +333,13 @@ router.put('/insurance/:id', verifyToken(['User']), insuranceDocUpload.single('p
 router.delete('/insurance/:id', verifyToken(['User']), deleteInsurancePolicy);
 router.get('/insurance/:id/download', verifyToken(['User']), downloadInsurancePolicyPdf);
 router.post('/insurance/check-reminders', verifyToken(['User']), checkInsuranceExpiryReminders);
+
+// Returns & Refunds
+router.post('/returns', verifyToken(['User']), createReturnRequest);
+router.get('/returns/me', verifyToken(['User']), getMyReturnRequests);
+router.get('/returns/:id', verifyToken(['User', 'Store']), getReturnRequestById);
+router.post('/returns/:id/evidence', verifyToken(['User']), submitReturnEvidence);
+router.get('/returns/store/queue', verifyToken(['Store']), getStoreReturnRequests);
+router.patch('/returns/:id/review', verifyToken(['Store']), reviewReturnRequest);
 
 module.exports = router;

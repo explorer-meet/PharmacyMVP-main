@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import axios from 'axios';
-import { Activity, Calendar, Pill, FileText, Clock, User, Menu, X, Home, CircleUser as UserCircle, ShoppingBag, Syringe, Bell, MessageSquare, Mail as MailIcon, Pencil, ClipboardList, DollarSign, Package, Truck, ChevronDown, ChevronUp, CreditCard, Plus, Minus, Trash2, CheckCircle2, Star, AlertTriangle, Info, Download, Search } from 'lucide-react';
+import { Activity, Calendar, Pill, FileText, Clock, User, Menu, X, Home, CircleUser as UserCircle, ShoppingBag, Syringe, Bell, MessageSquare, Mail as MailIcon, Pencil, ClipboardList, DollarSign, Package, Truck, ChevronDown, ChevronUp, CreditCard, Plus, Minus, Trash2, CheckCircle2, Star, AlertTriangle, Info, Download, Search, RotateCcw } from 'lucide-react';
 import { baseURL } from '../main';
 import Loader from '../components/Loader';
 import PrescriptionDialog from '../components/PrescriptionDialog';
@@ -11,6 +11,8 @@ import { useLocationOptions } from '../hooks/useLocationOptions';
 import { usePincodeLookup } from '../hooks/usePincodeLookup';
 import PincodeStatusLabels from '../components/PincodeStatusLabels';
 import StatusBadge from '../components/StatusBadge';
+import ReturnsPanel from '../components/ReturnsPanel';
+import ReturnRequestModal from '../components/ReturnRequestModal';
 
 const Dashboard = () => {
     const latestOrderStorageKey = 'medVisionLatestOrderId';
@@ -24,6 +26,9 @@ const Dashboard = () => {
     const [showNotifications, setShowNotifications] = useState(false);
     const [showRaiseQuery, setShowRaiseQuery] = useState(false);
     const [showMyOrders, setShowMyOrders] = useState(false);
+    const [showMyReturns, setShowMyReturns] = useState(false);
+    const [returnModalOrder, setReturnModalOrder] = useState(null);
+    const [userReturns, setUserReturns] = useState([]);
     const [orderStatusFilter, setOrderStatusFilter] = useState('all');
     const [orderSearchQuery, setOrderSearchQuery] = useState('');
     const [ordersPage, setOrdersPage] = useState(1);
@@ -987,6 +992,21 @@ const Dashboard = () => {
         }
     };
 
+    const fetchMyReturns = async () => {
+        try {
+            const token = localStorage.getItem('medVisionToken');
+            const response = await axios.get(`${baseURL}/returns/me`, {
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                },
+            });
+            setUserReturns(response.data.returns || []);
+        } catch (error) {
+            console.error('Error fetching returns:', error.message);
+            setUserReturns([]);
+        }
+    };
+
     const loadHealthManagementData = async () => {
         const token = localStorage.getItem('medVisionToken');
         if (!token) return;
@@ -1093,6 +1113,7 @@ const Dashboard = () => {
     useEffect(() => {
         fetchDataFromApi();
         fetchMyOrders();
+        fetchMyReturns();
         fetchNotificationPreferences();
         fetchMyPrescriptionRequests();
         fetchMyQueries();
@@ -1123,6 +1144,7 @@ const Dashboard = () => {
         setShowRaiseQuery(false);
         setShowQueryForm(false);
         setShowMyOrders(false);
+        setShowMyReturns(false);
         setShowMyVaccinations(false);
         setShowHealthManagement(false);
         setShowProfile(false);
@@ -1133,6 +1155,7 @@ const Dashboard = () => {
         setIsEditingProfile(false);
         setProfileErrors({});
         setExpandedDashboardOrder(null);
+        setReturnModalOrder(null);
     };
 
     useEffect(() => {
@@ -1148,9 +1171,14 @@ const Dashboard = () => {
             fetchNotificationPreferences();
             navigate(location.pathname, { replace: true, state: null });
         }
+        if (location.state?.openSection === 'returns') {
+            resetDashboardPanels();
+            setShowMyReturns(true);
+            navigate(location.pathname, { replace: true, state: null });
+        }
     }, [location, navigate]);
 
-    const hasActivePanel = showPrescriptions || showNotifications || showRaiseQuery || showMyOrders || showMyVaccinations || showHealthManagement || showProfile || showFeedback;
+    const hasActivePanel = showPrescriptions || showNotifications || showRaiseQuery || showMyOrders || showMyReturns || showMyVaccinations || showHealthManagement || showProfile || showFeedback;
     const reviewedStoreIds = new Set(myReviews.map((review) => getReviewStoreId(review)).filter(Boolean));
     const availableStoresForNewReview = storesForReviews.filter((store) => !reviewedStoreIds.has(String(store._id)));
 
@@ -1238,6 +1266,33 @@ const Dashboard = () => {
             totalAmount: getDashboardOrderAmount(order),
             payment: order.payment || 'N/A',
         }));
+
+    const getOrderReturnRequests = (order) => {
+        const orderKey = String(order?.id || order?.orderId || '').trim();
+        if (!orderKey) return [];
+
+        return userReturns
+            .filter((request) => String(request?.orderRefId || '').trim() === orderKey)
+            .sort((left, right) => new Date(right?.updatedAt || right?.createdAt || 0) - new Date(left?.updatedAt || left?.createdAt || 0));
+    };
+
+    const getLatestOrderReturnRequest = (order) => getOrderReturnRequests(order)[0] || null;
+
+    const formatReturnStatusLabel = (status) => String(status || 'unknown')
+        .replace(/_/g, ' ')
+        .replace(/\b\w/g, (char) => char.toUpperCase());
+
+    const getReturnStatusClassName = (status) => {
+        const normalized = String(status || '').toLowerCase();
+
+        if (['approved', 'refunded'].includes(normalized)) return 'border-emerald-200 bg-emerald-50 text-emerald-700';
+        if (normalized === 'rejected') return 'border-rose-200 bg-rose-50 text-rose-700';
+        if (['evidence_requested', 'admin_review'].includes(normalized)) return 'border-amber-200 bg-amber-50 text-amber-700';
+        return 'border-violet-200 bg-violet-50 text-violet-700';
+    };
+
+    const returnsInOrders = dashboardOrders.filter((order) => getOrderReturnRequests(order).length > 0).length;
+    const refundedOrderReturns = userReturns.filter((request) => request.status === 'refunded').length;
 
     const toggleDashboardOrderItems = (orderId) => {
         setExpandedDashboardOrder((prev) => (prev === orderId ? null : orderId));
@@ -1345,9 +1400,10 @@ const Dashboard = () => {
     };
 
     const sidebarItems = [
-        { icon: Home,        text: "Dashboard",       isActive: !showPrescriptions && !showMyOrders && !showMyVaccinations && !showHealthManagement && !showProfile && !showNotifications && !showFeedback && !showRaiseQuery, iconBg: "bg-cyan-500/20",    color: "text-cyan-400",    onClick: () => { resetDashboardPanels(); setSidebarOpen(false); } },
+        { icon: Home,        text: "Dashboard",       isActive: !showPrescriptions && !showMyOrders && !showMyReturns && !showMyVaccinations && !showHealthManagement && !showProfile && !showNotifications && !showFeedback && !showRaiseQuery, iconBg: "bg-cyan-500/20",    color: "text-cyan-400",    onClick: () => { resetDashboardPanels(); setSidebarOpen(false); } },
         { icon: Pill,        text: "My Prescriptions", isActive: showPrescriptions,   iconBg: "bg-sky-500/20",     color: "text-sky-400",     onClick: () => { const n = !showPrescriptions;  resetDashboardPanels(); setShowPrescriptions(n); if (n) { fetchMyPrescriptionRequests(); } setSidebarOpen(false); } },
         { icon: ShoppingBag, text: "My Orders",        isActive: showMyOrders,        iconBg: "bg-emerald-500/20", color: "text-emerald-400", onClick: () => { const n = !showMyOrders;        resetDashboardPanels(); setShowMyOrders(n);        setSidebarOpen(false); } },
+        { icon: RotateCcw,   text: "My Returns",       isActive: showMyReturns, iconBg: "bg-rose-500/20", color: "text-rose-300", onClick: () => { const n = !showMyReturns; resetDashboardPanels(); setShowMyReturns(n); setSidebarOpen(false); } },
         { icon: Syringe,     text: "My Vaccinations",  isActive: showMyVaccinations,  iconBg: "bg-teal-500/20",    color: "text-teal-400",    onClick: () => { const n = !showMyVaccinations;  resetDashboardPanels(); setShowMyVaccinations(n); if (n) { loadVaccinations(); } setSidebarOpen(false); } },
         { icon: Activity,    text: "Health Management", isActive: showHealthManagement, iconBg: "bg-indigo-500/20", color: "text-indigo-400", onClick: () => { const n = !showHealthManagement; resetDashboardPanels(); setShowHealthManagement(n); if (n) { loadHealthManagementData(); } setSidebarOpen(false); } },
         { icon: UserCircle,  text: "Profile",          isActive: showProfile,         iconBg: "bg-slate-500/20",   color: "text-slate-300",   onClick: () => { const n = !showProfile;        resetDashboardPanels(); setShowProfile(n);         setSidebarOpen(false); } },
@@ -1488,7 +1544,7 @@ const Dashboard = () => {
 
                     {/* Navigation */}
                     <nav className="flex-1 overflow-y-auto px-3 pt-2 pb-2">
-                        {[{ label: 'Navigation', items: sidebarItems.slice(0, 4) }, { label: 'Account', items: sidebarItems.slice(4, 6) }, { label: 'Support', items: sidebarItems.slice(6) }].map((group) => (
+                        {[{ label: 'Navigation', items: sidebarItems.slice(0, 5) }, { label: 'Account', items: sidebarItems.slice(5, 7) }, { label: 'Support', items: sidebarItems.slice(7) }].map((group) => (
                             <React.Fragment key={group.label}>
                                 <p className="px-3 pt-3 pb-1.5 text-[10px] font-bold tracking-widest text-slate-500 uppercase select-none">{group.label}</p>
                                 {group.items.map((item, idx) => (
@@ -1664,10 +1720,13 @@ const Dashboard = () => {
                                             Open the panels you need from the left sidebar. Your prescriptions, orders, and support are always a click away.
                                         </p>
 
-                                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
                                             {[
                                                 { icon: ShoppingBag, label: 'Track Orders', sub: 'Delivery status & items', color: 'text-orange-300', bg: 'bg-orange-400/10 border-orange-400/20', onClick: () => { resetDashboardPanels(); setShowMyOrders(true); } },
+                                                { icon: RotateCcw, label: 'My Returns', sub: 'Refunds, evidence, status', color: 'text-rose-300', bg: 'bg-rose-400/10 border-rose-400/20', onClick: () => { resetDashboardPanels(); setShowMyReturns(true); } },
                                                 { icon: Pill, label: 'Prescriptions', sub: 'Medicines at a glance', color: 'text-violet-300', bg: 'bg-violet-400/10 border-violet-400/20', onClick: () => { resetDashboardPanels(); setShowPrescriptions(true); fetchMyPrescriptionRequests(); } },
+                                                { icon: Syringe, label: 'Vaccinations', sub: 'Immunization records', color: 'text-emerald-300', bg: 'bg-emerald-400/10 border-emerald-400/20', onClick: () => { resetDashboardPanels(); setShowMyVaccinations(true); loadVaccinations(); } },
+                                                { icon: Bell, label: 'Notifications', sub: 'Alerts and preferences', color: 'text-amber-300', bg: 'bg-amber-400/10 border-amber-400/20', onClick: () => { resetDashboardPanels(); setShowNotifications(true); fetchNotificationPreferences(); } },
                                                 { icon: MessageSquare, label: 'Raise a Query', sub: 'Pharmacy support', color: 'text-cyan-300', bg: 'bg-cyan-400/10 border-cyan-400/20', onClick: () => { resetDashboardPanels(); setShowRaiseQuery(true); setShowQueryForm(false); fetchMyQueries(); fetchStoresForReviews(); } },
                                             ].map((card) => (
                                                 <button
@@ -2757,6 +2816,10 @@ const Dashboard = () => {
                             </div>
                         )}
 
+                        {showMyReturns && (
+                            <ReturnsPanel embedded onClose={() => setShowMyReturns(false)} />
+                        )}
+
                         {/* My Orders Panel */}
                        {showMyOrders && (
                             <div className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
@@ -2769,7 +2832,7 @@ const Dashboard = () => {
                                             <p className="text-blue-100 text-sm mt-1">Track your medicine orders with full status updates</p>
                                         </div>
                                         <div className="flex items-start gap-3">
-                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 w-full md:w-auto">
+                                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 w-full md:w-auto">
                                                 <div className="bg-white/15 backdrop-blur rounded-2xl px-4 py-3 min-w-[150px] border border-white/20">
                                                     <p className="text-[11px] uppercase tracking-wide text-blue-100">Total Orders</p>
                                                     <p className="text-lg font-semibold flex items-center gap-1.5">
@@ -2782,6 +2845,14 @@ const Dashboard = () => {
                                                     <p className="text-lg font-semibold flex items-center gap-1.5">
                                                         {formatUsd(dashboardOrders.reduce((sum, order) => sum + (order.totalAmount || 0), 0))}
                                                     </p>
+                                                </div>
+                                                <div className="bg-white/15 backdrop-blur rounded-2xl px-4 py-3 min-w-[150px] border border-white/20">
+                                                    <p className="text-[11px] uppercase tracking-wide text-blue-100">Returns / Refunds</p>
+                                                    <p className="text-lg font-semibold flex items-center gap-1.5">
+                                                        <RotateCcw className="w-4 h-4" />
+                                                        {returnsInOrders} tracked
+                                                    </p>
+                                                    <p className="mt-0.5 text-[11px] text-blue-100">{refundedOrderReturns} refunded</p>
                                                 </div>
                                             </div>
                                             <button
@@ -2850,6 +2921,8 @@ const Dashboard = () => {
                                             >
                                                 {(() => {
                                                     const paymentMeta = getPaymentMeta(order.payment);
+                                                    const relatedReturns = getOrderReturnRequests(order);
+                                                    const latestReturn = getLatestOrderReturnRequest(order);
                                                     return (
                                                 <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between lg:gap-6">
                                                     <div className="space-y-2 min-w-0 flex-1">
@@ -2862,6 +2935,12 @@ const Dashboard = () => {
                                                                 <Truck className="w-3.5 h-3.5 text-slate-500" />
                                                                 <StatusBadge value={order.trackingStatus || order.status || 'Order Placed'} />
                                                             </div>
+                                                            {latestReturn && (
+                                                                <span className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-semibold ${getReturnStatusClassName(latestReturn.status)}`}>
+                                                                    <RotateCcw className="w-3.5 h-3.5" />
+                                                                    Return: {formatReturnStatusLabel(latestReturn.status)}
+                                                                </span>
+                                                            )}
                                                         </div>
 
                                                         <p className="text-sm text-gray-700">
@@ -2896,18 +2975,18 @@ const Dashboard = () => {
                                                         <p className="text-lg font-bold text-gray-900">{formatUsd(order.totalAmount)}</p>
                                                     </div>
 
-                                                    <div className="flex items-center gap-2 flex-wrap lg:flex-nowrap lg:shrink-0">
+                                                    <div className="flex w-full flex-col gap-2 sm:w-auto lg:w-48 lg:shrink-0">
                                                         <button
-                                                            className="group inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:border-slate-300 hover:bg-slate-50 transition shrink-0"
+                                                            className="group inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:border-slate-300 hover:bg-slate-50 transition"
                                                             onClick={() => navigate(`/tracking/${order.id}`)}
                                                             title="Track order"
                                                         >
                                                             <Truck className="w-4 h-4 text-slate-600 group-hover:text-slate-800" />
-                                                            <span className="hidden sm:inline">Track</span>
+                                                            <span>Track</span>
                                                         </button>
 
                                                         <button
-                                                            className={`group inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-sm font-medium transition shrink-0 ${
+                                                            className={`group inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-sm font-medium transition ${
                                                                 managedDashboardOrder === order.id
                                                                     ? 'border-blue-300 bg-blue-50 text-blue-700'
                                                                     : 'border-slate-200 bg-white text-slate-700 hover:border-blue-200 hover:bg-blue-50/60'
@@ -2916,21 +2995,21 @@ const Dashboard = () => {
                                                             title="Manage order"
                                                         >
                                                             <ClipboardList className="w-4 h-4" />
-                                                            <span className="hidden sm:inline">Manage</span>
+                                                            <span>Manage</span>
                                                         </button>
 
                                                         <button
-                                                            className="group inline-flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-700 hover:bg-emerald-100 transition disabled:opacity-60 shrink-0"
+                                                            className="group inline-flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-700 hover:bg-emerald-100 transition disabled:opacity-60"
                                                             onClick={() => downloadDashboardOrderInvoice(order)}
                                                             disabled={downloadingOrderId === order.id}
                                                             title="Download invoice"
                                                         >
                                                             <Download className={`w-4 h-4 ${downloadingOrderId === order.id ? 'animate-spin' : ''}`} />
-                                                            <span className="hidden sm:inline">{downloadingOrderId === order.id ? 'Downloading' : 'Invoice'}</span>
+                                                            <span>{downloadingOrderId === order.id ? 'Downloading' : 'Invoice'}</span>
                                                         </button>
 
                                                         <button
-                                                            className={`group inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-sm font-medium transition shrink-0 ${
+                                                            className={`group inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-sm font-medium transition ${
                                                                 expandedDashboardOrder === order.id
                                                                     ? 'border-purple-300 bg-purple-50 text-purple-700'
                                                                     : 'border-slate-200 bg-white text-slate-700 hover:border-purple-200 hover:bg-purple-50/60'
@@ -2943,8 +3022,29 @@ const Dashboard = () => {
                                                             ) : (
                                                                 <ChevronDown className="w-4 h-4" />
                                                             )}
-                                                            <span className="hidden sm:inline">Items</span>
+                                                            <span>Items</span>
                                                         </button>
+
+                                                        {latestReturn ? (
+                                                            <button
+                                                                onClick={() => {
+                                                                    resetDashboardPanels();
+                                                                    setShowMyReturns(true);
+                                                                }}
+                                                                className="inline-flex items-center gap-2 rounded-xl border border-rose-200 bg-white px-3 py-2 text-sm font-medium text-rose-700 hover:bg-rose-50 transition"
+                                                            >
+                                                                <RotateCcw className="w-4 h-4" />
+                                                                View Returns
+                                                            </button>
+                                                        ) : (
+                                                            <button
+                                                                onClick={() => setReturnModalOrder(order)}
+                                                                className="inline-flex items-center gap-2 rounded-xl border border-rose-200 bg-white px-3 py-2 text-sm font-medium text-rose-700 hover:bg-rose-50 transition"
+                                                            >
+                                                                <RotateCcw className="w-4 h-4" />
+                                                                Raise Refund Request
+                                                            </button>
+                                                        )}
                                                     </div>
                                                 </div>
                                                     );
@@ -2973,6 +3073,21 @@ const Dashboard = () => {
                                                             <div className="rounded-lg border border-slate-200 bg-white px-3 py-2">
                                                                 <p className="text-xs text-slate-500">Store</p>
                                                                 <p className="text-sm font-semibold text-slate-800">{order.storeName || 'Not available'}</p>
+                                                            </div>
+                                                            <div className="rounded-lg border border-slate-200 bg-white px-3 py-2 md:col-span-2">
+                                                                <p className="text-xs text-slate-500">Return / Refund</p>
+                                                                {latestReturn ? (
+                                                                    <div className="mt-1 flex flex-wrap items-center gap-2">
+                                                                        <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold ${getReturnStatusClassName(latestReturn.status)}`}>
+                                                                            {formatReturnStatusLabel(latestReturn.status)}
+                                                                        </span>
+                                                                        <span className="text-xs text-slate-500">
+                                                                            {latestReturn.refundAmount ? `Refund amount: Rs. ${latestReturn.refundAmount}` : 'Refund pending or not assigned yet'}
+                                                                        </span>
+                                                                    </div>
+                                                                ) : (
+                                                                    <p className="mt-1 text-sm font-semibold text-slate-800">No return request</p>
+                                                                )}
                                                             </div>
                                                         </div>
 
@@ -3253,6 +3368,16 @@ const Dashboard = () => {
                                     )}
                                 </div>
                             </div>
+                        )}
+                        {returnModalOrder && (
+                            <ReturnRequestModal
+                                order={returnModalOrder}
+                                onClose={() => setReturnModalOrder(null)}
+                                onSuccess={async () => {
+                                    setReturnModalOrder(null);
+                                    await fetchMyReturns();
+                                }}
+                            />
                         )}
 
                         {/* Health Management Panel */}

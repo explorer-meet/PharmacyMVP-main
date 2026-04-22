@@ -1,4 +1,4 @@
-import { Route, Routes } from 'react-router-dom'
+import { Navigate, Route, Routes } from 'react-router-dom'
 import './App.css'
 import ProtectedRoute from './components/Route/ProtectedRoute';
 import PublicRoute from "./components/Route//PublicRoute";
@@ -106,6 +106,14 @@ function App() {
           <Route path="/payments" element={<PaymentPage />} />
           <Route path="/orderconfirmation" element={<OrderConfirmationPage />} />
           <Route path="/orders" element={<Orders />} />
+          <Route
+            path="/my-returns"
+            element={
+              <ProtectedRoute allowedRoles={["User"]}>
+                <Navigate to="/dashboard" replace state={{ openSection: 'returns' }} />
+              </ProtectedRoute>
+            }
+          />
           <Route path="/admintracking" element={<AdminTracking />} />
           <Route path="/lungcancerprediction" element={<LungCancer />} />
           <Route path="/kidneyprediction" element={<KidneyPrediction />} />
