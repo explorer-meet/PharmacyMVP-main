@@ -35,7 +35,7 @@ const {
   updatePromotionalCampaignStatus,
   deletePromotionalCampaign,
 } = require("../controllers/auth");
-const { getCountries, getStatesByCountry } = require("../controllers/locationMaster");
+const { getCountries, getStatesByCountry, createCountry, createState } = require("../controllers/locationMaster");
 const verifyToken  = require("../middleware/authMiddleware");  
 
 const uploadsDir = process.env.UPLOADS_DIR || path.join(os.tmpdir(), "medvision-uploads");
@@ -275,7 +275,9 @@ router.get("/user-vaccinations", verifyToken(["User"]), getUserVaccinationsForDa
 router.put("/user-vaccinations/:vaccinationId", verifyToken(["User"]), updateUserVaccinationByMasterId);
 router.get('/medicines-by-store/:storeId', getMedicinesByStore);
 router.get('/locations/countries', getCountries);
+router.post('/locations/countries', verifyToken(['admin']), createCountry);
 router.get('/locations/states', getStatesByCountry);
+router.post('/locations/states', verifyToken(['admin']), createState);
 router.get('/providers', verifyToken(['Store', 'admin']), getProviders);
 router.post('/providers', verifyToken(['admin']), createProvider);
 router.put('/providers/:providerId', verifyToken(['admin']), updateProvider);

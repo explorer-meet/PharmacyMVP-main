@@ -19,6 +19,22 @@ const AdminDashboard = () => {
   const [providers, setProviders] = useState([]);
   const [providersLoading, setProvidersLoading] = useState(false);
   const [providerSaving, setProviderSaving] = useState(false);
+  const [locationSaving, setLocationSaving] = useState(false);
+  const [locationCountries, setLocationCountries] = useState([]);
+  const [locationStates, setLocationStates] = useState([]);
+  const [selectedLocationCountryId, setSelectedLocationCountryId] = useState('');
+  const [showCountryForm, setShowCountryForm] = useState(false);
+  const [showStateForm, setShowStateForm] = useState(false);
+  const [countryForm, setCountryForm] = useState({
+    name: '',
+    isoCode: '',
+    dialCode: '',
+  });
+  const [stateForm, setStateForm] = useState({
+    countryId: '',
+    name: '',
+    code: '',
+  });
   const [showProviderForm, setShowProviderForm] = useState(false);
   const [providerForm, setProviderForm] = useState({
     name: '',
@@ -140,6 +156,45 @@ const AdminDashboard = () => {
   useEffect(() => {
     fetchProviders();
   }, [refreshCounter]);
+
+  const fetchLocationCountries = async () => {
+    try {
+      const response = await axios.get(`${baseURL}/locations/countries`);
+      const countries = response.data?.countries || [];
+      setLocationCountries(countries);
+      if (!selectedLocationCountryId && countries.length > 0) {
+        setSelectedLocationCountryId(countries[0]._id);
+      }
+    } catch (error) {
+      console.error('Failed to fetch location countries:', error);
+      setLocationCountries([]);
+    }
+  };
+
+  const fetchLocationStates = async (countryId) => {
+    if (!countryId) {
+      setLocationStates([]);
+      return;
+    }
+
+    try {
+      const response = await axios.get(`${baseURL}/locations/states`, {
+        params: { countryId },
+      });
+      setLocationStates(response.data?.states || []);
+    } catch (error) {
+      console.error('Failed to fetch location states:', error);
+      setLocationStates([]);
+    }
+  };
+
+  useEffect(() => {
+    fetchLocationCountries();
+  }, [refreshCounter]);
+
+  useEffect(() => {
+    fetchLocationStates(selectedLocationCountryId);
+  }, [selectedLocationCountryId]);
 
   const openStoreForm = () => {
     setEditingStoreId(null);
@@ -454,8 +509,101 @@ const AdminDashboard = () => {
     { key: 'stores', icon: Store, text: 'Stores List' },
     { key: 'addStore', icon: PlusSquare, text: 'Add Store' },
     { key: 'providers', icon: Building2, text: 'Providers' },
+    { key: 'locations', icon: BarChart3, text: 'Location Master' },
     { key: 'requests', icon: ClipboardCheck, text: 'Store Approval Requests' },
   ];
+
+  const handleCountryFormChange = (event) => {
+    const { name, value } = event.target;
+    setCountryForm((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const handleStateFormChange = (event) => {
+    const { name, value } = event.target;
+    setStateForm((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const closeCountryModal = () => {
+    setShowCountryForm(false);
+    setCountryForm({ name: '', isoCode: '', dialCode: '' });
+  };
+
+  const closeStateModal = () => {
+    setShowStateForm(false);
+    setStateForm((prev) => ({
+      ...prev,
+      countryId: prev.countryId || selectedLocationCountryId || '',
+      name: '',
+      code: '',
+    }));
+  };
+
+  const addCountry = async (event) => {
+    event.preventDefault();
+
+    const token = localStorage.getItem('medVisionToken');
+    if (!token) return;
+
+    try {
+      setLocationSaving(true);
+      await axios.post(
+        `${baseURL}/locations/countries`,
+        {
+          name: String(countryForm.name || '').trim(),
+          isoCode: String(countryForm.isoCode || '').trim().toUpperCase(),
+          dialCode: String(countryForm.dialCode || '').trim(),
+        },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      setToast({ show: true, message: 'Country added successfully', type: 'success' });
+      closeCountryModal();
+      await fetchLocationCountries();
+    } catch (error) {
+      setToast({
+        show: true,
+        message: error?.response?.data?.message || 'Failed to add country',
+        type: 'error',
+      });
+    } finally {
+      setLocationSaving(false);
+    }
+  };
+
+  const addState = async (event) => {
+    event.preventDefault();
+
+    const token = localStorage.getItem('medVisionToken');
+    if (!token) return;
+
+    try {
+      setLocationSaving(true);
+      await axios.post(
+        `${baseURL}/locations/states`,
+        {
+          countryId: stateForm.countryId,
+          name: String(stateForm.name || '').trim(),
+          code: String(stateForm.code || '').trim().toUpperCase(),
+        },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      setToast({ show: true, message: 'State added successfully', type: 'success' });
+      closeStateModal();
+      if (stateForm.countryId) {
+        setSelectedLocationCountryId(stateForm.countryId);
+        await fetchLocationStates(stateForm.countryId);
+      }
+    } catch (error) {
+      setToast({
+        show: true,
+        message: error?.response?.data?.message || 'Failed to add state',
+        type: 'error',
+      });
+    } finally {
+      setLocationSaving(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -463,6 +611,136 @@ const AdminDashboard = () => {
         <div className="fixed right-6 top-6 z-50">
           <div className={`rounded-xl px-4 py-3 text-sm font-medium shadow-lg ${toast.type === 'success' ? 'bg-emerald-600 text-white' : 'bg-red-600 text-white'}`}>
             {toast.message}
+          </div>
+        </div>
+      )}
+      {showCountryForm && (
+        <div className="fixed inset-0 z-40 flex items-center justify-center bg-slate-950/45 px-4">
+          <div className="w-full max-w-lg rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl">
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <h3 className="text-lg font-semibold text-slate-900">Add Country</h3>
+                <p className="text-sm text-slate-500">Create a new country for dynamic dropdowns.</p>
+              </div>
+              <button
+                type="button"
+                onClick={closeCountryModal}
+                className="rounded-2xl bg-slate-100 px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-200"
+              >
+                Close
+              </button>
+            </div>
+            <form onSubmit={addCountry} className="mt-6 space-y-4">
+              <input
+                name="name"
+                value={countryForm.name}
+                onChange={handleCountryFormChange}
+                placeholder="Country name"
+                className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 focus:border-blue-500 focus:outline-none"
+                required
+              />
+              <div className="grid grid-cols-2 gap-3">
+                <input
+                  name="isoCode"
+                  value={countryForm.isoCode}
+                  onChange={handleCountryFormChange}
+                  placeholder="ISO (e.g. IN)"
+                  maxLength={3}
+                  className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 focus:border-blue-500 focus:outline-none"
+                  required
+                />
+                <input
+                  name="dialCode"
+                  value={countryForm.dialCode}
+                  onChange={handleCountryFormChange}
+                  placeholder="Dial code (e.g. +91)"
+                  className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 focus:border-blue-500 focus:outline-none"
+                  required
+                />
+              </div>
+              <div className="flex justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={closeCountryModal}
+                  className="rounded-xl bg-slate-200 px-4 py-2 text-sm font-semibold text-slate-800 transition hover:bg-slate-300"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={locationSaving}
+                  className="rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:opacity-60"
+                >
+                  {locationSaving ? 'Saving...' : 'Add Country'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+      {showStateForm && (
+        <div className="fixed inset-0 z-40 flex items-center justify-center bg-slate-950/45 px-4">
+          <div className="w-full max-w-lg rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl">
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <h3 className="text-lg font-semibold text-slate-900">Add State</h3>
+                <p className="text-sm text-slate-500">Add a state under the selected country.</p>
+              </div>
+              <button
+                type="button"
+                onClick={closeStateModal}
+                className="rounded-2xl bg-slate-100 px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-200"
+              >
+                Close
+              </button>
+            </div>
+            <form onSubmit={addState} className="mt-6 space-y-4">
+              <select
+                name="countryId"
+                value={stateForm.countryId}
+                onChange={handleStateFormChange}
+                className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 focus:border-blue-500 focus:outline-none"
+                required
+              >
+                <option value="">Select country</option>
+                {locationCountries.map((country) => (
+                  <option key={country._id} value={country._id}>{country.name} ({country.dialCode})</option>
+                ))}
+              </select>
+              <div className="grid grid-cols-2 gap-3">
+                <input
+                  name="name"
+                  value={stateForm.name}
+                  onChange={handleStateFormChange}
+                  placeholder="State name"
+                  className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 focus:border-blue-500 focus:outline-none"
+                  required
+                />
+                <input
+                  name="code"
+                  value={stateForm.code}
+                  onChange={handleStateFormChange}
+                  placeholder="State code (optional)"
+                  className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 focus:border-blue-500 focus:outline-none"
+                />
+              </div>
+              <div className="flex justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={closeStateModal}
+                  className="rounded-xl bg-slate-200 px-4 py-2 text-sm font-semibold text-slate-800 transition hover:bg-slate-300"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={locationSaving}
+                  className="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:opacity-60"
+                >
+                  {locationSaving ? 'Saving...' : 'Add State'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
@@ -1016,6 +1294,98 @@ const AdminDashboard = () => {
                     ))}
                   </div>
                 )}
+              </div>
+            )}
+
+            {activePanel === 'locations' && (
+              <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+                <div className="flex items-center justify-between mb-6">
+                  <div>
+                    <h2 className="text-xl font-semibold text-slate-900">Location Master</h2>
+                    <p className="text-sm text-slate-500">Add countries and states for dynamic dropdowns across the app.</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowCountryForm((prev) => !prev);
+                        if (showStateForm) setShowStateForm(false);
+                      }}
+                      className="rounded-2xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 transition"
+                    >
+                      {showCountryForm ? 'Close Country' : 'Add Country'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setStateForm((prev) => ({
+                          ...prev,
+                          countryId: prev.countryId || selectedLocationCountryId || '',
+                        }));
+                        setShowStateForm((prev) => !prev);
+                        if (showCountryForm) setShowCountryForm(false);
+                      }}
+                      className="rounded-2xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 transition"
+                    >
+                      {showStateForm ? 'Close State' : 'Add State'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        fetchLocationCountries();
+                        fetchLocationStates(selectedLocationCountryId);
+                      }}
+                      className="rounded-2xl bg-slate-100 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-200 transition"
+                    >
+                      Refresh
+                    </button>
+                  </div>
+                </div>
+
+                <div className="mt-6 grid gap-6 lg:grid-cols-2">
+                  <div className="rounded-2xl border border-slate-200 p-4">
+                    <h3 className="text-sm font-semibold text-slate-900 mb-3">Countries</h3>
+                    {locationCountries.length === 0 ? (
+                      <p className="text-sm text-slate-500">No countries found.</p>
+                    ) : (
+                      <div className="space-y-2 max-h-72 overflow-auto">
+                        {locationCountries.map((country) => (
+                          <button
+                            key={country._id}
+                            type="button"
+                            onClick={() => setSelectedLocationCountryId(country._id)}
+                            className={`w-full rounded-xl border px-3 py-2 text-left text-sm transition ${
+                              selectedLocationCountryId === country._id
+                                ? 'border-blue-500 bg-blue-50 text-blue-900'
+                                : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                            }`}
+                          >
+                            <div className="font-semibold">{country.name}</div>
+                            <div className="text-xs text-slate-500">{country.isoCode} • {country.dialCode}</div>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="rounded-2xl border border-slate-200 p-4">
+                    <h3 className="text-sm font-semibold text-slate-900 mb-3">States</h3>
+                    {!selectedLocationCountryId ? (
+                      <p className="text-sm text-slate-500">Select a country to view states.</p>
+                    ) : locationStates.length === 0 ? (
+                      <p className="text-sm text-slate-500">No states found for selected country.</p>
+                    ) : (
+                      <div className="space-y-2 max-h-72 overflow-auto">
+                        {locationStates.map((state) => (
+                          <div key={state._id} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700">
+                            <div className="font-semibold">{state.name}</div>
+                            {state.code ? <div className="text-xs text-slate-500">{state.code}</div> : null}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
               </div>
             )}
 
