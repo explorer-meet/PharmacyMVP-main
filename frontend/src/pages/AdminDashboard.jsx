@@ -4,6 +4,7 @@ import axios from 'axios';
 import { Store, PlusSquare, ShieldCheck, BarChart3, ClipboardCheck, FileText, Building2 } from 'lucide-react';
 import { baseURL } from '../main';
 import { useLocationOptions } from '../hooks/useLocationOptions';
+import StatusBadge from '../components/StatusBadge';
 
 const AdminDashboard = () => {
   const navigate = useNavigate();
@@ -869,9 +870,7 @@ const AdminDashboard = () => {
                             <p className="text-sm text-slate-500">Licence Doc: {store.licenceDocumentName || 'N/A'}</p>
                           </div>
                           <div className="flex flex-col gap-3 items-start sm:items-end">
-                            <span className={`rounded-full px-3 py-1 text-xs font-semibold ${store.status === 'Active' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
-                              {store.status}
-                            </span>
+                            <StatusBadge value={store.status} tone={store.status === 'Active' ? 'success' : 'warning'} />
                             <div className="flex flex-wrap gap-2">
                               <button
                                 type="button"
@@ -1438,14 +1437,16 @@ const AdminDashboard = () => {
                           </div>
 
                           <div className="flex flex-col gap-3 items-start sm:items-end">
-                            <span className={`rounded-full px-3 py-1 text-xs font-semibold ${request.status === 'approved'
-                              ? 'bg-emerald-100 text-emerald-700'
-                              : request.status === 'rejected'
-                                ? 'bg-red-100 text-red-700'
-                                : 'bg-amber-100 text-amber-700'
-                              }`}>
-                              {request.status}
-                            </span>
+                            <StatusBadge
+                              value={request.status}
+                              tone={
+                                request.status === 'approved'
+                                  ? 'success'
+                                  : request.status === 'rejected'
+                                    ? 'danger'
+                                    : 'warning'
+                              }
+                            />
 
                             {request.status === 'pending' && (
                               <div className="flex gap-2">

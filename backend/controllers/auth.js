@@ -4092,13 +4092,32 @@ const getStoreQueries = async (req, res) => {
     try {
         const storeId = req.user?._id;
         const queries = await UserQuery.find({ storeId })
-            .populate('userId', 'name email mobile')
+            .populate('userId', 'name firstName lastName email mobile')
             .sort({ status: 1, createdAt: -1 })
             .lean();
 
+        const normalizedQueries = queries.map((query) => {
+            const user = query?.userId && typeof query.userId === 'object' ? query.userId : null;
+            if (!user) return query;
+
+            const derivedName = String(user.name || '').trim()
+                || [String(user.firstName || '').trim(), String(user.lastName || '').trim()].filter(Boolean).join(' ').trim()
+                || String(user.email || '').trim()
+                || String(user.mobile || '').trim()
+                || 'Unknown Patient';
+
+            return {
+                ...query,
+                userId: {
+                    ...user,
+                    name: derivedName,
+                },
+            };
+        });
+
         return res.status(StatusCodes.OK).json({
             success: true,
-            queries,
+            queries: normalizedQueries,
         });
     } catch (error) {
         console.error('Error fetching store queries:', error);
@@ -4131,13 +4150,29 @@ const answerStoreQuery = async (req, res) => {
                 },
             },
             { new: true }
-        ).populate('userId', 'name email mobile');
+        ).populate('userId', 'name firstName lastName email mobile');
 
         if (!updatedQuery) {
             return res.status(StatusCodes.NOT_FOUND).json({
                 message: 'Query not found',
             });
         }
+
+        const rawQuery = updatedQuery.toObject();
+        const updatedUser = rawQuery?.userId && typeof rawQuery.userId === 'object' ? rawQuery.userId : null;
+        const normalizedUpdatedQuery = {
+            ...rawQuery,
+            userId: updatedUser
+                ? {
+                    ...updatedUser,
+                    name: String(updatedUser.name || '').trim()
+                        || [String(updatedUser.firstName || '').trim(), String(updatedUser.lastName || '').trim()].filter(Boolean).join(' ').trim()
+                        || String(updatedUser.email || '').trim()
+                        || String(updatedUser.mobile || '').trim()
+                        || 'Unknown Patient',
+                }
+                : rawQuery.userId,
+        };
 
         runInBackground('query-answer-notification', async () => {
             await triggerUserNotifications({
@@ -4156,7 +4191,7 @@ const answerStoreQuery = async (req, res) => {
         return res.status(StatusCodes.OK).json({
             success: true,
             message: 'Query answered successfully',
-            query: updatedQuery,
+            query: normalizedUpdatedQuery,
         });
     } catch (error) {
         console.error('Error answering query:', error);

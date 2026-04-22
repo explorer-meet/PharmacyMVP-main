@@ -4,6 +4,7 @@ import axios from 'axios';
 import { baseURL } from '../main';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
+import StatusBadge from '../components/StatusBadge';
 
 const CartPage = ({ appliedCampaign = null, selectedStoreId = null }) => {
   const latestOrderStorageKey = 'medVisionLatestOrderId';
@@ -499,9 +500,12 @@ const CartPage = ({ appliedCampaign = null, selectedStoreId = null }) => {
                 </button>
 
                 {couponFeedback?.message && (
-                  <p className={`mt-3 text-xs font-medium text-center ${couponFeedback.type === 'success' ? 'text-emerald-600' : 'text-rose-600'}`}>
-                    {couponFeedback.message}
-                  </p>
+                  <div className="mt-3 text-center">
+                    <StatusBadge
+                      label={couponFeedback.message}
+                      tone={couponFeedback.type === 'success' ? 'success' : 'danger'}
+                    />
+                  </div>
                 )}
               </div>
 

@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { Pill, ShoppingCart, FileText, CheckCircle, Upload, X, AlertCircle, Clock, BadgeCheck, Stethoscope, CalendarDays, UserRound, Zap, Heart } from 'lucide-react';
 import axios from 'axios';
 import { baseURL } from '../main';
+import StatusBadge from './StatusBadge';
 
 const MedicineCard = ({
   id,
@@ -234,14 +235,10 @@ const MedicineCard = ({
           {/* Stock Badge */}
           <div className="absolute top-3 right-3">
             {stock > 0 ? (
-              <span className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-700 border border-emerald-300">
-                <Zap className="w-3 h-3" />
-                In Stock
-              </span>
+              <StatusBadge label="In Stock" tone="success" className="gap-1">
+              </StatusBadge>
             ) : (
-              <span className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-full text-xs font-bold bg-red-100 text-red-700 border border-red-300">
-                Out of Stock
-              </span>
+              <StatusBadge label="Out of Stock" tone="danger" />
             )}
           </div>
         </div>
@@ -271,15 +268,9 @@ const MedicineCard = ({
           {/* Prescription Status Badge */}
           <div className="mb-3">
             {requiresPrescription ? (
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-amber-50 text-amber-700 border border-amber-200">
-                <FileText className="w-3 h-3" />
-                Rx Required
-              </span>
+              <StatusBadge label="Rx Required" tone="warning" className="gap-1.5" />
             ) : (
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                <CheckCircle className="w-3 h-3" />
-                OTC
-              </span>
+              <StatusBadge label="OTC" tone="success" className="gap-1.5" />
             )}
           </div>
 
@@ -288,7 +279,7 @@ const MedicineCard = ({
             <div className="mb-3 bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-2 flex flex-col gap-1">
               <div className="flex items-center gap-1.5">
                 <Clock className="w-3.5 h-3.5 text-amber-600 shrink-0 animate-pulse" />
-                <p className="text-xs font-bold text-amber-800">Under Review</p>
+                <StatusBadge label="Under Review" tone="warning" />
               </div>
               <p className="text-xs text-amber-700 pl-4.5">Awaiting approval...</p>
               <button
@@ -303,7 +294,7 @@ const MedicineCard = ({
           {requiresPrescription && prescriptionStatus === 'approved' && (
             <div className="mb-3 bg-emerald-50 border border-emerald-200 rounded-lg px-2.5 py-2 flex items-center gap-2">
               <BadgeCheck className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-              <p className="text-xs font-bold text-emerald-800">Approved</p>
+              <StatusBadge label="Approved" tone="success" />
             </div>
           )}
 

@@ -1,4 +1,5 @@
-import { FileText, Trash2, ChevronRight, Clock, CheckCircle, AlertCircle } from 'lucide-react';
+import { FileText, Trash2, ChevronRight } from 'lucide-react';
+import StatusBadge from './StatusBadge';
 
 const PrescriptionHistoryCard = ({
   prescription,
@@ -7,47 +8,25 @@ const PrescriptionHistoryCard = ({
   isLoading,
 }) => {
   const getStatusBadge = (status) => {
-    const statusMap = {
-      uploaded: {
-        bg: 'bg-amber-50',
-        text: 'text-amber-700',
-        border: 'border-amber-200',
-        icon: Clock,
-        label: 'Uploaded',
-      },
-      processing: {
-        bg: 'bg-blue-50',
-        text: 'text-blue-700',
-        border: 'border-blue-200',
-        icon: Clock,
-        label: 'Processing',
-      },
-      extracted: {
-        bg: 'bg-emerald-50',
-        text: 'text-emerald-700',
-        border: 'border-emerald-200',
-        icon: CheckCircle,
-        label: 'Extracted',
-      },
-      error: {
-        bg: 'bg-red-50',
-        text: 'text-red-700',
-        border: 'border-red-200',
-        icon: AlertCircle,
-        label: 'Error',
-      },
+    const normalized = String(status || '').toLowerCase();
+    const labelMap = {
+      uploaded: 'Uploaded',
+      processing: 'Processing',
+      extracted: 'Extracted',
+      error: 'Error',
+    };
+    const toneMap = {
+      uploaded: 'warning',
+      processing: 'progress',
+      extracted: 'success',
+      error: 'danger',
     };
 
-    const statusInfo = statusMap[status] || statusMap.uploaded;
-    const Icon = statusInfo.icon;
-
     return (
-      <div
-        className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium ${statusInfo.bg} ${statusInfo.text} ${statusInfo.border}`}
-      >
-        <Icon size={14} />
-        {statusInfo.label}
-      </div>
+      <StatusBadge
+        label={labelMap[normalized] || 'Uploaded'}
+        tone={toneMap[normalized] || 'warning'}
+      />
     );
   };
 
@@ -101,14 +80,14 @@ const PrescriptionHistoryCard = ({
               </span>
             )}
             {prescription.addedToCart && (
-              <span className="text-emerald-600">✓ Added to cart</span>
+              <StatusBadge label="Added to cart" tone="success" />
             )}
           </div>
 
           {/* Error message */}
           {prescription.errorMessage && (
-            <div className="mt-2 rounded bg-red-50 p-2 text-xs text-red-700">
-              {prescription.errorMessage}
+            <div className="mt-2">
+              <StatusBadge label={prescription.errorMessage} tone="danger" />
             </div>
           )}
         </div>

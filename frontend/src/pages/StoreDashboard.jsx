@@ -4,6 +4,7 @@ import toast from 'react-hot-toast';
 import Navbar from '../components/Navbar';
 import { baseURL } from '../main';
 import { useLocationOptions } from '../hooks/useLocationOptions';
+import StatusBadge from '../components/StatusBadge';
 import {
   Users,
   Package,
@@ -54,6 +55,16 @@ const MEDICINE_TYPE_OPTIONS = [
 ];
 
 const PAGINATION_PAGE_SIZE_OPTIONS = [10, 20];
+
+const getQueryPatientDisplayName = (query) => {
+  const user = query?.userId;
+  if (!user || typeof user !== 'object') return 'Unknown Patient';
+
+  const fullName = String(user.name || '').trim()
+    || [String(user.firstName || '').trim(), String(user.lastName || '').trim()].filter(Boolean).join(' ').trim();
+
+  return fullName || String(user.email || '').trim() || String(user.mobile || '').trim() || 'Unknown Patient';
+};
 
 const renderPaginationControls = ({ meta, onPageChange, onPageSizeChange, className = '' }) => {
   if (!meta || meta.totalItems === 0) {
@@ -4978,14 +4989,18 @@ const StoreDashboard = () => {
                           {/* Header Badge */}
                           <div className="flex items-start justify-between gap-2 mb-3">
                             <div className="flex-1">
-                              <span className={`inline-block rounded-full px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider ${
-                                campaign.status === 'Active' ? 'bg-emerald-100 text-emerald-700' :
-                                campaign.status === 'Scheduled' ? 'bg-blue-100 text-blue-700' :
-                                campaign.status === 'Inactive' ? 'bg-slate-100 text-slate-700' :
-                                'bg-amber-100 text-amber-700'
-                              }`}>
-                                {campaign.status}
-                              </span>
+                              <StatusBadge
+                                value={campaign.status}
+                                tone={
+                                  campaign.status === 'Active'
+                                    ? 'success'
+                                    : campaign.status === 'Scheduled'
+                                      ? 'progress'
+                                      : campaign.status === 'Inactive'
+                                        ? 'neutral'
+                                        : 'warning'
+                                }
+                              />
                             </div>
                             <span className={`rounded-full p-2 ${
                               campaign.campaignType === 'Coupon' ? 'bg-purple-100' :
@@ -5289,9 +5304,16 @@ const StoreDashboard = () => {
                                 <p className="text-sm text-slate-500">Type: <span className="font-medium text-slate-700">{item.type || 'N/A'}</span> • Price: <span className="font-medium text-slate-700">${Number(item.price || 0).toFixed(2)}</span></p>
                                 <p className="text-sm text-slate-500">Stock left: <span className="font-semibold text-slate-900">{item.stock}</span></p>
                               </div>
-                              <span className={`rounded-full px-3 py-1 text-xs font-semibold ${item.status === 'Low Stock' ? 'bg-amber-100 text-amber-700' : item.status === 'Out of Stock' ? 'bg-red-100 text-red-700' : 'bg-emerald-100 text-emerald-700'}`}>
-                                {item.status}
-                              </span>
+                              <StatusBadge
+                                value={item.status}
+                                tone={
+                                  item.status === 'Low Stock'
+                                    ? 'warning'
+                                    : item.status === 'Out of Stock'
+                                      ? 'danger'
+                                      : 'success'
+                                }
+                              />
                             </div>
                             <div className="flex flex-wrap gap-2">
                               <button
@@ -5787,9 +5809,16 @@ const StoreDashboard = () => {
                           </div>
                           <div className="mt-3 flex items-center justify-between text-sm text-slate-500">
                             <span>{formatShortDate(prescription.createdAt)}</span>
-                            <span className={`rounded-full px-3 py-1 text-xs font-semibold ${normalizedStatus === 'approved' ? 'bg-emerald-100 text-emerald-700' : normalizedStatus === 'rejected' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'}`}>
-                              {normalizedStatus.charAt(0).toUpperCase() + normalizedStatus.slice(1)}
-                            </span>
+                            <StatusBadge
+                              value={normalizedStatus}
+                              tone={
+                                normalizedStatus === 'approved'
+                                  ? 'success'
+                                  : normalizedStatus === 'rejected'
+                                    ? 'danger'
+                                    : 'warning'
+                              }
+                            />
                           </div>
                           <div className="mt-2 space-y-1 text-xs text-slate-500">
                             <p>Uploaded: {prescription.createdAt ? new Date(prescription.createdAt).toLocaleString() : 'N/A'}</p>
@@ -5824,9 +5853,17 @@ const StoreDashboard = () => {
                               </p>
                             )}
                           </div>
-                          <span className={`inline-flex rounded-full px-4 py-2 text-sm font-semibold ${selectedPendingPrescription.status === 'approved' ? 'bg-emerald-100 text-emerald-700' : selectedPendingPrescription.status === 'rejected' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'}`}>
-                            {selectedPendingPrescription.status?.charAt(0).toUpperCase() + selectedPendingPrescription.status?.slice(1)}
-                          </span>
+                          <StatusBadge
+                            value={selectedPendingPrescription.status}
+                            size="md"
+                            tone={
+                              selectedPendingPrescription.status === 'approved'
+                                ? 'success'
+                                : selectedPendingPrescription.status === 'rejected'
+                                  ? 'danger'
+                                  : 'warning'
+                            }
+                          />
                         </div>
                         <div className="mb-4 grid gap-3 md:grid-cols-2">
                           <div className="rounded-lg border border-blue-200 bg-blue-50 p-3">
@@ -6128,7 +6165,7 @@ const StoreDashboard = () => {
                     <div className="space-y-2">
                       {queriesPagination.items.map((q) => {
                         const active = selectedQueryId === q._id;
-                        const patientName = q.userId?.name || 'Unknown Patient';
+                        const patientName = getQueryPatientDisplayName(q);
                         const normalizedStatus = String(q.status || 'open').toLowerCase();
                         const isAnswered = normalizedStatus === 'resolved';
                         return (
@@ -6169,15 +6206,15 @@ const StoreDashboard = () => {
                       <div>
                         <div className="mb-6 flex items-start justify-between">
                           <div>
-                            <h3 className="text-xl font-semibold text-slate-900">{selectedQuery.userId?.name || 'Unknown Patient'}</h3>
+                            <h3 className="text-xl font-semibold text-slate-900">{getQueryPatientDisplayName(selectedQuery)}</h3>
                             <p className="text-sm text-slate-500">{selectedQuery.userId?.email || 'No email available'}</p>
                             <p className="mt-2 text-xs text-slate-400">Query Date: {formatShortDate(selectedQuery.createdAt)}</p>
                           </div>
-                          <span className={`inline-flex rounded-full px-3 py-1 text-sm font-semibold ${
-                            selectedQuery.status === 'resolved' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
-                          }`}>
-                            {selectedQuery.status === 'resolved' ? 'Answered' : 'Pending'}
-                          </span>
+                          <StatusBadge
+                            label={selectedQuery.status === 'resolved' ? 'Answered' : 'Pending'}
+                            size="md"
+                            tone={selectedQuery.status === 'resolved' ? 'success' : 'warning'}
+                          />
                         </div>
 
                         {/* Query Content */}

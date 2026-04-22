@@ -1,5 +1,6 @@
 import {useState} from 'react';
 import { Package, Truck, Box, Home, CheckCircle, Search, Filter } from 'lucide-react';
+import StatusBadge from '../components/StatusBadge';
 
 // Mock data for demonstration
 const initialOrders = [
@@ -78,17 +79,6 @@ function AdminTracking() {
         return matchesSearch && matchesStatus;
     });
 
-    const getStatusColor = (status) => {
-        const colors = {
-            'booking': 'bg-blue-100 text-blue-800',
-            'shipped': 'bg-purple-100 text-purple-800',
-            'in-transit': 'bg-yellow-100 text-yellow-800',
-            'out-delivery': 'bg-orange-100 text-orange-800',
-            'delivered': 'bg-green-100 text-green-800',
-        };
-        return colors[status] || 'bg-gray-100 text-gray-800';
-    };
-
     return (
         <div className="min-h-screen bg-gray-50">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -146,9 +136,7 @@ function AdminTracking() {
                                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{order.customer}</td>
                                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{order.date}</td>
                                         <td className="px-6 py-4 whitespace-nowrap">
-                                            <span className={`px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(order.status)}`}>
-                                                {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
-                                            </span>
+                                            <StatusBadge value={order.status} />
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{order.items}</td>
                                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{order.address}</td>

@@ -7,6 +7,7 @@ import toast from 'react-hot-toast';
 import { useLocation } from 'react-router-dom';
 import CheckoutFooter from '../components/CheckoutFooter';
 import { usePincodeLookup } from '../hooks/usePincodeLookup';
+import PincodeStatusLabels from '../components/PincodeStatusLabels';
 
 export function AddressPage() {
   const latestOrderStorageKey = 'medVisionLatestOrderId';
@@ -17,7 +18,7 @@ export function AddressPage() {
   const [loading, setLoading] = useState(false);
   const [deliveryType, setDeliveryType] = useState('delivery');
   const [sameDayDelivery, setSameDayDelivery] = useState(null); // null = not selected, true = selected
-  const { lookupPincode, lookupLoading, lookupError, pincodeOptions, resetPincodeLookup } = usePincodeLookup();
+  const { lookupPincode, lookupLoading, lookupError, lookupDetails, pincodeOptions, resetPincodeLookup } = usePincodeLookup();
   const [formData, setFormData] = useState({
     fullName: userdata?.name || '',
     email: userdata?.email || '',
@@ -278,9 +279,12 @@ export function AddressPage() {
                       required
                       className="w-full bg-transparent focus:outline-none"
                     />
-                    {!lookupError && pincodeOptions.length > 1 && (
-                      <p className="mt-2 text-xs text-gray-500">Available localities: {pincodeOptions.join(', ')}</p>
-                    )}
+                    <PincodeStatusLabels
+                      loading={lookupLoading}
+                      error={lookupError}
+                      details={lookupDetails}
+                      localities={pincodeOptions}
+                    />
                   </div>
 
                   <div className="bg-gray-50 border border-gray-200 rounded-xl px-4 py-3">
@@ -305,8 +309,6 @@ export function AddressPage() {
                       required
                       className="w-full bg-transparent focus:outline-none"
                     />
-                    {lookupLoading && <p className="mt-2 text-xs text-gray-500">Checking pincode...</p>}
-                    {lookupError && <p className="mt-2 text-xs text-red-500">{lookupError}</p>}
                   </div>
                 </div>
 

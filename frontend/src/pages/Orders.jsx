@@ -4,6 +4,7 @@ import { baseURL } from '../main';
 import { useNavigate } from 'react-router-dom';
 import { Package, Truck, ChevronDown, ChevronUp, ClipboardList, CreditCard, Search } from 'lucide-react';
 import CheckoutFooter from '../components/CheckoutFooter';
+import StatusBadge from '../components/StatusBadge';
 
 const Orders = () => {
   const [userdata, setUserData] = useState([]);
@@ -197,10 +198,10 @@ const Orders = () => {
                           <Package className="w-3.5 h-3.5" />
                           Order #{order.orderId || 'N/A'}
                         </span>
-                        <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 border border-emerald-200 px-2.5 py-1 text-xs font-medium text-emerald-700">
-                          <Truck className="w-3.5 h-3.5" />
-                          {order.trackingStatus || order.status || 'Booked'}
-                        </span>
+                        <div className="inline-flex items-center gap-1.5">
+                          <Truck className="w-3.5 h-3.5 text-slate-500" />
+                          <StatusBadge value={order.trackingStatus || order.status || 'Booked'} />
+                        </div>
                       </div>
 
                       <p className="text-sm text-gray-700">

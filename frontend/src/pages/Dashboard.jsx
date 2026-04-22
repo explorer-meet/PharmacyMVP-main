@@ -9,6 +9,8 @@ import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 import { useLocationOptions } from '../hooks/useLocationOptions';
 import { usePincodeLookup } from '../hooks/usePincodeLookup';
+import PincodeStatusLabels from '../components/PincodeStatusLabels';
+import StatusBadge from '../components/StatusBadge';
 
 const Dashboard = () => {
     const latestOrderStorageKey = 'medVisionLatestOrderId';
@@ -74,7 +76,7 @@ const Dashboard = () => {
         pincode: '',
     });
     const { countryOptions, stateOptions: profileStateOptions, getCountryLabelByDialCode } = useLocationOptions(profileForm.countryCode);
-    const { lookupPincode, lookupLoading: profilePincodeLoading, lookupError: profilePincodeError, pincodeOptions: profilePincodeOptions, resetPincodeLookup: resetProfilePincodeLookup } = usePincodeLookup();
+    const { lookupPincode, lookupLoading: profilePincodeLoading, lookupError: profilePincodeError, lookupDetails: profilePincodeDetails, pincodeOptions: profilePincodeOptions, resetPincodeLookup: resetProfilePincodeLookup } = usePincodeLookup();
     const [profileErrors, setProfileErrors] = useState({});
     const [profileImageFile, setProfileImageFile] = useState(null);
     const [profileImagePreview, setProfileImagePreview] = useState('');
@@ -1866,23 +1868,17 @@ const Dashboard = () => {
                                                         )}
                                                     </div>
 
-                                                    <div className="ml-4 flex items-center space-x-2">
-                                                        <span className={`w-3 h-3 rounded-full ${
-                                                            isApprovedPrescription(prescription.status)
-                                                                ? 'bg-green-500'
-                                                                : prescription.status === 'pending'
-                                                                    ? 'bg-amber-500'
-                                                                    : 'bg-red-500'
-                                                        }`} />
-                                                        <span className={`text-xs font-semibold capitalize ${
-                                                            isApprovedPrescription(prescription.status)
-                                                                ? 'text-green-800'
-                                                                : prescription.status === 'pending'
-                                                                    ? 'text-amber-800'
-                                                                    : 'text-red-800'
-                                                        }`}>
-                                                            {isApprovedPrescription(prescription.status) ? 'Approved' : (prescription.status || 'pending')}
-                                                        </span>
+                                                    <div className="ml-4">
+                                                        <StatusBadge
+                                                            value={isApprovedPrescription(prescription.status) ? 'Approved' : (prescription.status || 'pending')}
+                                                            tone={
+                                                                isApprovedPrescription(prescription.status)
+                                                                    ? 'success'
+                                                                    : prescription.status === 'pending'
+                                                                        ? 'warning'
+                                                                        : 'danger'
+                                                            }
+                                                        />
                                                     </div>
                                                 </div>
                                             </div>
@@ -2645,7 +2641,12 @@ const Dashboard = () => {
                                             {isEditingProfile ? (
                                                 <>
                                                     <input name="city" list="dashboard-profile-city-options" value={profileForm.city} onChange={handleProfileChange} className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-white text-gray-800 focus:outline-none focus:ring-2 focus:ring-green-500" placeholder="Enter city" />
-                                                    {!profilePincodeError && profilePincodeOptions.length > 1 && <p className="text-xs text-gray-500 mt-1">Available localities: {profilePincodeOptions.join(', ')}</p>}
+                                                    <PincodeStatusLabels
+                                                        loading={profilePincodeLoading}
+                                                        error={!profileErrors.pincode ? profilePincodeError : ''}
+                                                        details={profilePincodeDetails}
+                                                        localities={profilePincodeOptions}
+                                                    />
                                                 </>
                                             ) : (
                                                 <div className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-gray-50 text-gray-800">{userData?.city || 'Not provided'}</div>
@@ -2685,8 +2686,6 @@ const Dashboard = () => {
                                                 <>
                                                     <input name="pincode" value={profileForm.pincode} onChange={handleProfileChange} className={`w-full px-4 py-3 rounded-xl border bg-white text-gray-800 focus:outline-none focus:ring-2 focus:ring-green-500 ${profileErrors.pincode || profilePincodeError ? 'border-red-400' : 'border-gray-200'}`} placeholder="Enter pincode" />
                                                     {profileErrors.pincode && <p className="text-red-500 text-xs mt-1">{profileErrors.pincode}</p>}
-                                                    {!profileErrors.pincode && profilePincodeLoading && <p className="text-xs text-gray-500 mt-1">Checking pincode...</p>}
-                                                    {!profileErrors.pincode && profilePincodeError && <p className="text-red-500 text-xs mt-1">{profilePincodeError}</p>}
                                                 </>
                                             ) : (
                                                 <div className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-gray-50 text-gray-800">{userData?.pincode || 'Not provided'}</div>
@@ -2859,14 +2858,10 @@ const Dashboard = () => {
                                                                 <Package className="w-3.5 h-3.5" />
                                                                 Order #{order.id || 'N/A'}
                                                             </span>
-                                                            <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ${
-                                                                order.trackingStatus === 'Delivered' || order.trackingStatus === 'Picked Up'
-                                                                    ? 'bg-emerald-50 border border-emerald-200 text-emerald-700'
-                                                                    : 'bg-amber-50 border border-amber-200 text-amber-700'
-                                                            }`}>
-                                                                <Truck className="w-3.5 h-3.5" />
-                                                                {order.trackingStatus || order.status}
-                                                            </span>
+                                                            <div className="inline-flex items-center gap-1.5">
+                                                                <Truck className="w-3.5 h-3.5 text-slate-500" />
+                                                                <StatusBadge value={order.trackingStatus || order.status || 'Order Placed'} />
+                                                            </div>
                                                         </div>
 
                                                         <p className="text-sm text-gray-700">

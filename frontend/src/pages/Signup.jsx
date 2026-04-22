@@ -7,6 +7,7 @@ import Navbar from "../components/Navbar";
 import { baseURL } from "../main";
 import { useLocationOptions } from "../hooks/useLocationOptions";
 import { usePincodeLookup } from "../hooks/usePincodeLookup";
+import PincodeStatusLabels from "../components/PincodeStatusLabels";
 
 import {
   Mail,
@@ -55,7 +56,7 @@ const Signup = () => {
 
   const [loading, setLoading] = useState(false);
   const { countryOptions, stateOptions } = useLocationOptions(formData.countryCode);
-  const { lookupPincode, lookupLoading, lookupError, pincodeOptions, resetPincodeLookup } = usePincodeLookup();
+  const { lookupPincode, lookupLoading, lookupError, lookupDetails, pincodeOptions, resetPincodeLookup } = usePincodeLookup();
 
   const navigate = useNavigate();
 
@@ -719,13 +720,12 @@ const Signup = () => {
                             />
                           </div>
                           {formData.countryCode === '+91' && (
-                            <div className="mt-2 space-y-1 text-xs">
-                              {lookupLoading && <p className="text-slate-500">Checking pincode...</p>}
-                              {lookupError && <p className="text-red-500">{lookupError}</p>}
-                              {!lookupError && pincodeOptions.length > 1 && (
-                                <p className="text-slate-500">Available localities: {pincodeOptions.join(', ')}</p>
-                              )}
-                            </div>
+                            <PincodeStatusLabels
+                              loading={lookupLoading}
+                              error={lookupError}
+                              details={lookupDetails}
+                              localities={pincodeOptions}
+                            />
                           )}
                         </div>
                       </div>
@@ -814,13 +814,12 @@ const Signup = () => {
                             />
                           </div>
                           {formData.countryCode === '+91' && (
-                            <div className="mt-2 space-y-1 text-xs">
-                              {lookupLoading && <p className="text-slate-500">Checking pincode...</p>}
-                              {lookupError && <p className="text-red-500">{lookupError}</p>}
-                              {!lookupError && pincodeOptions.length > 1 && (
-                                <p className="text-slate-500">Available localities: {pincodeOptions.join(', ')}</p>
-                              )}
-                            </div>
+                            <PincodeStatusLabels
+                              loading={lookupLoading}
+                              error={lookupError}
+                              details={lookupDetails}
+                              localities={pincodeOptions}
+                            />
                           )}
                         </div>
                       </div>
@@ -880,13 +879,12 @@ const Signup = () => {
                             />
                           </div>
                           {formData.countryCode === '+91' && (
-                            <div className="mt-2 space-y-1 text-xs">
-                              {lookupLoading && <p className="text-slate-500">Checking pincode...</p>}
-                              {lookupError && <p className="text-red-500">{lookupError}</p>}
-                              {!lookupError && pincodeOptions.length > 1 && (
-                                <p className="text-slate-500">Available localities: {pincodeOptions.join(', ')}</p>
-                              )}
-                            </div>
+                            <PincodeStatusLabels
+                              loading={lookupLoading}
+                              error={lookupError}
+                              details={lookupDetails}
+                              localities={pincodeOptions}
+                            />
                           )}
                         </div>
                       </div>

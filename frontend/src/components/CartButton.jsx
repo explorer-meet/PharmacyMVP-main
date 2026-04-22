@@ -4,6 +4,7 @@ import axios from 'axios';
 import { baseURL } from '../main';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
+import StatusBadge from './StatusBadge';
 
 const CartButton = ({ openOnMount = false, appliedCampaign = null, selectedStoreId = null }) => {
   const latestOrderStorageKey = 'medVisionLatestOrderId';
@@ -466,9 +467,12 @@ const CartButton = ({ openOnMount = false, appliedCampaign = null, selectedStore
                   </button>
                 </div>
                 {couponFeedback?.message && (
-                  <p className={`mt-2 text-xs font-medium ${couponFeedback.type === 'success' ? 'text-emerald-700' : 'text-rose-600'}`}>
-                    {couponFeedback.message}
-                  </p>
+                  <div className="mt-2">
+                    <StatusBadge
+                      label={couponFeedback.message}
+                      tone={couponFeedback.type === 'success' ? 'success' : 'danger'}
+                    />
+                  </div>
                 )}
               </div>
 

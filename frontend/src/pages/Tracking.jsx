@@ -5,6 +5,7 @@ import { Package, Truck, CheckCircle, Clock, MapPin, ClipboardList, ShieldCheck,
 import { baseURL } from '../main';
 import axios from 'axios';
 import CheckoutFooter from '../components/CheckoutFooter';
+import StatusBadge from '../components/StatusBadge';
 import { MapContainer, Marker, Polyline, Popup, TileLayer, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -478,7 +479,9 @@ function Tracking() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
               <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
                 <p className="text-xs uppercase tracking-wide text-slate-500">Current Status</p>
-                <p className="text-base font-semibold text-slate-900 mt-1">{order.trackingStatus || 'Order Placed'}</p>
+                <div className="mt-1">
+                  <StatusBadge value={order.trackingStatus || 'Order Placed'} size="md" />
+                </div>
               </div>
               <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
                 <p className="text-xs uppercase tracking-wide text-slate-500">Delivery Type</p>
@@ -660,7 +663,7 @@ function Tracking() {
 
                 {order.trackingStatus === 'Delivered' && (
                   <div className="rounded-lg bg-emerald-50 p-4 border border-emerald-200">
-                    <p className="text-xs uppercase tracking-wide text-emerald-600 font-semibold">✓ Delivered</p>
+                    <StatusBadge value="Delivered" tone="success" />
                     <p className="text-sm text-gray-800 mt-2">
                       Your order from <span className="font-semibold">{userdata?.storeName}</span> has been successfully delivered
                     </p>

@@ -3,9 +3,10 @@ import axios from 'axios';
 import toast from 'react-hot-toast';
 import {
   ShieldCheck, Plus, Pencil, Trash2, Download, Bell,
-  Loader2, X, CheckCircle2, AlertTriangle, Clock, XCircle
+  Loader2, X
 } from 'lucide-react';
 import { baseURL } from '../main';
+import StatusBadge from '../components/StatusBadge';
 
 const EMPTY_FORM = {
   provider: '',
@@ -31,12 +32,12 @@ function daysUntil(dateStr) {
 function statusBadge(policy) {
   const days = daysUntil(policy.validTo);
   if (!policy.isActive || days < 0)
-    return { label: 'Expired', cls: 'bg-red-100 text-red-700 border-red-300', Icon: XCircle };
+    return { label: 'Expired', tone: 'danger' };
   if (days <= 30)
-    return { label: `Expires in ${days}d`, cls: 'bg-red-100 text-red-700 border-red-300', Icon: AlertTriangle };
+    return { label: `Expires in ${days}d`, tone: 'danger' };
   if (days <= 90)
-    return { label: `Expires in ${days}d`, cls: 'bg-amber-100 text-amber-700 border-amber-300', Icon: Clock };
-  return { label: 'Active', cls: 'bg-green-100 text-green-700 border-green-300', Icon: CheckCircle2 };
+    return { label: `Expires in ${days}d`, tone: 'warning' };
+  return { label: 'Active', tone: 'success' };
 }
 
 export default function MyInsurance() {
@@ -255,7 +256,7 @@ export default function MyInsurance() {
           ) : (
             <div className="divide-y divide-gray-100">
               {policies.map((policy) => {
-                const { label, cls, Icon } = statusBadge(policy);
+                const { label, tone } = statusBadge(policy);
                 const days = daysUntil(policy.validTo);
                 return (
                   <div key={policy._id} className="p-5 hover:bg-blue-50/30 transition-colors">
@@ -268,10 +269,7 @@ export default function MyInsurance() {
                           {policy.isPrimary && (
                             <span className="text-[10px] font-semibold bg-blue-600 text-white px-2 py-0.5 rounded-full">PRIMARY</span>
                           )}
-                          <span className={`inline-flex items-center gap-1 text-xs font-semibold border px-2 py-0.5 rounded-full ${cls}`}>
-                            <Icon className="w-3 h-3" />
-                            {label}
-                          </span>
+                          <StatusBadge label={label} tone={tone} />
                         </div>
 
                         {policy.planName && (
