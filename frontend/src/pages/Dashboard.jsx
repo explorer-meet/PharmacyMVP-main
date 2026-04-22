@@ -8,6 +8,7 @@ import PrescriptionDialog from '../components/PrescriptionDialog';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 import { useLocationOptions } from '../hooks/useLocationOptions';
+import { usePincodeLookup } from '../hooks/usePincodeLookup';
 
 const Dashboard = () => {
     const latestOrderStorageKey = 'medVisionLatestOrderId';
@@ -73,6 +74,7 @@ const Dashboard = () => {
         pincode: '',
     });
     const { countryOptions, stateOptions: profileStateOptions, getCountryLabelByDialCode } = useLocationOptions(profileForm.countryCode);
+    const { lookupPincode, lookupLoading: profilePincodeLoading, lookupError: profilePincodeError, pincodeOptions: profilePincodeOptions, resetPincodeLookup: resetProfilePincodeLookup } = usePincodeLookup();
     const [profileErrors, setProfileErrors] = useState({});
     const [profileImageFile, setProfileImageFile] = useState(null);
     const [profileImagePreview, setProfileImagePreview] = useState('');
@@ -464,7 +466,17 @@ const Dashboard = () => {
         }
     };
 
-    const handleProfileChange = (e) => {
+    const applyProfilePincodeDetails = (details) => {
+        if (!details) return;
+
+        setProfileForm((prev) => ({
+            ...prev,
+            city: prev.city || details.district || '',
+            state: details.state || prev.state,
+        }));
+    };
+
+    const handleProfileChange = async (e) => {
         const { name, value } = e.target;
         setProfileForm((prev) => ({
             ...prev,
@@ -472,6 +484,23 @@ const Dashboard = () => {
             ...(name === 'countryCode' ? { state: '' } : {}),
         }));
         setProfileErrors((prev) => ({ ...prev, [name]: undefined }));
+
+        if (name === 'countryCode') {
+            resetProfilePincodeLookup();
+            return;
+        }
+
+        if (name !== 'pincode') {
+            return;
+        }
+
+        if (profileForm.countryCode !== '+91' || !/^\d{6}$/.test(value.trim())) {
+            resetProfilePincodeLookup();
+            return;
+        }
+
+        const details = await lookupPincode(value);
+        applyProfilePincodeDetails(details);
     };
 
     const handleProfileImageChange = (e) => {
@@ -2614,7 +2643,10 @@ const Dashboard = () => {
                                         <div>
                                             <label className="block text-sm font-medium text-gray-700 mb-2">City</label>
                                             {isEditingProfile ? (
-                                                <input name="city" value={profileForm.city} onChange={handleProfileChange} className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-white text-gray-800 focus:outline-none focus:ring-2 focus:ring-green-500" placeholder="Enter city" />
+                                                <>
+                                                    <input name="city" list="dashboard-profile-city-options" value={profileForm.city} onChange={handleProfileChange} className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-white text-gray-800 focus:outline-none focus:ring-2 focus:ring-green-500" placeholder="Enter city" />
+                                                    {!profilePincodeError && profilePincodeOptions.length > 1 && <p className="text-xs text-gray-500 mt-1">Available localities: {profilePincodeOptions.join(', ')}</p>}
+                                                </>
                                             ) : (
                                                 <div className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-gray-50 text-gray-800">{userData?.city || 'Not provided'}</div>
                                             )}
@@ -2651,13 +2683,21 @@ const Dashboard = () => {
                                             <label className="block text-sm font-medium text-gray-700 mb-2">Pincode</label>
                                             {isEditingProfile ? (
                                                 <>
-                                                    <input name="pincode" value={profileForm.pincode} onChange={handleProfileChange} className={`w-full px-4 py-3 rounded-xl border bg-white text-gray-800 focus:outline-none focus:ring-2 focus:ring-green-500 ${profileErrors.pincode ? 'border-red-400' : 'border-gray-200'}`} placeholder="Enter pincode" />
+                                                    <input name="pincode" value={profileForm.pincode} onChange={handleProfileChange} className={`w-full px-4 py-3 rounded-xl border bg-white text-gray-800 focus:outline-none focus:ring-2 focus:ring-green-500 ${profileErrors.pincode || profilePincodeError ? 'border-red-400' : 'border-gray-200'}`} placeholder="Enter pincode" />
                                                     {profileErrors.pincode && <p className="text-red-500 text-xs mt-1">{profileErrors.pincode}</p>}
+                                                    {!profileErrors.pincode && profilePincodeLoading && <p className="text-xs text-gray-500 mt-1">Checking pincode...</p>}
+                                                    {!profileErrors.pincode && profilePincodeError && <p className="text-red-500 text-xs mt-1">{profilePincodeError}</p>}
                                                 </>
                                             ) : (
                                                 <div className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-gray-50 text-gray-800">{userData?.pincode || 'Not provided'}</div>
                                             )}
                                         </div>
+
+                                        <datalist id="dashboard-profile-city-options">
+                                            {profilePincodeOptions.map((locality) => (
+                                                <option key={locality} value={locality} />
+                                            ))}
+                                        </datalist>
                                     </div>
 
                                     {/* Account Stats */}
@@ -2812,8 +2852,8 @@ const Dashboard = () => {
                                                 {(() => {
                                                     const paymentMeta = getPaymentMeta(order.payment);
                                                     return (
-                                                <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                                                    <div className="space-y-2">
+                                                <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between lg:gap-6">
+                                                    <div className="space-y-2 min-w-0 flex-1">
                                                         <div className="flex items-center gap-2 flex-wrap">
                                                             <span className="inline-flex items-center gap-1.5 rounded-full bg-sky-50 border border-sky-200 px-2.5 py-1 text-xs font-medium text-sky-700">
                                                                 <Package className="w-3.5 h-3.5" />
@@ -2832,12 +2872,18 @@ const Dashboard = () => {
                                                         <p className="text-sm text-gray-700">
                                                             <span className="font-medium">Date:</span> {formatDashboardOrderDate(order.date)}
                                                         </p>
-                                                        <p className="text-sm text-gray-700">
-                                                            <span className="font-medium">Store:</span> {order.storeName || 'Not available'}
+                                                        <p className="text-sm text-gray-700 min-w-0">
+                                                            <span className="font-medium">Store:</span>{' '}
+                                                            <span className="inline-block max-w-full align-bottom truncate" title={order.storeName || 'Not available'}>
+                                                                {order.storeName || 'Not available'}
+                                                            </span>
                                                         </p>
                                                         {(order.storeAddress || order.storeCity || order.storeState || order.storePincode) && (
-                                                            <p className="text-sm text-gray-600">
-                                                                <span className="font-medium">Store Address:</span> {[order.storeAddress, order.storeCity, order.storeState, order.storePincode].filter(Boolean).join(', ')}
+                                                            <p className="text-sm text-gray-600 min-w-0">
+                                                                <span className="font-medium">Store Address:</span>{' '}
+                                                                <span className="inline-block max-w-full align-bottom truncate" title={[order.storeAddress, order.storeCity, order.storeState, order.storePincode].filter(Boolean).join(', ')}>
+                                                                    {[order.storeAddress, order.storeCity, order.storeState, order.storePincode].filter(Boolean).join(', ')}
+                                                                </span>
                                                             </p>
                                                         )}
                                                         {order.storeMobile && (
@@ -2855,9 +2901,9 @@ const Dashboard = () => {
                                                         <p className="text-lg font-bold text-gray-900">{formatUsd(order.totalAmount)}</p>
                                                     </div>
 
-                                                    <div className="flex items-center gap-2 flex-wrap">
+                                                    <div className="flex items-center gap-2 flex-wrap lg:flex-nowrap lg:shrink-0">
                                                         <button
-                                                            className="group inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:border-slate-300 hover:bg-slate-50 transition"
+                                                            className="group inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:border-slate-300 hover:bg-slate-50 transition shrink-0"
                                                             onClick={() => navigate(`/tracking/${order.id}`)}
                                                             title="Track order"
                                                         >
@@ -2866,7 +2912,7 @@ const Dashboard = () => {
                                                         </button>
 
                                                         <button
-                                                            className={`group inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-sm font-medium transition ${
+                                                            className={`group inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-sm font-medium transition shrink-0 ${
                                                                 managedDashboardOrder === order.id
                                                                     ? 'border-blue-300 bg-blue-50 text-blue-700'
                                                                     : 'border-slate-200 bg-white text-slate-700 hover:border-blue-200 hover:bg-blue-50/60'
@@ -2879,7 +2925,7 @@ const Dashboard = () => {
                                                         </button>
 
                                                         <button
-                                                            className="group inline-flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-700 hover:bg-emerald-100 transition disabled:opacity-60"
+                                                            className="group inline-flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-700 hover:bg-emerald-100 transition disabled:opacity-60 shrink-0"
                                                             onClick={() => downloadDashboardOrderInvoice(order)}
                                                             disabled={downloadingOrderId === order.id}
                                                             title="Download invoice"
@@ -2889,7 +2935,7 @@ const Dashboard = () => {
                                                         </button>
 
                                                         <button
-                                                            className={`group inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-sm font-medium transition ${
+                                                            className={`group inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-sm font-medium transition shrink-0 ${
                                                                 expandedDashboardOrder === order.id
                                                                     ? 'border-purple-300 bg-purple-50 text-purple-700'
                                                                     : 'border-slate-200 bg-white text-slate-700 hover:border-purple-200 hover:bg-purple-50/60'

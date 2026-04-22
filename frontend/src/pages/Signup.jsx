@@ -6,6 +6,7 @@ import Loader from "../components/Loader";
 import Navbar from "../components/Navbar";
 import { baseURL } from "../main";
 import { useLocationOptions } from "../hooks/useLocationOptions";
+import { usePincodeLookup } from "../hooks/usePincodeLookup";
 
 import {
   Mail,
@@ -54,16 +55,44 @@ const Signup = () => {
 
   const [loading, setLoading] = useState(false);
   const { countryOptions, stateOptions } = useLocationOptions(formData.countryCode);
+  const { lookupPincode, lookupLoading, lookupError, pincodeOptions, resetPincodeLookup } = usePincodeLookup();
 
   const navigate = useNavigate();
 
-  const handleChange = (e) => {
+  const applyPincodeDetails = (details) => {
+    if (!details) return;
+
+    setFormData((prev) => ({
+      ...prev,
+      city: prev.city || details.district || '',
+      state: details.state || prev.state,
+    }));
+  };
+
+  const handleChange = async (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({
       ...prev,
       [name]: value,
       ...(name === 'countryCode' ? { state: '' } : {}),
     }));
+
+    if (name === 'countryCode') {
+      resetPincodeLookup();
+      return;
+    }
+
+    if (name !== 'pincode') {
+      return;
+    }
+
+    if (formData.countryCode !== '+91' || !/^\d{6}$/.test(value.trim())) {
+      resetPincodeLookup();
+      return;
+    }
+
+    const details = await lookupPincode(value);
+    applyPincodeDetails(details);
   };
 
   const submitHandler = async (e) => {
@@ -634,7 +663,25 @@ const Signup = () => {
                         </div>
                       </div>
 
-                      <div className="grid gap-5 sm:grid-cols-2">
+                      <div className="grid gap-5 sm:grid-cols-3">
+                        <div>
+                          <label className="mb-2 block text-sm font-semibold text-slate-700">
+                            City
+                          </label>
+                          <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3.5 transition-all focus-within:border-cyan-500 focus-within:ring-4 focus-within:ring-cyan-100">
+                            <input
+                              type="text"
+                              name="city"
+                              list="signup-city-options"
+                              value={formData.city}
+                              onChange={handleChange}
+                              placeholder="Enter city"
+                              required
+                              className="w-full bg-transparent text-slate-800 outline-none placeholder:text-slate-400"
+                            />
+                          </div>
+                        </div>
+
                         <div>
                           <label className="mb-2 block text-sm font-semibold text-slate-700">
                             State
@@ -671,6 +718,15 @@ const Signup = () => {
                               className="w-full bg-transparent text-slate-800 outline-none placeholder:text-slate-400"
                             />
                           </div>
+                          {formData.countryCode === '+91' && (
+                            <div className="mt-2 space-y-1 text-xs">
+                              {lookupLoading && <p className="text-slate-500">Checking pincode...</p>}
+                              {lookupError && <p className="text-red-500">{lookupError}</p>}
+                              {!lookupError && pincodeOptions.length > 1 && (
+                                <p className="text-slate-500">Available localities: {pincodeOptions.join(', ')}</p>
+                              )}
+                            </div>
+                          )}
                         </div>
                       </div>
                     </>
@@ -749,6 +805,7 @@ const Signup = () => {
                             <input
                               type="text"
                               name="city"
+                              list="signup-city-options"
                               value={formData.city}
                               onChange={handleChange}
                               placeholder="Enter city"
@@ -756,6 +813,15 @@ const Signup = () => {
                               className="w-full bg-transparent text-slate-800 outline-none placeholder:text-slate-400"
                             />
                           </div>
+                          {formData.countryCode === '+91' && (
+                            <div className="mt-2 space-y-1 text-xs">
+                              {lookupLoading && <p className="text-slate-500">Checking pincode...</p>}
+                              {lookupError && <p className="text-red-500">{lookupError}</p>}
+                              {!lookupError && pincodeOptions.length > 1 && (
+                                <p className="text-slate-500">Available localities: {pincodeOptions.join(', ')}</p>
+                              )}
+                            </div>
+                          )}
                         </div>
                       </div>
 
@@ -813,10 +879,25 @@ const Signup = () => {
                               className="w-full bg-transparent text-slate-800 outline-none placeholder:text-slate-400"
                             />
                           </div>
+                          {formData.countryCode === '+91' && (
+                            <div className="mt-2 space-y-1 text-xs">
+                              {lookupLoading && <p className="text-slate-500">Checking pincode...</p>}
+                              {lookupError && <p className="text-red-500">{lookupError}</p>}
+                              {!lookupError && pincodeOptions.length > 1 && (
+                                <p className="text-slate-500">Available localities: {pincodeOptions.join(', ')}</p>
+                              )}
+                            </div>
+                          )}
                         </div>
                       </div>
                     </>
                   )}
+
+                  <datalist id="signup-city-options">
+                    {pincodeOptions.map((locality) => (
+                      <option key={locality} value={locality} />
+                    ))}
+                  </datalist>
 
                   {selectedRole === "patient" && (
                     <div className="grid gap-5 sm:grid-cols-2">

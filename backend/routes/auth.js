@@ -36,6 +36,7 @@ const {
   deletePromotionalCampaign,
 } = require("../controllers/auth");
 const { getCountries, getStatesByCountry, createCountry, createState } = require("../controllers/locationMaster");
+const { getPincodeDetails } = require("../controllers/pincodeLookup");
 const verifyToken  = require("../middleware/authMiddleware");  
 
 const uploadsDir = process.env.UPLOADS_DIR || path.join(os.tmpdir(), "medvision-uploads");
@@ -251,6 +252,7 @@ router.patch("/marketing/campaigns/:campaignId/status", verifyToken(["Store"]), 
 router.delete("/marketing/campaigns/:campaignId", verifyToken(["Store"]), deletePromotionalCampaign);
 router.get('/marketing/campaigns/public', getPublicPromotionalCampaigns);
 router.post('/marketing/campaigns/validate-coupon', validatePublicCoupon);
+router.get('/locations/pincode/:pincode', getPincodeDetails);
 
 // Supplier Management
 router.post("/suppliers", verifyToken(["Store"]), createSupplier);

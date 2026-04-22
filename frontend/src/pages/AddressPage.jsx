@@ -6,6 +6,7 @@ import axios from 'axios';
 import toast from 'react-hot-toast';
 import { useLocation } from 'react-router-dom';
 import CheckoutFooter from '../components/CheckoutFooter';
+import { usePincodeLookup } from '../hooks/usePincodeLookup';
 
 export function AddressPage() {
   const latestOrderStorageKey = 'medVisionLatestOrderId';
@@ -16,6 +17,7 @@ export function AddressPage() {
   const [loading, setLoading] = useState(false);
   const [deliveryType, setDeliveryType] = useState('delivery');
   const [sameDayDelivery, setSameDayDelivery] = useState(null); // null = not selected, true = selected
+  const { lookupPincode, lookupLoading, lookupError, pincodeOptions, resetPincodeLookup } = usePincodeLookup();
   const [formData, setFormData] = useState({
     fullName: userdata?.name || '',
     email: userdata?.email || '',
@@ -48,6 +50,16 @@ export function AddressPage() {
   const totalAmount = Math.max(0, computedSubtotal - discountAmount);
   const totalItems = cartItems.reduce((sum, item) => sum + item.quantity, 0);
 
+  const applyPincodeDetails = (details) => {
+    if (!details) return;
+
+    setFormData((prev) => ({
+      ...prev,
+      city: prev.city || details.district || '',
+      state: details.state || prev.state,
+    }));
+  };
+
   const fetchDataFromApi = async () => {
     try {
       const token = localStorage.getItem('medVisionToken');
@@ -58,13 +70,16 @@ export function AddressPage() {
       });
       const fetchedData = response.data.userData;
       setUserData(fetchedData);
-      setFormData({
-        ...formData,
+      setFormData((prev) => ({
+        ...prev,
         fullName: fetchedData?.name || '',
         email: fetchedData?.email || '',
         phone: fetchedData?.mobile || '',
         address: fetchedData?.address || '',
-      });
+        city: fetchedData?.city || '',
+        state: fetchedData?.state || '',
+        zipCode: fetchedData?.pincode || '',
+      }));
 
       localStorage.setItem('userData', JSON.stringify(fetchedData));
     } catch (error) {
@@ -76,11 +91,25 @@ export function AddressPage() {
     fetchDataFromApi();
   }, []);
 
-  const handleChange = (e) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value
-    });
+  const handleChange = async (e) => {
+    const { name, value } = e.target;
+
+    setFormData((prev) => ({
+      ...prev,
+      [name]: value
+    }));
+
+    if (name !== 'zipCode') {
+      return;
+    }
+
+    if (!/^\d{6}$/.test(value.trim())) {
+      resetPincodeLookup();
+      return;
+    }
+
+    const details = await lookupPincode(value);
+    applyPincodeDetails(details);
   };
 
   const handleSubmit = async (e) => {
@@ -92,10 +121,17 @@ export function AddressPage() {
         throw new Error('Order ID not found');
       }
 
+      const deliveryAddress = [
+        formData.address.trim(),
+        formData.city.trim(),
+        formData.state.trim(),
+        formData.zipCode.trim(),
+      ].filter(Boolean).join(', ');
+
       const response = await axios.post(`${baseURL}/addaddress`, {
         id: userdata?._id,
         orderid: currentOrderId,
-        address: formData.address,
+        address: deliveryAddress,
         deliveryType: deliveryType,
         sameDayDelivery: deliveryType === 'delivery' ? sameDayDelivery : null,
       });
@@ -229,6 +265,56 @@ export function AddressPage() {
                     className="flex-1 bg-transparent focus:outline-none"
                   />
                 </div>
+
+                <div className="grid gap-4 md:grid-cols-3">
+                  <div className="bg-gray-50 border border-gray-200 rounded-xl px-4 py-3">
+                    <input
+                      type="text"
+                      name="city"
+                      list="address-city-options"
+                      placeholder="City"
+                      value={formData.city}
+                      onChange={handleChange}
+                      required
+                      className="w-full bg-transparent focus:outline-none"
+                    />
+                    {!lookupError && pincodeOptions.length > 1 && (
+                      <p className="mt-2 text-xs text-gray-500">Available localities: {pincodeOptions.join(', ')}</p>
+                    )}
+                  </div>
+
+                  <div className="bg-gray-50 border border-gray-200 rounded-xl px-4 py-3">
+                    <input
+                      type="text"
+                      name="state"
+                      placeholder="State"
+                      value={formData.state}
+                      onChange={handleChange}
+                      required
+                      className="w-full bg-transparent focus:outline-none"
+                    />
+                  </div>
+
+                  <div className="bg-gray-50 border border-gray-200 rounded-xl px-4 py-3">
+                    <input
+                      type="text"
+                      name="zipCode"
+                      placeholder="Pincode"
+                      value={formData.zipCode}
+                      onChange={handleChange}
+                      required
+                      className="w-full bg-transparent focus:outline-none"
+                    />
+                    {lookupLoading && <p className="mt-2 text-xs text-gray-500">Checking pincode...</p>}
+                    {lookupError && <p className="mt-2 text-xs text-red-500">{lookupError}</p>}
+                  </div>
+                </div>
+
+                <datalist id="address-city-options">
+                  {pincodeOptions.map((locality) => (
+                    <option key={locality} value={locality} />
+                  ))}
+                </datalist>
 
                 <div className="space-y-3 pt-2">
                   <label className="text-sm font-semibold text-gray-700">Delivery Type</label>
