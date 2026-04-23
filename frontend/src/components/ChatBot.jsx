@@ -1,7 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
 import { X, Send, Bot, User, ChevronDown } from 'lucide-react';
-import { useLanguage } from '../contexts/LanguageContext';
-
 const FAQ_RESPONSES = [
   {
     patterns: ['hello', 'hi', 'hey', 'namaste', 'hola', 'greet'],
@@ -94,10 +92,9 @@ const findBestAnswer = (input) => {
 };
 
 const ChatBot = () => {
-  const { t } = useLanguage();
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState([
-    { from: 'bot', text: t.chatbot.greeting, time: new Date() },
+    { from: 'bot', text: "Hello! I'm MedBot. How can I help you today?", time: new Date() },
   ]);
   const [input, setInput] = useState('');
   const [typing, setTyping] = useState(false);
@@ -201,7 +198,7 @@ const ChatBot = () => {
               <Bot className="w-5 h-5 text-white drop-shadow" />
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-bold text-white truncate drop-shadow">{t.chatbot.title}</p>
+              <p className="text-sm font-bold text-white truncate drop-shadow">MedBot Assistant</p>
               <div className="flex items-center gap-1.5">
                 <span className="w-2 h-2 rounded-full bg-emerald-300 animate-pulse shadow shadow-emerald-300/50"></span>
                 <p className="text-xs text-cyan-100 font-medium">Online · Always here to help</p>
@@ -305,7 +302,7 @@ const ChatBot = () => {
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder={t.chatbot.placeholder}
+              placeholder="Ask about medicines, orders…"
               className="flex-1 min-w-0 px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-800 text-sm text-slate-800 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-cyan-400"
             />
             <button

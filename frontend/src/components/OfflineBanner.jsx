@@ -1,11 +1,8 @@
 import { useEffect, useState } from 'react';
 import { WifiOff, RefreshCw } from 'lucide-react';
 import useOnlineStatus from '../hooks/useOnlineStatus';
-import { useLanguage } from '../contexts/LanguageContext';
-
 const OfflineBanner = () => {
   const isOnline = useOnlineStatus();
-  const { t } = useLanguage();
   const [visible, setVisible] = useState(false);
   const [wasOffline, setWasOffline] = useState(false);
   const [backOnline, setBackOnline] = useState(false);
@@ -44,7 +41,7 @@ const OfflineBanner = () => {
       ) : (
         <>
           <WifiOff className="w-4 h-4 flex-shrink-0" />
-          <span>{t.offline.banner}</span>
+          <span>You are offline. Some features may be unavailable.</span>
           <button
             onClick={() => window.location.reload()}
             className="ml-2 underline underline-offset-2 hover:no-underline"

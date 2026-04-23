@@ -1,0 +1,1608 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PharmacyMVP — Product Feature Overview</title>
+  <style>
+    /* ── RESET & BASE ── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --brand:      #2563eb;
+      --brand-dark: #1e40af;
+      --accent:     #0ea5e9;
+      --emerald:    #059669;
+      --violet:     #7c3aed;
+      --amber:      #d97706;
+      --rose:       #e11d48;
+      --slate-50:   #f8fafc;
+      --slate-100:  #f1f5f9;
+      --slate-200:  #e2e8f0;
+      --slate-300:  #cbd5e1;
+      --slate-500:  #64748b;
+      --slate-700:  #334155;
+      --slate-800:  #1e293b;
+      --slate-900:  #0f172a;
+      --white:      #ffffff;
+      --font-body:  'Segoe UI', system-ui, -apple-system, sans-serif;
+    }
+    html { font-size: 10.5pt; }
+    body {
+      font-family: var(--font-body);
+      color: var(--slate-800);
+      background: var(--white);
+      line-height: 1.6;
+    }
+
+    /* ── PRINT ── */
+    @media print {
+      .no-print { display: none !important; }
+      .page-break { page-break-before: always; }
+      .avoid-break { page-break-inside: avoid; }
+      body { font-size: 9.5pt; }
+      @page { margin: 18mm 15mm; size: A4; }
+    }
+
+    /* ── LAYOUT ── */
+    .page { max-width: 860px; margin: 0 auto; padding: 0 24px 60px; }
+
+    /* ── COVER PAGE ── */
+    .cover {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      text-align: center;
+      background: linear-gradient(135deg, #0f172a 0%, #1e3a8a 50%, #0c4a6e 100%);
+      color: white;
+      padding: 60px 40px;
+      position: relative;
+      overflow: hidden;
+    }
+    .cover::before {
+      content: '';
+      position: absolute; top: -80px; right: -80px;
+      width: 320px; height: 320px;
+      border-radius: 50%;
+      background: rgba(14,165,233,.15);
+    }
+    .cover::after {
+      content: '';
+      position: absolute; bottom: -60px; left: -60px;
+      width: 240px; height: 240px;
+      border-radius: 50%;
+      background: rgba(124,58,237,.12);
+    }
+    .cover-inner { position: relative; z-index: 1; }
+    .cover-logo {
+      display: inline-flex; align-items: center; gap: 10px;
+      background: rgba(255,255,255,.1);
+      border: 1px solid rgba(255,255,255,.2);
+      border-radius: 50px;
+      padding: 8px 20px;
+      font-size: 11pt; font-weight: 700; letter-spacing: 2px;
+      text-transform: uppercase; color: #93c5fd;
+      margin-bottom: 32px;
+    }
+    .cover h1 {
+      font-size: 38pt; font-weight: 900; line-height: 1.1;
+      letter-spacing: -1px;
+      background: linear-gradient(90deg, #ffffff, #93c5fd);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      background-clip: text;
+      margin-bottom: 16px;
+    }
+    .cover-tagline {
+      font-size: 14pt; color: #94a3b8; max-width: 560px; margin: 0 auto 40px;
+    }
+    .cover-divider {
+      width: 60px; height: 3px;
+      background: linear-gradient(90deg, #2563eb, #0ea5e9);
+      border-radius: 4px; margin: 28px auto;
+    }
+    .cover-meta {
+      display: flex; gap: 32px; justify-content: center; flex-wrap: wrap;
+      margin-top: 12px;
+    }
+    .cover-meta-item { text-align: center; }
+    .cover-meta-item .label { font-size: 8pt; text-transform: uppercase; letter-spacing: 1px; color: #64748b; margin-bottom: 4px; }
+    .cover-meta-item .val { font-size: 11pt; font-weight: 700; color: #e2e8f0; }
+    .cover-roles {
+      display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; margin-top: 32px;
+    }
+    .role-pill {
+      padding: 6px 18px; border-radius: 50px; font-size: 9pt; font-weight: 700;
+      border: 1px solid; letter-spacing: .5px;
+    }
+    .role-pill.patient   { color: #34d399; border-color: #34d399; background: rgba(52,211,153,.1); }
+    .role-pill.store     { color: #60a5fa; border-color: #60a5fa; background: rgba(96,165,250,.1); }
+    .role-pill.staff     { color: #c084fc; border-color: #c084fc; background: rgba(192,132,252,.1); }
+    .role-pill.admin     { color: #fbbf24; border-color: #fbbf24; background: rgba(251,191,36,.1); }
+
+    /* ── TABLE OF CONTENTS ── */
+    .toc { padding: 48px 0 32px; }
+    .toc h2 { font-size: 22pt; font-weight: 900; color: var(--slate-900); margin-bottom: 24px; }
+    .toc-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .toc-item {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 10px 14px; border-radius: 10px;
+      border: 1px solid var(--slate-200);
+      background: var(--slate-50);
+      font-size: 9.5pt;
+    }
+    .toc-item .toc-title { font-weight: 600; color: var(--slate-700); }
+    .toc-item .toc-num {
+      font-size: 8pt; font-weight: 800; color: var(--brand);
+      background: #dbeafe; border-radius: 6px; padding: 2px 7px;
+    }
+
+    /* ── SECTION HEADER ── */
+    .section-header {
+      padding: 48px 0 20px;
+    }
+    .section-badge {
+      display: inline-flex; align-items: center; gap: 6px;
+      font-size: 7.5pt; font-weight: 800; text-transform: uppercase; letter-spacing: 1.5px;
+      padding: 4px 12px; border-radius: 50px; margin-bottom: 10px;
+    }
+    .badge-patient { background: #dcfce7; color: #166534; }
+    .badge-store   { background: #dbeafe; color: #1e3a8a; }
+    .badge-staff   { background: #f3e8ff; color: #581c87; }
+    .badge-admin   { background: #fef3c7; color: #92400e; }
+    .badge-shared  { background: #f1f5f9; color: #334155; }
+
+    .section-header h2 {
+      font-size: 22pt; font-weight: 900; color: var(--slate-900);
+      line-height: 1.15; margin-bottom: 6px;
+    }
+    .section-header p { font-size: 10pt; color: var(--slate-500); max-width: 640px; }
+    .section-accent-bar {
+      height: 4px; width: 56px; border-radius: 4px; margin-top: 16px;
+    }
+    .bar-patient { background: linear-gradient(90deg, #22c55e, #16a34a); }
+    .bar-store   { background: linear-gradient(90deg, #3b82f6, #2563eb); }
+    .bar-staff   { background: linear-gradient(90deg, #a855f7, #7c3aed); }
+    .bar-admin   { background: linear-gradient(90deg, #f59e0b, #d97706); }
+    .bar-shared  { background: linear-gradient(90deg, #64748b, #475569); }
+
+    /* ── FEATURE CARDS ── */
+    .feature-grid {
+      display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; margin-top: 8px;
+    }
+    .feature-grid.cols-3 { grid-template-columns: repeat(3, 1fr); }
+    .feature-card {
+      border-radius: 14px; border: 1px solid var(--slate-200);
+      background: var(--white); overflow: hidden;
+    }
+    .fc-header {
+      padding: 14px 16px 10px;
+      display: flex; align-items: flex-start; gap: 12px;
+    }
+    .fc-icon {
+      width: 36px; height: 36px; border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 16px; flex-shrink: 0;
+    }
+    .fc-title { font-size: 10.5pt; font-weight: 800; color: var(--slate-900); }
+    .fc-subtitle { font-size: 8.5pt; color: var(--slate-500); margin-top: 1px; }
+    .fc-body { padding: 0 16px 14px; }
+    .fc-list { list-style: none; }
+    .fc-list li {
+      font-size: 9pt; color: var(--slate-700);
+      padding: 3px 0 3px 16px; position: relative; line-height: 1.5;
+    }
+    .fc-list li::before {
+      content: ''; position: absolute; left: 4px; top: 10px;
+      width: 5px; height: 5px; border-radius: 50%;
+    }
+
+    /* icon bg colours */
+    .ic-green  { background: #dcfce7; }
+    .ic-blue   { background: #dbeafe; }
+    .ic-violet { background: #f3e8ff; }
+    .ic-amber  { background: #fef3c7; }
+    .ic-rose   { background: #ffe4e6; }
+    .ic-cyan   { background: #cffafe; }
+    .ic-slate  { background: #f1f5f9; }
+    .ic-indigo { background: #e0e7ff; }
+
+    /* bullet colours */
+    .bl-green li::before  { background: #16a34a; }
+    .bl-blue li::before   { background: #2563eb; }
+    .bl-violet li::before { background: #7c3aed; }
+    .bl-amber li::before  { background: #d97706; }
+    .bl-rose li::before   { background: #e11d48; }
+    .bl-cyan li::before   { background: #0891b2; }
+    .bl-slate li::before  { background: #64748b; }
+    .bl-indigo li::before { background: #4338ca; }
+
+    /* ── FULL-WIDTH FEATURE ROW ── */
+    .feature-row {
+      border-radius: 14px; border: 1px solid var(--slate-200);
+      background: var(--white); padding: 16px 20px; margin-top: 16px;
+    }
+    .fr-title { font-size: 10.5pt; font-weight: 800; color: var(--slate-900); margin-bottom: 8px; }
+    .fr-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+    .fr-grid.cols-3 { grid-template-columns: repeat(3, 1fr); }
+    .fr-grid.cols-2 { grid-template-columns: repeat(2, 1fr); }
+    .fr-cell { background: var(--slate-50); border-radius: 8px; padding: 10px 12px; border: 1px solid var(--slate-200); }
+    .fr-cell-title { font-size: 8.5pt; font-weight: 700; color: var(--slate-700); margin-bottom: 4px; }
+    .fr-cell ul { list-style: none; }
+    .fr-cell ul li { font-size: 8.5pt; color: var(--slate-600); padding: 1.5px 0; }
+
+    /* ── STATUS/BADGE TABLE ── */
+    .status-row {
+      display: flex; gap: 10px; flex-wrap: wrap; margin-top: 14px;
+    }
+    .status-badge {
+      padding: 5px 14px; border-radius: 50px; font-size: 8.5pt; font-weight: 700;
+    }
+    .sb-green  { background: #dcfce7; color: #166534; }
+    .sb-amber  { background: #fef3c7; color: #92400e; }
+    .sb-rose   { background: #ffe4e6; color: #9f1239; }
+    .sb-blue   { background: #dbeafe; color: #1e40af; }
+    .sb-violet { background: #f3e8ff; color: #581c87; }
+    .sb-slate  { background: #f1f5f9; color: #334155; }
+    .sb-cyan   { background: #cffafe; color: #164e63; }
+
+    /* ── WORKFLOW STEPS ── */
+    .workflow-steps { margin-top: 12px; }
+    .step {
+      display: flex; gap: 14px; align-items: flex-start;
+      padding: 10px 0; border-bottom: 1px solid var(--slate-100);
+    }
+    .step:last-child { border-bottom: none; }
+    .step-num {
+      width: 26px; height: 26px; border-radius: 50%; flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 9pt; font-weight: 900; color: white;
+    }
+    .step-body { flex: 1; }
+    .step-title { font-size: 9.5pt; font-weight: 700; color: var(--slate-900); }
+    .step-desc  { font-size: 8.5pt; color: var(--slate-500); margin-top: 1px; }
+
+    /* ── HIGHLIGHT BANNER ── */
+    .highlight-banner {
+      border-radius: 14px; padding: 18px 22px; margin: 20px 0;
+      border: 1px solid;
+    }
+    .hb-blue   { background: linear-gradient(135deg, #eff6ff, #dbeafe); border-color: #bfdbfe; }
+    .hb-green  { background: linear-gradient(135deg, #f0fdf4, #dcfce7); border-color: #bbf7d0; }
+    .hb-violet { background: linear-gradient(135deg, #faf5ff, #f3e8ff); border-color: #e9d5ff; }
+    .hb-amber  { background: linear-gradient(135deg, #fffbeb, #fef3c7); border-color: #fde68a; }
+    .hb-title { font-size: 10pt; font-weight: 800; margin-bottom: 6px; }
+    .hb-blue .hb-title   { color: #1e3a8a; }
+    .hb-green .hb-title  { color: #166534; }
+    .hb-violet .hb-title { color: #581c87; }
+    .hb-amber .hb-title  { color: #92400e; }
+    .hb-list { display: flex; flex-wrap: wrap; gap: 6px; }
+    .hb-item {
+      font-size: 8.5pt; font-weight: 600; padding: 3px 10px;
+      border-radius: 50px; background: rgba(255,255,255,.7);
+    }
+    .hb-blue .hb-item   { color: #1d4ed8; border: 1px solid #bfdbfe; }
+    .hb-green .hb-item  { color: #15803d; border: 1px solid #86efac; }
+    .hb-violet .hb-item { color: #6d28d9; border: 1px solid #c4b5fd; }
+    .hb-amber .hb-item  { color: #b45309; border: 1px solid #fcd34d; }
+
+    /* ── DIVIDER ── */
+    hr.divider { border: none; border-top: 1px solid var(--slate-200); margin: 32px 0; }
+    .section-sep { height: 40px; }
+
+    /* ── KPI ROW ── */
+    .kpi-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-top: 12px; }
+    .kpi-row.cols-3 { grid-template-columns: repeat(3, 1fr); }
+    .kpi-card {
+      border-radius: 12px; padding: 14px 16px;
+      border: 1px solid var(--slate-200); background: var(--slate-50);
+      text-align: center;
+    }
+    .kpi-value { font-size: 20pt; font-weight: 900; line-height: 1; }
+    .kpi-label { font-size: 8pt; color: var(--slate-500); margin-top: 4px; font-weight: 600; text-transform: uppercase; letter-spacing: .5px; }
+
+    /* ── TECH STACK TABLE ── */
+    .tech-table { width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 9pt; }
+    .tech-table th {
+      background: var(--slate-800); color: white;
+      padding: 8px 14px; text-align: left; font-weight: 700; font-size: 8.5pt;
+    }
+    .tech-table th:first-child { border-radius: 8px 0 0 0; }
+    .tech-table th:last-child  { border-radius: 0 8px 0 0; }
+    .tech-table td { padding: 8px 14px; border-bottom: 1px solid var(--slate-200); }
+    .tech-table tr:nth-child(even) td { background: var(--slate-50); }
+    .tech-table .tag {
+      display: inline-block; padding: 2px 8px; border-radius: 50px;
+      font-size: 7.5pt; font-weight: 700;
+    }
+    .tag-done { background: #dcfce7; color: #166534; }
+    .tag-ready { background: #fef3c7; color: #92400e; }
+
+    /* ── FOOTER ── */
+    .doc-footer {
+      margin-top: 60px; padding-top: 20px;
+      border-top: 2px solid var(--slate-200);
+      display: flex; justify-content: space-between; align-items: center;
+      font-size: 8pt; color: var(--slate-500);
+    }
+    .doc-footer strong { color: var(--brand); }
+
+    /* ── PRINT BUTTON ── */
+    .print-btn-wrap { text-align: center; padding: 24px 0; }
+    .print-btn {
+      display: inline-flex; align-items: center; gap: 8px;
+      background: var(--brand); color: white;
+      border: none; border-radius: 10px; padding: 12px 28px;
+      font-size: 11pt; font-weight: 700; cursor: pointer;
+      letter-spacing: .3px;
+    }
+    .print-btn:hover { background: var(--brand-dark); }
+
+    /* ── ROLE SECTION DIVIDERS (colored top-bar on cards) ── */
+    .fc-top-patient { border-top: 3px solid #22c55e; }
+    .fc-top-store   { border-top: 3px solid #3b82f6; }
+    .fc-top-staff   { border-top: 3px solid #a855f7; }
+    .fc-top-admin   { border-top: 3px solid #f59e0b; }
+    .fc-top-shared  { border-top: 3px solid #64748b; }
+
+    /* ── SIDE NOTE ── */
+    .side-note {
+      border-left: 3px solid var(--slate-300); padding: 8px 14px;
+      background: var(--slate-50); border-radius: 0 8px 8px 0;
+      font-size: 8.5pt; color: var(--slate-600); margin-top: 10px;
+    }
+
+    /* ── INTRO STATS ── */
+    .intro-stats {
+      display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin: 20px 0;
+    }
+    .intro-stat {
+      text-align: center; padding: 14px; border-radius: 12px;
+      border: 1px solid var(--slate-200); background: var(--slate-50);
+    }
+    .intro-stat .num { font-size: 18pt; font-weight: 900; color: var(--brand); }
+    .intro-stat .lbl { font-size: 8pt; color: var(--slate-500); font-weight: 600; text-transform: uppercase; }
+  </style>
+</head>
+<body>
+
+<!-- ══════════════════════════════════════════ PRINT BUTTON ══ -->
+<div class="print-btn-wrap no-print">
+  <button class="print-btn" onclick="window.print()">
+    🖨 Print / Save as PDF
+  </button>
+  <p style="font-size:8.5pt;color:#64748b;margin-top:8px;">
+    In the print dialog → set Destination to "Save as PDF" → Paper: A4
+  </p>
+</div>
+
+<!-- ══════════════════════════════════════════ COVER PAGE ══ -->
+<div class="cover">
+  <div class="cover-inner">
+    <div class="cover-logo">💊 PharmacyMVP</div>
+    <h1>Product Feature<br/>Overview</h1>
+    <p class="cover-tagline">A complete digital healthcare &amp; pharmaceutical platform connecting patients, pharmacies, and administrators.</p>
+    <div class="cover-divider"></div>
+    <div class="cover-meta">
+      <div class="cover-meta-item"><div class="label">Version</div><div class="val">1.0 — MVP Release</div></div>
+      <div class="cover-meta-item"><div class="label">Date</div><div class="val">April 2026</div></div>
+      <div class="cover-meta-item"><div class="label">Status</div><div class="val">Client Ready</div></div>
+    </div>
+    <div class="cover-roles">
+      <span class="role-pill patient">Patient Portal</span>
+      <span class="role-pill store">Store Owner Dashboard</span>
+      <span class="role-pill staff">Store Staff</span>
+      <span class="role-pill admin">Admin Panel</span>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════ MAIN CONTENT ══ -->
+<div class="page">
+
+  <!-- ── TABLE OF CONTENTS ── -->
+  <div class="toc avoid-break">
+    <h2>Table of Contents</h2>
+    <div class="toc-grid">
+      <div class="toc-item"><span class="toc-title">1 · Platform Overview</span><span class="toc-num">01</span></div>
+      <div class="toc-item"><span class="toc-title">2 · Authentication &amp; Onboarding</span><span class="toc-num">02</span></div>
+      <div class="toc-item"><span class="toc-title">3 · Patient Portal</span><span class="toc-num">03</span></div>
+      <div class="toc-item"><span class="toc-title">4 · Online Pharmacy &amp; Cart</span><span class="toc-num">04</span></div>
+      <div class="toc-item"><span class="toc-title">5 · Prescription Management</span><span class="toc-num">05</span></div>
+      <div class="toc-item"><span class="toc-title">6 · Order Tracking System</span><span class="toc-num">06</span></div>
+      <div class="toc-item"><span class="toc-title">7 · Returns &amp; Refunds</span><span class="toc-num">07</span></div>
+      <div class="toc-item"><span class="toc-title">8 · Store Owner Dashboard</span><span class="toc-num">08</span></div>
+      <div class="toc-item"><span class="toc-title">9 · Analytics &amp; Reports</span><span class="toc-num">09</span></div>
+      <div class="toc-item"><span class="toc-title">10 · Staff Management</span><span class="toc-num">10</span></div>
+      <div class="toc-item"><span class="toc-title">11 · Vaccination Management</span><span class="toc-num">11</span></div>
+      <div class="toc-item"><span class="toc-title">12 · Query Management</span><span class="toc-num">12</span></div>
+      <div class="toc-item"><span class="toc-title">13 · Admin Panel</span><span class="toc-num">13</span></div>
+      <div class="toc-item"><span class="toc-title">14 · AI &amp; Smart Features</span><span class="toc-num">14</span></div>
+      <div class="toc-item"><span class="toc-title">15 · Technology Stack</span><span class="toc-num">15</span></div>
+    </div>
+  </div>
+
+  <hr class="divider" />
+
+  <!-- ══════════════════════════════════════════ 01 OVERVIEW ══ -->
+  <div class="section-header avoid-break">
+    <span class="section-badge badge-shared">01 · Overview</span>
+    <h2>Platform Overview</h2>
+    <p>PharmacyMVP is a full-stack, multi-role healthcare platform built to modernise the pharmacy experience — from online medicine ordering to prescription workflows and store analytics.</p>
+    <div class="section-accent-bar bar-shared"></div>
+  </div>
+
+  <div class="intro-stats avoid-break">
+    <div class="intro-stat"><div class="num">4</div><div class="lbl">User Roles</div></div>
+    <div class="intro-stat"><div class="num">15+</div><div class="lbl">Core Modules</div></div>
+    <div class="intro-stat"><div class="num">50+</div><div class="lbl">REST APIs</div></div>
+    <div class="intro-stat"><div class="num">25+</div><div class="lbl">DB Collections</div></div>
+    <div class="intro-stat"><div class="num">100%</div><div class="lbl">Dynamic Data</div></div>
+  </div>
+
+  <div class="highlight-banner hb-blue avoid-break">
+    <div class="hb-title">🎯 What the Platform Delivers</div>
+    <div class="hb-list">
+      <span class="hb-item">Online Medicine Ordering</span>
+      <span class="hb-item">Prescription Upload &amp; Approval</span>
+      <span class="hb-item">Real-time Order Tracking</span>
+      <span class="hb-item">Vaccination Records</span>
+      <span class="hb-item">Store Analytics &amp; Reports</span>
+      <span class="hb-item">Staff Management</span>
+      <span class="hb-item">Returns &amp; Refunds</span>
+      <span class="hb-item">AI Health Assistant (MedBot)</span>
+      <span class="hb-item">Disease Prediction Tools</span>
+      <span class="hb-item">Bulk Patient Import</span>
+      <span class="hb-item">Pincode Availability Check</span>
+      <span class="hb-item">Insurance Profile</span>
+    </div>
+  </div>
+
+  <div class="feature-row avoid-break">
+    <div class="fr-title">User Roles at a Glance</div>
+    <div class="fr-grid">
+      <div class="fr-cell">
+        <div class="fr-cell-title" style="color:#16a34a">👤 Patient</div>
+        <ul><li>Browse &amp; order medicines</li><li>Track orders in real-time</li><li>Upload prescriptions</li><li>Manage vaccinations</li><li>Raise support queries</li><li>AI Health Assistant</li></ul>
+      </div>
+      <div class="fr-cell">
+        <div class="fr-cell-title" style="color:#2563eb">🏪 Store Owner</div>
+        <ul><li>Full store operations dashboard</li><li>Review prescriptions</li><li>Manage orders &amp; returns</li><li>Revenue analytics</li><li>Staff administration</li><li>Promotional campaigns</li></ul>
+      </div>
+      <div class="fr-cell">
+        <div class="fr-cell-title" style="color:#7c3aed">👷 Store Staff</div>
+        <ul><li>View assigned orders</li><li>Update tracking status</li><li>Respond to queries</li><li>Prescription processing</li></ul>
+      </div>
+      <div class="fr-cell">
+        <div class="fr-cell-title" style="color:#d97706">🛡 Admin</div>
+        <ul><li>Platform-wide oversight</li><li>Store approval workflow</li><li>Compliance checklists</li><li>Medicine catalog management</li><li>Supplier management</li></ul>
+      </div>
+    </div>
+  </div>
+
+  <hr class="divider" />
+
+  <!-- ══════════════════════════════════════════ 02 AUTH ══ -->
+  <div class="section-header avoid-break page-break">
+    <span class="section-badge badge-shared">02 · Authentication</span>
+    <h2>Authentication &amp; Onboarding</h2>
+    <p>Secure, role-based access for all user types powered by JWT authentication.</p>
+    <div class="section-accent-bar bar-shared"></div>
+  </div>
+
+  <div class="feature-grid avoid-break">
+    <div class="feature-card fc-top-shared">
+      <div class="fc-header">
+        <div class="fc-icon ic-blue">🔐</div>
+        <div><div class="fc-title">User Registration</div><div class="fc-subtitle">Patients &amp; Store Owners</div></div>
+      </div>
+      <div class="fc-body">
+        <ul class="fc-list bl-blue">
+          <li>Separate registration flows for Patients and Store Owners</li>
+          <li>Email and mobile number validation</li>
+          <li>Password encryption using bcrypt</li>
+          <li>Store Owner profile: Store Name, Owner Name, Licence Number, GST Number</li>
+          <li>Patient profile: Personal details + health information</li>
+          <li>Welcome confirmation on successful registration</li>
+        </ul>
+      </div>
+    </div>
+    <div class="feature-card fc-top-shared">
+      <div class="fc-header">
+        <div class="fc-icon ic-green">✅</div>
+        <div><div class="fc-title">Login &amp; Session Management</div><div class="fc-subtitle">All Roles</div></div>
+      </div>
+      <div class="fc-body">
+        <ul class="fc-list bl-green">
+          <li>JWT token-based authentication</li>
+          <li>Role-based token payload (Patient / Store / Staff)</li>
+          <li>Token persisted in localStorage (medVisionToken)</li>
+          <li>Protected routes redirect unauthenticated users</li>
+          <li>Forgot Password flow</li>
+          <li>Auto logout on token expiry</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <hr class="divider" />
+
+  <!-- ══════════════════════════════════════════ 03 PATIENT PORTAL ══ -->
+  <div class="section-header avoid-break">
+    <span class="section-badge badge-patient">03 · Patient</span>
+    <h2>Patient Portal</h2>
+    <p>A comprehensive, data-driven personal dashboard giving patients full visibility and control over their healthcare journey.</p>
+    <div class="section-accent-bar bar-patient"></div>
+  </div>
+
+  <div class="feature-grid avoid-break">
+    <div class="feature-card fc-top-patient">
+      <div class="fc-header">
+        <div class="fc-icon ic-green">🏠</div>
+        <div><div class="fc-title">Dashboard Home</div><div class="fc-subtitle">Personalised overview</div></div>
+      </div>
+      <div class="fc-body">
+        <ul class="fc-list bl-green">
+          <li>Time-aware greeting (Good Morning / Afternoon / Evening)</li>
+          <li>Live avatar with patient initials</li>
+          <li>Current date &amp; time display</li>
+          <li>Active status indicator badge</li>
+          <li>Quick-access summary cards for all key sections</li>
+        </ul>
+      </div>
+    </div>
+    <div class="feature-card fc-top-patient">
+      <div class="fc-header">
+        <div class="fc-icon ic-green">📊</div>
+        <div><div class="fc-title">Summary Cards</div><div class="fc-subtitle">At-a-glance KPIs</div></div>
+      </div>
+      <div class="fc-body">
+        <ul class="fc-list bl-green">
+          <li>Total Orders &amp; total spending amount</li>
+          <li>Pending Orders count</li>
+          <li>Prescriptions — accepted vs pending</li>
+          <li>Vaccination records count</li>
+          <li>Open Queries badge (unresolved count)</li>
+        </ul>
+      </div>
+    </div>
+    <div class="feature-card fc-top-patient">
+      <div class="fc-header">
+        <div class="fc-icon ic-green">📦</div>
+        <div><div class="fc-title">My Orders</div><div class="fc-subtitle">Order history</div></div>
+      </div>
+      <div class="fc-body">
+        <ul class="fc-list bl-green">
+          <li>Full list of all patient orders</li>
+          <li>Order ID, total amount, current status</li>
+          <li>Payment method &amp; delivery address</li>
+          <li>One-click Track Order button per order</li>
+          <li>Reorder feature for previous orders</li>
+        </ul>
+      </div>
+    </div>
+    <div class="feature-card fc-top-patient">
+      <div class="fc-header">
+        <div class="fc-icon ic-green">👤</div>
+        <div><div class="fc-title">Edit Profile</div><div class="fc-subtitle">Personal &amp; health info</div></div>
+      </div>
+      <div class="fc-body">
+        <ul class="fc-list bl-green">
+          <li>Edit: First / Middle / Last Name, Email, Mobile</li>
+          <li>Address: Street, City, State, Pincode</li>
+          <li>Health info: Weight, Height, Blood Group, DOB, Sex</li>
+          <li>Insurance Profile management</li>
+          <li>Instant database persistence on save</li>
+        </ul>
+      </div>
+    </div>
+    <div class="feature-card fc-top-patient">
+      <div class="fc-header">
+        <div class="fc-icon ic-green">🔔</div>
+        <div><div class="fc-title">Notification Settings</div><div class="fc-subtitle">Communication preferences</div></div>
+      </div>
+      <div class="fc-body">
+        <ul class="fc-list bl-green">
+          <li>SMS Alerts — enable / disable toggle</li>
+          <li>Email Alerts — enable / disable toggle</li>
+          <li>Confirmation modal before any change</li>
+          <li>Animated success feedback</li>
+          <li>Instant save — no separate Submit button needed</li>
+        </ul>
+      </div>
+    </div>
+    <div class="feature-card fc-top-patient">
+      <div class="fc-header">
+        <div class="fc-icon ic-rose">🩺</div>
+        <div><div class="fc-title">Disease Prediction Tools</div><div class="fc-subtitle">AI-powered health checks</div></div>
+      </div>
+      <div class="fc-body">
+        <ul class="fc-list bl-rose">
+          <li>Heart Disease Prediction</li>
+          <li>Kidney Disease Prediction</li>
+          <li>Lung Cancer Risk Assessment</li>
+          <li>General Disease Prediction</li>
+          <li>Critical Disease Guide &amp; Emergency Care info</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <hr class="divider" />
+
+  <!-- ══════════════════════════════════════════ 04 PHARMACY ══ -->
+  <div class="section-header avoid-break page-break">
+    <span class="section-badge badge-patient">04 · Online Pharmacy</span>
+    <h2>Online Pharmacy &amp; Cart</h2>
+    <p>A fully dynamic medicine store with search, filtering, cart management, and multi-step checkout.</p>
+    <div class="section-accent-bar bar-patient"></div>
+  </div>
+
+  <div class="feature-grid avoid-break">
+    <div class="feature-card fc-top-patient">
+      <div class="fc-header">
+        <div class="fc-icon ic-green">💊</div>
+        <div><div class="fc-title">Medicine Catalog</div><div class="fc-subtitle">Browse &amp; search</div></div>
+      </div>
+      <div class="fc-body">
+        <ul class="fc-list bl-green">
+          <li>Browse all available medicines</li>
+          <li>Search by medicine name</li>
+          <li>Category filtering</li>
+          <li>Medicine name, price, stock display</li>
+          <li>Add to Cart button per item</li>
+          <li>Availability check by pincode</li>
+        </ul>
+      </div>
+    </div>
+    <div class="feature-card fc-top-patient">
+      <div class="fc-header">
+        <div class="fc-icon ic-green">🛒</div>
+        <div><div class="fc-title">Shopping Cart</div><div class="fc-subtitle">Persistent cart management</div></div>
+      </div>
+      <div class="fc-body">
+        <ul class="fc-list bl-green">
+          <li>Add / Remove medicines from cart</li>
+          <li>Increase / Decrease quantity per item</li>
+          <li>Cart persisted in database (1 cart per user)</li>
+          <li>Real-time cart item count in header</li>
+          <li>Cart total auto-calculated</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="feature-row avoid-break">
+    <div class="fr-title">Checkout Flow — 4 Steps</div>
+    <div class="fr-grid">
+      <div class="fr-cell">
+        <div class="fr-cell-title" style="color:#2563eb">Step 1 · Review Cart</div>
+        <ul><li>View all cart items</li><li>Check quantities &amp; prices</li><li>Cart total displayed</li></ul>
+      </div>
+      <div class="fr-cell">
+        <div class="fr-cell-title" style="color:#2563eb">Step 2 · Delivery</div>
+        <ul><li>Enter delivery address</li><li>Store Pick Up option</li><li>Home Delivery option</li></ul>
+      </div>
+      <div class="fr-cell">
+        <div class="fr-cell-title" style="color:#2563eb">Step 3 · Payment</div>
+        <ul><li>Select payment method</li><li>UPI / Card / COD (UI ready)</li><li>Order summary review</li></ul>
+      </div>
+      <div class="fr-cell">
+        <div class="fr-cell-title" style="color:#2563eb">Step 4 · Confirmation</div>
+        <ul><li>Order confirmation screen</li><li>Unique Order ID assigned</li><li>Tracking begins</li></ul>
+      </div>
+    </div>
+  </div>
+
+  <hr class="divider" />
+
+  <!-- ══════════════════════════════════════════ 05 PRESCRIPTION ══ -->
+  <div class="section-header avoid-break">
+    <span class="section-badge badge-shared">05 · Prescription</span>
+    <h2>Prescription Management</h2>
+    <p>End-to-end digital prescription workflow — patient uploads, pharmacy review, and approval with a clear status trail.</p>
+    <div class="section-accent-bar bar-shared"></div>
+  </div>
+
+  <div class="feature-grid avoid-break">
+    <div class="feature-card fc-top-patient">
+      <div class="fc-header">
+        <div class="fc-icon ic-green">📤</div>
+        <div><div class="fc-title">Patient: Upload Prescription</div><div class="fc-subtitle">Digital submission</div></div>
+      </div>
+      <div class="fc-body">
+        <ul class="fc-list bl-green">
+          <li>Upload dialog for prescription images</li>
+          <li>Supported formats: PDF, JPG, PNG</li>
+          <li>File size validation before upload</li>
+          <li>AI-powered medicine extraction from uploaded prescription</li>
+          <li>Extracted medicines shown in modal for review</li>
+          <li>Re-upload option for rejected prescriptions</li>
+        </ul>
+      </div>
+    </div>
+    <div class="feature-card fc-top-store">
+      <div class="fc-header">
+        <div class="fc-icon ic-blue">🔍</div>
+        <div><div class="fc-title">Store: Review Prescriptions</div><div class="fc-subtitle">Approval workflow</div></div>
+      </div>
+      <div class="fc-body">
+        <ul class="fc-list bl-blue">
+          <li>List of all pending prescriptions from patients</li>
+          <li>Patient details &amp; prescription preview</li>
+          <li>Approve with quote builder (itemised medicines, price, delivery)</li>
+          <li>Reject with documented reason</li>
+          <li>Buttons hidden after action (clean workflow)</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="feature-row avoid-break">
+    <div class="fr-title">Prescription Status Workflow</div>
+    <div class="fr-grid cols-3">
+      <div class="fr-cell">
+        <div class="fr-cell-title" style="color:#d97706">⏳ Pending</div>
+        <ul><li>Awaiting pharmacy review</li><li>Patient sees: "Our Pharmacists are carefully reviewing your Prescription"</li></ul>
+      </div>
+      <div class="fr-cell">
+        <div class="fr-cell-title" style="color:#16a34a">✅ Approved</div>
+        <ul><li>Prescription verified by pharmacy</li><li>Quote provided to patient</li><li>Patient sees: "Your Prescription is Approved. Stay in Touch!!"</li></ul>
+      </div>
+      <div class="fr-cell">
+        <div class="fr-cell-title" style="color:#e11d48">❌ Rejected</div>
+        <ul><li>Patient sees rejection reason</li><li>"Re-upload Prescription" button appears</li><li>Re-upload resets to Pending for fresh review</li></ul>
+      </div>
+    </div>
+  </div>
+
+  <hr class="divider" />
+
+  <!-- ══════════════════════════════════════════ 06 TRACKING ══ -->
+  <div class="section-header avoid-break page-break">
+    <span class="section-badge badge-shared">06 · Order Tracking</span>
+    <h2>Order Tracking System</h2>
+    <p>Visual, real-time order tracking with different status progressions based on delivery type.</p>
+    <div class="section-accent-bar bar-shared"></div>
+  </div>
+
+  <div class="feature-grid avoid-break">
+    <div class="feature-card fc-top-patient">
+      <div class="fc-header">
+        <div class="fc-icon ic-green">🏃</div>
+        <div><div class="fc-title">Store Pick Up Tracking</div><div class="fc-subtitle">3-step progression</div></div>
+      </div>
+      <div class="fc-body">
+        <div class="workflow-steps">
+          <div class="step">
+            <div class="step-num" style="background:#2563eb">1</div>
+            <div class="step-body"><div class="step-title">Order Placed</div><div class="step-desc">Order confirmed and received by pharmacy</div></div>
+          </div>
+          <div class="step">
+            <div class="step-num" style="background:#7c3aed">2</div>
+            <div class="step-body"><div class="step-title">Packed</div><div class="step-desc">Medicines packed and ready to be collected</div></div>
+          </div>
+          <div class="step">
+            <div class="step-num" style="background:#059669">3</div>
+            <div class="step-body"><div class="step-title">Ready for Pick Up</div><div class="step-desc">Patient can collect from store</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="feature-card fc-top-patient">
+      <div class="fc-header">
+        <div class="fc-icon ic-green">🚚</div>
+        <div><div class="fc-title">Home Delivery Tracking</div><div class="fc-subtitle">4-step progression</div></div>
+      </div>
+      <div class="fc-body">
+        <div class="workflow-steps">
+          <div class="step">
+            <div class="step-num" style="background:#2563eb">1</div>
+            <div class="step-body"><div class="step-title">Order Placed</div><div class="step-desc">Order confirmed and received by pharmacy</div></div>
+          </div>
+          <div class="step">
+            <div class="step-num" style="background:#7c3aed">2</div>
+            <div class="step-body"><div class="step-title">Packed</div><div class="step-desc">Order packed and ready for dispatch</div></div>
+          </div>
+          <div class="step">
+            <div class="step-num" style="background:#d97706">3</div>
+            <div class="step-body"><div class="step-title">Out for Delivery</div><div class="step-desc">Delivery agent en route to patient address</div></div>
+          </div>
+          <div class="step">
+            <div class="step-num" style="background:#059669">4</div>
+            <div class="step-body"><div class="step-title">Delivered</div><div class="step-desc">Order delivered to patient</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="highlight-banner hb-green avoid-break">
+    <div class="hb-title">📍 Tracking Features</div>
+    <div class="hb-list">
+      <span class="hb-item">Visual step progression indicator</span>
+      <span class="hb-item">Completed steps highlighted in green</span>
+      <span class="hb-item">Current step animated highlight</span>
+      <span class="hb-item">Real-time updates without page reload</span>
+      <span class="hb-item">Staff updates status from Store Dashboard</span>
+      <span class="hb-item">Patient sees changes instantly</span>
+      <span class="hb-item">Live Map Tracking component</span>
+    </div>
+  </div>
+
+  <hr class="divider" />
+
+  <!-- ══════════════════════════════════════════ 07 RETURNS ══ -->
+  <div class="section-header avoid-break">
+    <span class="section-badge badge-shared">07 · Returns</span>
+    <h2>Returns &amp; Refunds</h2>
+    <p>A structured returns workflow with evidence submission, multi-stage review, and refund processing.</p>
+    <div class="section-accent-bar bar-shared"></div>
+  </div>
+
+  <div class="feature-grid avoid-break">
+    <div class="feature-card fc-top-patient">
+      <div class="fc-header">
+        <div class="fc-icon ic-rose">↩️</div>
+        <div><div class="fc-title">Patient: Raise Return</div><div class="fc-subtitle">Self-service return request</div></div>
+      </div>
+      <div class="fc-body">
+        <ul class="fc-list bl-rose">
+          <li>Raise return request against a delivered order</li>
+          <li>Select items and quantity to return</li>
+          <li>Provide reason for return</li>
+          <li>Upload evidence photos / documents</li>
+          <li>Track return status in My Returns page</li>
+        </ul>
+      </div>
+    </div>
+    <div class="feature-card fc-top-store">
+      <div class="fc-header">
+        <div class="fc-icon ic-blue">⚖️</div>
+        <div><div class="fc-title">Store: Process Returns</div><div class="fc-subtitle">Review &amp; decide</div></div>
+      </div>
+      <div class="fc-body">
+        <ul class="fc-list bl-blue">
+          <li>View all open return requests</li>
+          <li>Review evidence submitted by patient</li>
+          <li>Request additional evidence if needed</li>
+          <li>Approve return (triggers refund flow)</li>
+          <li>Reject return with documented reason</li>
+          <li>Mark as Refunded after processing</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="feature-row avoid-break">
+    <div class="fr-title">Return Request Status Flow</div>
+    <div class="fr-grid">
+      <div class="fr-cell"><div class="fr-cell-title" style="color:#d97706">Open</div><ul><li>Request submitted by patient, awaiting store review</li></ul></div>
+      <div class="fr-cell"><div class="fr-cell-title" style="color:#7c3aed">Evidence Needed</div><ul><li>Store requested more evidence from patient</li></ul></div>
+      <div class="fr-cell"><div class="fr-cell-title" style="color:#2563eb">Store Review</div><ul><li>Evidence submitted, under final review</li></ul></div>
+      <div class="fr-cell"><div class="fr-cell-title" style="color:#16a34a">Approved / Refunded</div><ul><li>Return approved; refund processing complete</li></ul></div>
+    </div>
+  </div>
+
+  <hr class="divider" />
+
+  <!-- ══════════════════════════════════════════ 08 STORE DASHBOARD ══ -->
+  <div class="section-header avoid-break page-break">
+    <span class="section-badge badge-store">08 · Store Owner</span>
+    <h2>Store Owner Dashboard</h2>
+    <p>A comprehensive operations hub covering every aspect of pharmacy management — from daily orders to financial analytics.</p>
+    <div class="section-accent-bar bar-store"></div>
+  </div>
+
+  <div class="highlight-banner hb-blue avoid-break">
+    <div class="hb-title">📋 Dashboard Sections Available to Store Owner</div>
+    <div class="hb-list">
+      <span class="hb-item">Dashboard Overview</span>
+      <span class="hb-item">Inventory</span>
+      <span class="hb-item">Orders</span>
+      <span class="hb-item">Returns &amp; Refunds</span>
+      <span class="hb-item">Prescriptions</span>
+      <span class="hb-item">Financial Management</span>
+      <span class="hb-item">Promotions</span>
+      <span class="hb-item">Staff Members</span>
+      <span class="hb-item">Queries</span>
+      <span class="hb-item">Reviews</span>
+      <span class="hb-item">My Profile</span>
+      <span class="hb-item">Reports &amp; Analytics</span>
+      <span class="hb-item">Audit Trail</span>
+      <span class="hb-item">Import Patients</span>
+    </div>
+  </div>
+
+  <div class="feature-grid avoid-break">
+    <div class="feature-card fc-top-store">
+      <div class="fc-header">
+        <div class="fc-icon ic-blue">📦</div>
+        <div><div class="fc-title">Inventory Management</div><div class="fc-subtitle">Full stock control</div></div>
+      </div>
+      <div class="fc-body">
+        <ul class="fc-list bl-blue">
+          <li>Add, edit and remove medicines from inventory</li>
+          <li>Set price, stock quantity, medicine category/type</li>
+          <li>Low stock alerts and out-of-stock indicators</li>
+          <li>Inventory risk reporting (near-stockout count)</li>
+          <li>Search and filter inventory list</li>
+        </ul>
+      </div>
+    </div>
+    <div class="feature-card fc-top-store">
+      <div class="fc-header">
+        <div class="fc-icon ic-blue">🛍️</div>
+        <div><div class="fc-title">Orders Management</div><div class="fc-subtitle">End-to-end order ops</div></div>
+      </div>
+      <div class="fc-body">
+        <ul class="fc-list bl-blue">
+          <li>List all store orders with status badges</li>
+          <li>Order detail view: items, quantities, prices</li>
+          <li>Customer name, address, payment method</li>
+          <li>Update tracking status from dropdown</li>
+          <li>Real-time status change — no page reload</li>
+        </ul>
+      </div>
+    </div>
+    <div class="feature-card fc-top-store">
+      <div class="fc-header">
+        <div class="fc-icon ic-indigo">💰</div>
+        <div><div class="fc-title">Financial Management</div><div class="fc-subtitle">Invoice &amp; supplier ops</div></div>
+      </div>
+      <div class="fc-body">
+        <ul class="fc-list bl-indigo">
+          <li>Generate and manage invoices</li>
+          <li>Supplier management (add, update, list)</li>
+          <li>Payment tracking per order</li>
+          <li>Financial overview with revenue summaries</li>
+          <li>Export financial data as CSV</li>
+        </ul>
+      </div>
+    </div>
+    <div class="feature-card fc-top-store">
+      <div class="fc-header">
+        <div class="fc-icon ic-amber">🎁</div>
+        <div><div class="fc-title">Promotions &amp; Campaigns</div><div class="fc-subtitle">Marketing tools</div></div>
+      </div>
+      <div class="fc-body">
+        <ul class="fc-list bl-amber">
+          <li>Create promotional campaigns</li>
+          <li>Set campaign name, type, discount amount</li>
+          <li>Define start and end dates</li>
+          <li>Activate / deactivate campaigns</li>
+          <li>Campaign list with status indicators</li>
+        </ul>
+      </div>
+    </div>
+    <div class="feature-card fc-top-store">
+      <div class="fc-header">
+        <div class="fc-icon ic-blue">⭐</div>
+        <div><div class="fc-title">Reviews Management</div><div class="fc-subtitle">Customer feedback</div></div>
+      </div>
+      <div class="fc-body">
+        <ul class="fc-list bl-blue">
+          <li>View all customer reviews for the store</li>
+          <li>Patient name, star rating, and comment</li>
+          <li>Reply to individual reviews</li>
+          <li>Update existing replies</li>
+          <li>Pending / Replied status per review</li>
+        </ul>
+      </div>
+    </div>
+    <div class="feature-card fc-top-store">
+      <div class="fc-header">
+        <div class="fc-icon ic-slate">📂</div>
+        <div><div class="fc-title">Import Patients (CSV)</div><div class="fc-subtitle">Bulk patient onboarding</div></div>
+      </div>
+      <div class="fc-body">
+        <ul class="fc-list bl-slate">
+          <li>Upload CSV file with patient records</li>
+          <li>Auto-validation before import</li>
+          <li>Creates accounts in User collection</li>
+          <li>Result summary: Created / Skipped / Errors</li>
+          <li>Supports all patient fields (name, health, address)</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="feature-row avoid-break">
+    <div class="fr-title">Audit Trail</div>
+    <div class="fr-grid cols-2">
+      <div class="fr-cell">
+        <div class="fr-cell-title">What is logged</div>
+        <ul><li>Order status changes</li><li>Stock &amp; price edits to inventory</li><li>Prescription approvals &amp; rejections</li><li>Staff add / edit / remove events</li></ul>
+      </div>
+      <div class="fr-cell">
+        <div class="fr-cell-title">Audit Entry Details</div>
+        <ul><li>Action type &amp; description</li><li>Who performed the action (user/staff)</li><li>Timestamp of the event</li><li>Searchable &amp; filterable log</li></ul>
+      </div>
+    </div>
+  </div>
+
+  <hr class="divider" />
+
+  <!-- ══════════════════════════════════════════ 09 ANALYTICS ══ -->
+  <div class="section-header avoid-break page-break">
+    <span class="section-badge badge-store">09 · Analytics</span>
+    <h2>Analytics &amp; Reports</h2>
+    <p>Real-time business intelligence with revenue trends, customer insights, and downloadable operational reports.</p>
+    <div class="section-accent-bar bar-store"></div>
+  </div>
+
+  <div class="feature-grid avoid-break">
+    <div class="feature-card fc-top-store">
+      <div class="fc-header">
+        <div class="fc-icon ic-blue">📈</div>
+        <div><div class="fc-title">Revenue Command Center</div><div class="fc-subtitle">Live financial KPIs</div></div>
+      </div>
+      <div class="fc-body">
+        <ul class="fc-list bl-blue">
+          <li>Month-wise revenue (current month)</li>
+          <li>All-time total orders revenue</li>
+          <li>Today's revenue</li>
+          <li>Today's order count</li>
+          <li>Week-over-week growth percentage</li>
+          <li>Average Order Value</li>
+          <li>Order Completion Rate (%)</li>
+        </ul>
+      </div>
+    </div>
+    <div class="feature-card fc-top-store">
+      <div class="fc-header">
+        <div class="fc-icon ic-blue">📊</div>
+        <div><div class="fc-title">Monthly Revenue Trend</div><div class="fc-subtitle">Historical bar chart</div></div>
+      </div>
+      <div class="fc-body">
+        <ul class="fc-list bl-blue">
+          <li>Bar chart of revenue per calendar month</li>
+          <li>Highlights the top-revenue month</li>
+          <li>Shows order count per month</li>
+          <li>Dynamically calculated from live order data</li>
+          <li>No external chart library — custom built</li>
+        </ul>
+      </div>
+    </div>
+    <div class="feature-card fc-top-store">
+      <div class="fc-header">
+        <div class="fc-icon ic-green">🏆</div>
+        <div><div class="fc-title">Top-Selling Medicines</div><div class="fc-subtitle">Product performance</div></div>
+      </div>
+      <div class="fc-body">
+        <ul class="fc-list bl-green">
+          <li>Ranked list of top 10 medicines by units sold</li>
+          <li>Medal indicators for top 3 (🥇🥈🥉)</li>
+          <li>Units sold + revenue per medicine</li>
+          <li>Horizontal bar chart with proportional fill</li>
+          <li>Computed from all order items dynamically</li>
+        </ul>
+      </div>
+    </div>
+    <div class="feature-card fc-top-store">
+      <div class="fc-header">
+        <div class="fc-icon ic-violet">👥</div>
+        <div><div class="fc-title">Repeat Purchase Rate</div><div class="fc-subtitle">Customer loyalty</div></div>
+      </div>
+      <div class="fc-body">
+        <ul class="fc-list bl-violet">
+          <li>% of customers who placed multiple orders</li>
+          <li>Total customers count</li>
+          <li>Repeat buyers vs first-time breakdown</li>
+          <li>Visual fill bar (percentage width)</li>
+          <li>Colour-coded tile breakdown</li>
+        </ul>
+      </div>
+    </div>
+    <div class="feature-card fc-top-store">
+      <div class="fc-header">
+        <div class="fc-icon ic-cyan">🧲</div>
+        <div><div class="fc-title">Customer Acquisition</div><div class="fc-subtitle">New customer growth</div></div>
+      </div>
+      <div class="fc-body">
+        <ul class="fc-list bl-cyan">
+          <li>New first-time customers this month</li>
+          <li>New first-time customers last month</li>
+          <li>Month-over-month growth % (▲/▼ indicator)</li>
+          <li>Side-by-side comparison bars</li>
+          <li>Based on first order date per customer</li>
+        </ul>
+      </div>
+    </div>
+    <div class="feature-card fc-top-store">
+      <div class="fc-header">
+        <div class="fc-icon ic-blue">🗂️</div>
+        <div><div class="fc-title">Medicine Category Breakdown</div><div class="fc-subtitle">Inventory intelligence</div></div>
+      </div>
+      <div class="fc-body">
+        <ul class="fc-list bl-blue">
+          <li>SKU count per medicine category/type</li>
+          <li>Total stock units per category</li>
+          <li>Total inventory value per category</li>
+          <li>Colour-coded grid with progress bars</li>
+          <li>Computed from live inventory in real-time</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="feature-row avoid-break">
+    <div class="fr-title">Downloadable Operational Reports (CSV Export)</div>
+    <div class="fr-grid cols-3">
+      <div class="fr-cell">
+        <div class="fr-cell-title" style="color:#1e293b">📋 Daily Close Report</div>
+        <ul><li>Orders &amp; revenue for the day</li><li>Rejected prescriptions count</li><li>Pending orders &amp; prescriptions</li><li>One-click CSV download</li></ul>
+      </div>
+      <div class="fr-cell">
+        <div class="fr-cell-title" style="color:#4338ca">📑 Prescription Turnaround</div>
+        <ul><li>Reviewed vs pending count</li><li>Average turnaround time (hours)</li><li>Exportable for SLA tracking</li></ul>
+      </div>
+      <div class="fr-cell">
+        <div class="fr-cell-title" style="color:#b45309">⚠️ Inventory Risk Report</div>
+        <ul><li>Out-of-stock items count</li><li>Near-stockout items count</li><li>Total tracked items</li><li>Actionable CSV for re-ordering</li></ul>
+      </div>
+    </div>
+  </div>
+
+  <hr class="divider" />
+
+  <!-- ══════════════════════════════════════════ 10 STAFF ══ -->
+  <div class="section-header avoid-break">
+    <span class="section-badge badge-staff">10 · Staff</span>
+    <h2>Staff Management</h2>
+    <p>Complete staff lifecycle management — hire, assign roles, update, and deactivate — all from the Store Dashboard.</p>
+    <div class="section-accent-bar bar-staff"></div>
+  </div>
+
+  <div class="feature-grid avoid-break">
+    <div class="feature-card fc-top-staff">
+      <div class="fc-header">
+        <div class="fc-icon ic-violet">👷</div>
+        <div><div class="fc-title">Staff Administration</div><div class="fc-subtitle">Full CRUD operations</div></div>
+      </div>
+      <div class="fc-body">
+        <ul class="fc-list bl-violet">
+          <li>Add new staff: Name, Role, Contact Number, Email</li>
+          <li>Roles: Manager, Delivery, Counter</li>
+          <li>Edit staff details with pre-filled form</li>
+          <li>Activate / Inactivate staff members</li>
+          <li>Remove staff from system</li>
+          <li>All changes persist instantly — no page reload</li>
+        </ul>
+      </div>
+    </div>
+    <div class="feature-card fc-top-staff">
+      <div class="fc-header">
+        <div class="fc-icon ic-violet">🎯</div>
+        <div><div class="fc-title">Staff Permissions</div><div class="fc-subtitle">Role-based access</div></div>
+      </div>
+      <div class="fc-body">
+        <ul class="fc-list bl-violet">
+          <li>Staff log in with their own credentials</li>
+          <li>Access scoped to: Orders, Prescriptions, Inventory, Queries, Reviews</li>
+          <li>Cannot access financial or staff management sections</li>
+          <li>Update order tracking status</li>
+          <li>Process prescriptions</li>
+          <li>Respond to patient queries</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="feature-row avoid-break">
+    <div class="fr-title">Staff Performance &amp; Training Tracking</div>
+    <div class="fr-grid cols-2">
+      <div class="fr-cell">
+        <div class="fr-cell-title">Staff Performance</div>
+        <ul><li>Performance records per staff member</li><li>Linked to StoreStaff collection</li><li>Trackable metrics for HR reporting</li></ul>
+      </div>
+      <div class="fr-cell">
+        <div class="fr-cell-title">Staff Training &amp; Attendance</div>
+        <ul><li>Training records management</li><li>Attendance tracking per staff</li><li>Date-wise logs with notes</li></ul>
+      </div>
+    </div>
+  </div>
+
+  <hr class="divider" />
+
+  <!-- ══════════════════════════════════════════ 11 VACCINATION ══ -->
+  <div class="section-header avoid-break page-break">
+    <span class="section-badge badge-patient">11 · Vaccinations</span>
+    <h2>Vaccination Management</h2>
+    <p>Personal vaccination record-keeping with a pre-loaded master list and real-time status updates.</p>
+    <div class="section-accent-bar bar-patient"></div>
+  </div>
+
+  <div class="feature-grid avoid-break">
+    <div class="feature-card fc-top-patient">
+      <div class="fc-header">
+        <div class="fc-icon ic-green">💉</div>
+        <div><div class="fc-title">Vaccination Master List</div><div class="fc-subtitle">Pre-loaded vaccination catalogue</div></div>
+      </div>
+      <div class="fc-body">
+        <ul class="fc-list bl-green">
+          <li>BCG, DPT1, DPT2, DPT3</li>
+          <li>Polio1, Polio2, Polio3</li>
+          <li>Hepatitis B, Measles</li>
+          <li>Chickenpox, Typhoid, Yellow Fever</li>
+          <li>Each with ID, name, description</li>
+        </ul>
+      </div>
+    </div>
+    <div class="feature-card fc-top-patient">
+      <div class="fc-header">
+        <div class="fc-icon ic-green">📋</div>
+        <div><div class="fc-title">My Vaccinations</div><div class="fc-subtitle">Personal health record</div></div>
+      </div>
+      <div class="fc-body">
+        <ul class="fc-list bl-green">
+          <li>Complete list of all available vaccinations</li>
+          <li>Toggle status: Completed / Pending per vaccine</li>
+          <li>Date picker for vaccination date on completion</li>
+          <li>Count badge on Dashboard summary card</li>
+          <li>Database persistence — no duplicates</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <hr class="divider" />
+
+  <!-- ══════════════════════════════════════════ 12 QUERIES ══ -->
+  <div class="section-header avoid-break">
+    <span class="section-badge badge-shared">12 · Queries</span>
+    <h2>Query Management System</h2>
+    <p>Bidirectional communication between patients and the pharmacy — raise issues, get answers, track resolution.</p>
+    <div class="section-accent-bar bar-shared"></div>
+  </div>
+
+  <div class="feature-grid avoid-break">
+    <div class="feature-card fc-top-patient">
+      <div class="fc-header">
+        <div class="fc-icon ic-green">❓</div>
+        <div><div class="fc-title">Patient: Raise Query</div><div class="fc-subtitle">Support request</div></div>
+      </div>
+      <div class="fc-body">
+        <ul class="fc-list bl-green">
+          <li>Subject and message fields</li>
+          <li>Auto-assigned to patient's pharmacy store</li>
+          <li>Default status: Open</li>
+          <li>List-first UI — queries shown before form</li>
+          <li>Auto-refresh after submission</li>
+          <li>Open Queries badge on sidebar</li>
+        </ul>
+      </div>
+    </div>
+    <div class="feature-card fc-top-store">
+      <div class="fc-header">
+        <div class="fc-icon ic-blue">💬</div>
+        <div><div class="fc-title">Store: Answer Query</div><div class="fc-subtitle">Customer support</div></div>
+      </div>
+      <div class="fc-body">
+        <ul class="fc-list bl-blue">
+          <li>View all open queries for the store</li>
+          <li>Patient name, subject, message displayed</li>
+          <li>Text area to type response</li>
+          <li>Submit Answer updates status to Answered</li>
+          <li>Answer saved to database immediately</li>
+          <li>Patient sees response in their dashboard</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="feature-row avoid-break">
+    <div class="fr-title">Query Status &amp; Patient View</div>
+    <div class="fr-grid cols-2">
+      <div class="fr-cell">
+        <div class="fr-cell-title">Status Indicators</div>
+        <ul>
+          <li><strong>Open</strong> — Query raised, awaiting store response</li>
+          <li><strong>Answered</strong> — Store has responded; answer visible to patient</li>
+        </ul>
+      </div>
+      <div class="fr-cell">
+        <div class="fr-cell-title">Patient View of Answer</div>
+        <ul><li>Query subject &amp; status in list</li><li>Store's full answer text displayed</li><li>Submission date shown</li></ul>
+      </div>
+    </div>
+  </div>
+
+  <hr class="divider" />
+
+  <!-- ══════════════════════════════════════════ 13 ADMIN ══ -->
+  <div class="section-header avoid-break page-break">
+    <span class="section-badge badge-admin">13 · Admin</span>
+    <h2>Admin Panel</h2>
+    <p>Platform-wide administration for store approvals, compliance, medicine catalogue management, and global oversight.</p>
+    <div class="section-accent-bar bar-admin"></div>
+  </div>
+
+  <div class="feature-grid avoid-break">
+    <div class="feature-card fc-top-admin">
+      <div class="fc-header">
+        <div class="fc-icon ic-amber">🏪</div>
+        <div><div class="fc-title">Store Approval Workflow</div><div class="fc-subtitle">Onboarding control</div></div>
+      </div>
+      <div class="fc-body">
+        <ul class="fc-list bl-amber">
+          <li>Review store approval requests from new Store Owners</li>
+          <li>View store details: name, licence, GST, owner</li>
+          <li>Approve store — grants full access to Store Dashboard</li>
+          <li>Reject store with reason</li>
+          <li>Pending approval list with filters</li>
+        </ul>
+      </div>
+    </div>
+    <div class="feature-card fc-top-admin">
+      <div class="fc-header">
+        <div class="fc-icon ic-amber">💊</div>
+        <div><div class="fc-title">Medicine Catalogue Admin</div><div class="fc-subtitle">Master medicine management</div></div>
+      </div>
+      <div class="fc-body">
+        <ul class="fc-list bl-amber">
+          <li>Add new medicines to the platform catalogue</li>
+          <li>Edit existing medicine details (name, price, category)</li>
+          <li>Delete medicines from catalogue</li>
+          <li>Medicines available to all stores for inventory</li>
+        </ul>
+      </div>
+    </div>
+    <div class="feature-card fc-top-admin">
+      <div class="fc-header">
+        <div class="fc-icon ic-amber">✅</div>
+        <div><div class="fc-title">Compliance Checklists</div><div class="fc-subtitle">Regulatory oversight</div></div>
+      </div>
+      <div class="fc-body">
+        <ul class="fc-list bl-amber">
+          <li>Compliance checklist management per store</li>
+          <li>Track required documentation status</li>
+          <li>Mark items as compliant / non-compliant</li>
+          <li>Full audit log available</li>
+        </ul>
+      </div>
+    </div>
+    <div class="feature-card fc-top-admin">
+      <div class="fc-header">
+        <div class="fc-icon ic-amber">🌐</div>
+        <div><div class="fc-title">Location Master Data</div><div class="fc-subtitle">Geographic management</div></div>
+      </div>
+      <div class="fc-body">
+        <ul class="fc-list bl-amber">
+          <li>Country master data management</li>
+          <li>State master data management</li>
+          <li>Pincode lookup and delivery availability</li>
+          <li>Location hierarchy: Country → State → Pincode</li>
+        </ul>
+      </div>
+    </div>
+    <div class="feature-card fc-top-admin">
+      <div class="fc-header">
+        <div class="fc-icon ic-amber">📊</div>
+        <div><div class="fc-title">Admin Tracking &amp; Oversight</div><div class="fc-subtitle">Platform monitoring</div></div>
+      </div>
+      <div class="fc-body">
+        <ul class="fc-list bl-amber">
+          <li>Real-time order tracking across all stores</li>
+          <li>Platform-wide user management</li>
+          <li>Audit log access for all entities</li>
+          <li>Admin-level reports and metrics</li>
+        </ul>
+      </div>
+    </div>
+    <div class="feature-card fc-top-admin">
+      <div class="fc-header">
+        <div class="fc-icon ic-amber">🏭</div>
+        <div><div class="fc-title">Supplier Management</div><div class="fc-subtitle">Supply chain admin</div></div>
+      </div>
+      <div class="fc-body">
+        <ul class="fc-list bl-amber">
+          <li>Add and manage medicine suppliers</li>
+          <li>Supplier details: name, contact, product range</li>
+          <li>Link suppliers to medicines in catalogue</li>
+          <li>Centralised supply chain view</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <hr class="divider" />
+
+  <!-- ══════════════════════════════════════════ 14 AI ══ -->
+  <div class="section-header avoid-break">
+    <span class="section-badge badge-shared">14 · AI Features</span>
+    <h2>AI &amp; Smart Features</h2>
+    <p>Intelligent tools that enhance the patient experience and reduce manual effort for pharmacists.</p>
+    <div class="section-accent-bar bar-shared"></div>
+  </div>
+
+  <div class="feature-grid avoid-break">
+    <div class="feature-card fc-top-shared">
+      <div class="fc-header">
+        <div class="fc-icon ic-slate">🤖</div>
+        <div><div class="fc-title">MedBot AI Health Assistant</div><div class="fc-subtitle">Conversational chatbot</div></div>
+      </div>
+      <div class="fc-body">
+        <ul class="fc-list bl-slate">
+          <li>AI-powered chat widget available site-wide</li>
+          <li>Ask about medicines, dosage, interactions</li>
+          <li>Help with order queries</li>
+          <li>Greeting: "Hello! I'm MedBot. How can I help?"</li>
+          <li>Persistent chat window, minimise/maximise</li>
+        </ul>
+      </div>
+    </div>
+    <div class="feature-card fc-top-shared">
+      <div class="fc-header">
+        <div class="fc-icon ic-slate">📄</div>
+        <div><div class="fc-title">AI Prescription Extraction</div><div class="fc-subtitle">Automated OCR processing</div></div>
+      </div>
+      <div class="fc-body">
+        <ul class="fc-list bl-slate">
+          <li>AI reads uploaded prescription images</li>
+          <li>Automatically extracts medicine names &amp; dosages</li>
+          <li>Displays extracted medicines in review modal</li>
+          <li>Patient can confirm before submitting</li>
+          <li>Reduces pharmacist manual entry effort</li>
+        </ul>
+      </div>
+    </div>
+    <div class="feature-card fc-top-shared">
+      <div class="fc-header">
+        <div class="fc-icon ic-rose">❤️</div>
+        <div><div class="fc-title">Disease Prediction Models</div><div class="fc-subtitle">AI health screening</div></div>
+      </div>
+      <div class="fc-body">
+        <ul class="fc-list bl-rose">
+          <li>Heart Disease Prediction</li>
+          <li>Kidney Disease Assessment</li>
+          <li>Lung Cancer Risk Score</li>
+          <li>General Disease Prediction</li>
+          <li>Input-based predictions (not medical advice)</li>
+        </ul>
+      </div>
+    </div>
+    <div class="feature-card fc-top-shared">
+      <div class="fc-header">
+        <div class="fc-icon ic-slate">📍</div>
+        <div><div class="fc-title">Smart Availability</div><div class="fc-subtitle">Location-based features</div></div>
+      </div>
+      <div class="fc-body">
+        <ul class="fc-list bl-slate">
+          <li>Pincode availability check before ordering</li>
+          <li>Delivery serviceability indicator</li>
+          <li>Live map tracking during delivery</li>
+          <li>Offline Banner — notifies user when offline</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <hr class="divider" />
+
+  <!-- ══════════════════════════════════════════ 15 TECH STACK ══ -->
+  <div class="section-header avoid-break page-break">
+    <span class="section-badge badge-shared">15 · Technology</span>
+    <h2>Technology Stack</h2>
+    <p>Built on a modern, scalable, open-source technology foundation.</p>
+    <div class="section-accent-bar bar-shared"></div>
+  </div>
+
+  <table class="tech-table avoid-break">
+    <thead>
+      <tr>
+        <th>Layer</th>
+        <th>Technology</th>
+        <th>Purpose</th>
+        <th>Status</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><td><strong>Frontend</strong></td><td>React 18 + Vite</td><td>Patient &amp; Store Owner SPA</td><td><span class="tag tag-done">Live</span></td></tr>
+      <tr><td><strong>Styling</strong></td><td>Tailwind CSS</td><td>Utility-first responsive design</td><td><span class="tag tag-done">Live</span></td></tr>
+      <tr><td><strong>State</strong></td><td>Redux Toolkit</td><td>Global client state management</td><td><span class="tag tag-done">Live</span></td></tr>
+      <tr><td><strong>HTTP</strong></td><td>Axios</td><td>REST API communication</td><td><span class="tag tag-done">Live</span></td></tr>
+      <tr><td><strong>Backend</strong></td><td>Node.js + Express.js</td><td>REST API server, business logic</td><td><span class="tag tag-done">Live</span></td></tr>
+      <tr><td><strong>Database</strong></td><td>MongoDB Atlas</td><td>Cloud NoSQL data store</td><td><span class="tag tag-done">Live</span></td></tr>
+      <tr><td><strong>ODM</strong></td><td>Mongoose</td><td>MongoDB schema &amp; query layer</td><td><span class="tag tag-done">Live</span></td></tr>
+      <tr><td><strong>Auth</strong></td><td>JWT + bcrypt</td><td>Token auth &amp; password hashing</td><td><span class="tag tag-done">Live</span></td></tr>
+      <tr><td><strong>File Storage</strong></td><td>AWS S3 / Local</td><td>Prescription &amp; document uploads</td><td><span class="tag tag-done">Live</span></td></tr>
+      <tr><td><strong>API Docs</strong></td><td>Swagger / OpenAPI</td><td>Auto-generated API documentation</td><td><span class="tag tag-done">Live</span></td></tr>
+      <tr><td><strong>Notifications</strong></td><td>react-hot-toast</td><td>In-app user feedback toasts</td><td><span class="tag tag-done">Live</span></td></tr>
+      <tr><td><strong>Icons</strong></td><td>Lucide React</td><td>Consistent icon system</td><td><span class="tag tag-done">Live</span></td></tr>
+      <tr><td><strong>Deployment</strong></td><td>Vercel (Frontend)</td><td>Frontend hosting &amp; CDN</td><td><span class="tag tag-done">Live</span></td></tr>
+      <tr><td><strong>SMS/Email</strong></td><td>Infrastructure Ready</td><td>Notification delivery (Twilio/SES)</td><td><span class="tag tag-ready">Ready</span></td></tr>
+      <tr><td><strong>Payment</strong></td><td>UI Prepared</td><td>Payment gateway integration</td><td><span class="tag tag-ready">Ready</span></td></tr>
+    </tbody>
+  </table>
+
+  <div class="highlight-banner hb-violet avoid-break" style="margin-top:20px;">
+    <div class="hb-title">🗄️ Database Collections (25+)</div>
+    <div class="hb-list">
+      <span class="hb-item">users</span>
+      <span class="hb-item">orders</span>
+      <span class="hb-item">cart</span>
+      <span class="hb-item">prescriptions</span>
+      <span class="hb-item">storeStaff</span>
+      <span class="hb-item">userVaccination</span>
+      <span class="hb-item">vaccinationMaster</span>
+      <span class="hb-item">userQuery</span>
+      <span class="hb-item">returnRequest</span>
+      <span class="hb-item">invoice</span>
+      <span class="hb-item">supplier</span>
+      <span class="hb-item">promotionalCampaign</span>
+      <span class="hb-item">review</span>
+      <span class="hb-item">auditLog</span>
+      <span class="hb-item">complianceChecklist</span>
+      <span class="hb-item">storeApprovalRequest</span>
+      <span class="hb-item">staffAttendance</span>
+      <span class="hb-item">staffPerformance</span>
+      <span class="hb-item">staffTraining</span>
+      <span class="hb-item">insuranceProfile</span>
+      <span class="hb-item">medicineTracker</span>
+      <span class="hb-item">countryMaster</span>
+      <span class="hb-item">stateMaster</span>
+      <span class="hb-item">admin</span>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════ FEATURE MATRIX ══ -->
+  <div class="section-header avoid-break" style="margin-top:40px;">
+    <span class="section-badge badge-shared">Summary</span>
+    <h2>Feature Completion Matrix</h2>
+    <div class="section-accent-bar bar-shared"></div>
+  </div>
+
+  <table class="tech-table avoid-break">
+    <thead>
+      <tr>
+        <th>Feature</th>
+        <th>Patient</th>
+        <th>Store Owner</th>
+        <th>Staff</th>
+        <th>Admin</th>
+        <th>Status</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><td>Authentication &amp; Login</td><td>✓</td><td>✓</td><td>✓</td><td>✓</td><td><span class="tag tag-done">Complete</span></td></tr>
+      <tr><td>Dashboard Overview</td><td>✓</td><td>✓</td><td>✓</td><td>✓</td><td><span class="tag tag-done">Complete</span></td></tr>
+      <tr><td>Online Pharmacy / Medicine Ordering</td><td>✓</td><td>—</td><td>—</td><td>—</td><td><span class="tag tag-done">Complete</span></td></tr>
+      <tr><td>Cart Management</td><td>✓</td><td>—</td><td>—</td><td>—</td><td><span class="tag tag-done">Complete</span></td></tr>
+      <tr><td>Order Tracking</td><td>✓</td><td>✓</td><td>✓</td><td>✓</td><td><span class="tag tag-done">Complete</span></td></tr>
+      <tr><td>Prescription Upload &amp; Review</td><td>✓</td><td>✓</td><td>✓</td><td>—</td><td><span class="tag tag-done">Complete</span></td></tr>
+      <tr><td>Returns &amp; Refunds</td><td>✓</td><td>✓</td><td>—</td><td>—</td><td><span class="tag tag-done">Complete</span></td></tr>
+      <tr><td>Vaccination Records</td><td>✓</td><td>—</td><td>—</td><td>—</td><td><span class="tag tag-done">Complete</span></td></tr>
+      <tr><td>Query Management</td><td>✓</td><td>✓</td><td>✓</td><td>—</td><td><span class="tag tag-done">Complete</span></td></tr>
+      <tr><td>Staff Management</td><td>—</td><td>✓</td><td>—</td><td>—</td><td><span class="tag tag-done">Complete</span></td></tr>
+      <tr><td>Inventory Management</td><td>—</td><td>✓</td><td>✓</td><td>—</td><td><span class="tag tag-done">Complete</span></td></tr>
+      <tr><td>Reports &amp; Analytics</td><td>—</td><td>✓</td><td>—</td><td>✓</td><td><span class="tag tag-done">Complete</span></td></tr>
+      <tr><td>Financial Management</td><td>—</td><td>✓</td><td>—</td><td>—</td><td><span class="tag tag-done">Complete</span></td></tr>
+      <tr><td>Promotions &amp; Campaigns</td><td>—</td><td>✓</td><td>—</td><td>—</td><td><span class="tag tag-done">Complete</span></td></tr>
+      <tr><td>Store Approval</td><td>—</td><td>—</td><td>—</td><td>✓</td><td><span class="tag tag-done">Complete</span></td></tr>
+      <tr><td>Compliance Checklists</td><td>—</td><td>—</td><td>—</td><td>✓</td><td><span class="tag tag-done">Complete</span></td></tr>
+      <tr><td>AI MedBot Assistant</td><td>✓</td><td>✓</td><td>✓</td><td>—</td><td><span class="tag tag-done">Complete</span></td></tr>
+      <tr><td>Disease Prediction Tools</td><td>✓</td><td>—</td><td>—</td><td>—</td><td><span class="tag tag-done">Complete</span></td></tr>
+      <tr><td>AI Prescription Extraction</td><td>✓</td><td>✓</td><td>—</td><td>—</td><td><span class="tag tag-done">Complete</span></td></tr>
+      <tr><td>Bulk Patient Import (CSV)</td><td>—</td><td>✓</td><td>—</td><td>—</td><td><span class="tag tag-done">Complete</span></td></tr>
+      <tr><td>Payment Gateway</td><td>✓</td><td>—</td><td>—</td><td>—</td><td><span class="tag tag-ready">UI Ready</span></td></tr>
+      <tr><td>SMS / Email Notifications</td><td>✓</td><td>✓</td><td>—</td><td>—</td><td><span class="tag tag-ready">Infra Ready</span></td></tr>
+    </tbody>
+  </table>
+
+  <!-- ══════════════════════════════════════════ FOOTER ══ -->
+  <div class="doc-footer">
+    <div>
+      <strong>PharmacyMVP</strong> — Confidential Product Document<br/>
+      <span>Version 1.0 · April 2026</span>
+    </div>
+    <div style="text-align:right">
+      All features described are implemented &amp; functional<br/>
+      <span style="color:#059669;font-weight:700;">✓ MVP Complete — Client Ready</span>
+    </div>
+  </div>
+
+</div><!-- /page -->
+
+</body>
+</html>

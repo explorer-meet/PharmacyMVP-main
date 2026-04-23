@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { Bell, Mail, MessageSquare, ShoppingBag, Pill, Tag, Heart, Save, CheckCircle, ChevronLeft, Smartphone } from 'lucide-react';
 import Navbar from '../components/Navbar';
-import { useLanguage } from '../contexts/LanguageContext';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 
@@ -29,10 +28,10 @@ const defaultPrefs = {
 };
 
 const categoryMeta = [
-  { key: 'orderUpdates', icon: ShoppingBag, color: 'text-sky-600', bg: 'bg-sky-50 dark:bg-sky-900/30' },
-  { key: 'prescriptionReminders', icon: Pill, color: 'text-violet-600', bg: 'bg-violet-50 dark:bg-violet-900/30' },
-  { key: 'offerAlerts', icon: Tag, color: 'text-amber-600', bg: 'bg-amber-50 dark:bg-amber-900/30' },
-  { key: 'healthReminders', icon: Heart, color: 'text-rose-600', bg: 'bg-rose-50 dark:bg-rose-900/30' },
+  { key: 'orderUpdates', label: 'Order Updates', icon: ShoppingBag, color: 'text-sky-600', bg: 'bg-sky-50 dark:bg-sky-900/30' },
+  { key: 'prescriptionReminders', label: 'Prescription Reminders', icon: Pill, color: 'text-violet-600', bg: 'bg-violet-50 dark:bg-violet-900/30' },
+  { key: 'offerAlerts', label: 'Offer Alerts', icon: Tag, color: 'text-amber-600', bg: 'bg-amber-50 dark:bg-amber-900/30' },
+  { key: 'healthReminders', label: 'Health Reminders', icon: Heart, color: 'text-rose-600', bg: 'bg-rose-50 dark:bg-rose-900/30' },
 ];
 
 const channelMeta = [
@@ -58,7 +57,6 @@ const Toggle = ({ checked, onChange }) => (
 );
 
 const NotificationsHub = () => {
-  const { t } = useLanguage();
   const navigate = useNavigate();
   const [prefs, setPrefs] = useState(() => {
     try {
@@ -90,7 +88,7 @@ const NotificationsHub = () => {
   const savePreferences = () => {
     localStorage.setItem(PREF_KEY, JSON.stringify(prefs));
     setSaved(true);
-    toast.success(t.notifications.saved || 'Preferences saved!');
+    toast.success('Preferences saved!');
     setTimeout(() => setSaved(false), 3000);
   };
 
@@ -98,7 +96,6 @@ const NotificationsHub = () => {
   const activePrefs = prefs[activeChannel] || {};
   const allEnabled = Object.values(activePrefs).every(Boolean);
 
-  // Summary counts
   const totalEnabled = Object.values(prefs).reduce((sum, ch) => {
     return sum + Object.values(ch).filter(Boolean).length;
   }, 0);
@@ -125,7 +122,7 @@ const NotificationsHub = () => {
               </div>
               <div>
                 <h1 className="text-2xl font-black text-slate-900 dark:text-white">
-                  {t.notifications.title}
+                  Notifications Hub
                 </h1>
                 <p className="text-sm text-slate-500 dark:text-slate-400">
                   {totalEnabled} notification type{totalEnabled !== 1 ? 's' : ''} enabled across all channels
@@ -164,7 +161,6 @@ const NotificationsHub = () => {
 
         {/* Active Channel Panel */}
         <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-sm overflow-hidden mb-6">
-          {/* Panel Header */}
           <div className={`px-5 py-4 bg-gradient-to-r ${activeChannelMeta?.color} flex items-center justify-between`}>
             <div className="flex items-center gap-3">
               {activeChannelMeta && <activeChannelMeta.icon className="w-5 h-5 text-white" />}
@@ -182,33 +178,29 @@ const NotificationsHub = () => {
             </div>
           </div>
 
-          {/* Category Toggles */}
           <div className="divide-y divide-slate-50 dark:divide-slate-800">
-            {categoryMeta.map(({ key, icon: Icon, color, bg }) => {
-              const label = t.notifications[key] || key;
-              return (
-                <div
-                  key={key}
-                  className="flex items-center px-5 py-4 gap-4 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition"
-                >
-                  <div className={`w-10 h-10 rounded-xl ${bg} flex items-center justify-center flex-shrink-0`}>
-                    <Icon className={`w-5 h-5 ${color}`} />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">{label}</p>
-                    <p className="text-xs text-slate-500 dark:text-slate-400 truncate">
-                      {activeChannel === 'push' && 'In-app & browser notification'}
-                      {activeChannel === 'email' && 'Sent to your registered email'}
-                      {activeChannel === 'sms' && 'Text to your registered phone'}
-                    </p>
-                  </div>
-                  <Toggle
-                    checked={activePrefs[key] ?? false}
-                    onChange={(v) => setChannelPref(activeChannel, key, v)}
-                  />
+            {categoryMeta.map(({ key, label, icon: Icon, color, bg }) => (
+              <div
+                key={key}
+                className="flex items-center px-5 py-4 gap-4 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition"
+              >
+                <div className={`w-10 h-10 rounded-xl ${bg} flex items-center justify-center flex-shrink-0`}>
+                  <Icon className={`w-5 h-5 ${color}`} />
                 </div>
-              );
-            })}
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">{label}</p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 truncate">
+                    {activeChannel === 'push' && 'In-app & browser notification'}
+                    {activeChannel === 'email' && 'Sent to your registered email'}
+                    {activeChannel === 'sms' && 'Text to your registered phone'}
+                  </p>
+                </div>
+                <Toggle
+                  checked={activePrefs[key] ?? false}
+                  onChange={(v) => setChannelPref(activeChannel, key, v)}
+                />
+              </div>
+            ))}
           </div>
         </div>
 
@@ -218,25 +210,22 @@ const NotificationsHub = () => {
             <p className="text-xs font-bold uppercase tracking-widest text-slate-400">All Channels Overview</p>
           </div>
           <div className="divide-y divide-slate-50 dark:divide-slate-800">
-            {categoryMeta.map(({ key, icon: Icon, color, bg }) => {
-              const label = t.notifications[key] || key;
-              return (
-                <div key={key} className="flex items-center px-5 py-3 gap-4">
-                  <div className={`w-8 h-8 rounded-xl ${bg} flex items-center justify-center flex-shrink-0`}>
-                    <Icon className={`w-4 h-4 ${color}`} />
-                  </div>
-                  <p className="flex-1 text-sm text-slate-700 dark:text-slate-200 font-medium">{label}</p>
-                  <div className="flex items-center gap-3">
-                    {channelMeta.map((ch) => (
-                      <div key={ch.key} className="flex flex-col items-center gap-0.5">
-                        <ch.icon className="w-3 h-3 text-slate-400" />
-                        <div className={`w-2 h-2 rounded-full ${prefs[ch.key]?.[key] ? 'bg-emerald-500' : 'bg-slate-200 dark:bg-slate-700'}`} />
-                      </div>
-                    ))}
-                  </div>
+            {categoryMeta.map(({ key, label, icon: Icon, color, bg }) => (
+              <div key={key} className="flex items-center px-5 py-3 gap-4">
+                <div className={`w-8 h-8 rounded-xl ${bg} flex items-center justify-center flex-shrink-0`}>
+                  <Icon className={`w-4 h-4 ${color}`} />
                 </div>
-              );
-            })}
+                <p className="flex-1 text-sm text-slate-700 dark:text-slate-200 font-medium">{label}</p>
+                <div className="flex items-center gap-3">
+                  {channelMeta.map((ch) => (
+                    <div key={ch.key} className="flex flex-col items-center gap-0.5">
+                      <ch.icon className="w-3 h-3 text-slate-400" />
+                      <div className={`w-2 h-2 rounded-full ${prefs[ch.key]?.[key] ? 'bg-emerald-500' : 'bg-slate-200 dark:bg-slate-700'}`} />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
           </div>
         </div>
 
@@ -248,12 +237,12 @@ const NotificationsHub = () => {
           {saved ? (
             <>
               <CheckCircle className="w-5 h-5" />
-              {t.notifications.saved}
+              Preferences Saved
             </>
           ) : (
             <>
               <Save className="w-5 h-5" />
-              {t.notifications.save}
+              Save Preferences
             </>
           )}
         </button>

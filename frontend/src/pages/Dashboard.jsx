@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import axios from 'axios';
-import { Activity, Calendar, Pill, FileText, Clock, User, Menu, X, Home, CircleUser as UserCircle, ShoppingBag, Syringe, Bell, MessageSquare, Mail as MailIcon, Pencil, ClipboardList, DollarSign, Package, Truck, ChevronDown, ChevronUp, CreditCard, Plus, Minus, Trash2, CheckCircle2, Star, AlertTriangle, Info, Download, Search, RotateCcw } from 'lucide-react';
+import { Activity, Calendar, Pill, FileText, Clock, User, Menu, X, Home, CircleUser as UserCircle, ShoppingBag, Syringe, Bell, MessageSquare, Mail as MailIcon, Pencil, ClipboardList, DollarSign, Package, Truck, ChevronDown, ChevronUp, CreditCard, Plus, Minus, Trash2, CheckCircle2, Star, AlertTriangle, Info, Download, Search, RotateCcw, RefreshCw, Bot, Sparkles, Send } from 'lucide-react';
 import { baseURL } from '../main';
+import toast from 'react-hot-toast';
 import Loader from '../components/Loader';
 import PrescriptionDialog from '../components/PrescriptionDialog';
 import html2canvas from 'html2canvas';
@@ -35,6 +36,7 @@ const Dashboard = () => {
     const ORDERS_PER_PAGE = 5;
     const [showMyVaccinations, setShowMyVaccinations] = useState(false);
     const [showHealthManagement, setShowHealthManagement] = useState(false);
+    const [showHealthAssistant, setShowHealthAssistant] = useState(false);
     const [vaccinationMaster, setVaccinationMaster] = useState([]);
     const [userVaccinationMap, setUserVaccinationMap] = useState({});
     const [vacSaving, setVacSaving] = useState({});
@@ -66,6 +68,7 @@ const Dashboard = () => {
     const [expandedDashboardOrder, setExpandedDashboardOrder] = useState(null);
     const [managedDashboardOrder, setManagedDashboardOrder] = useState(null);
     const [downloadingOrderId, setDownloadingOrderId] = useState(null);
+    const [reorderingDashboardId, setReorderingDashboardId] = useState(null);
     const [isEditingProfile, setIsEditingProfile] = useState(false);
     const [isProfileSaving, setIsProfileSaving] = useState(false);
     const [profileForm, setProfileForm] = useState({
@@ -157,6 +160,19 @@ const Dashboard = () => {
     const [healthExporting, setHealthExporting] = useState(false);
     const [healthActionMessage, setHealthActionMessage] = useState('');
     const [healthActionType, setHealthActionType] = useState('success');
+    const [healthAssistantInput, setHealthAssistantInput] = useState('');
+    const [healthAssistantLoading, setHealthAssistantLoading] = useState(false);
+    const [healthAssistantSuggestions, setHealthAssistantSuggestions] = useState([
+        'Help me with dosage routine',
+        'Do I have medicines expiring soon?',
+        'Check medicine interaction safety',
+    ]);
+    const [healthAssistantMessages, setHealthAssistantMessages] = useState([
+        {
+            role: 'assistant',
+            text: 'Hi, I am your AI Health Assistant. I can help with dosage routines, expiry planning, interactions, and medicine safety questions.',
+        },
+    ]);
     const [showAddTrackerForm, setShowAddTrackerForm] = useState(false);
     const [newTracker, setNewTracker] = useState({
         medicineName: '',
@@ -1062,6 +1078,63 @@ const Dashboard = () => {
         }
     };
 
+    const handleAskHealthAssistant = async (seedMessage) => {
+        const messageToSend = String(seedMessage || healthAssistantInput).trim();
+        const token = localStorage.getItem('medVisionToken');
+        if (!token || !messageToSend || healthAssistantLoading) return;
+
+        const historyPayload = healthAssistantMessages
+            .filter((msg) => msg?.role === 'user' || msg?.role === 'assistant')
+            .map((msg) => ({
+                role: msg.role,
+                content: String(msg.text || '').trim(),
+            }))
+            .filter((msg) => msg.content.length > 0)
+            .slice(-12);
+
+        setHealthAssistantMessages((prev) => [
+            ...prev,
+            { role: 'user', text: messageToSend },
+        ]);
+        setHealthAssistantInput('');
+
+        try {
+            setHealthAssistantLoading(true);
+            const response = await axios.post(`${baseURL}/health/assistant`, {
+                message: messageToSend,
+                history: historyPayload,
+            }, {
+                headers: { Authorization: `Bearer ${token}` },
+            });
+
+            const reply = response.data?.reply || 'I could not generate a response right now.';
+            const suggestions = Array.isArray(response.data?.suggestions) ? response.data.suggestions : [];
+
+            setHealthAssistantMessages((prev) => [
+                ...prev,
+                {
+                    role: 'assistant',
+                    text: reply,
+                },
+            ]);
+
+            if (suggestions.length) {
+                setHealthAssistantSuggestions(suggestions.slice(0, 4));
+            }
+        } catch (error) {
+            console.error('Error asking health assistant:', error.message);
+            setHealthAssistantMessages((prev) => [
+                ...prev,
+                {
+                    role: 'assistant',
+                    text: 'I could not process your request right now. Please try again in a moment.',
+                },
+            ]);
+        } finally {
+            setHealthAssistantLoading(false);
+        }
+    };
+
     const handleLogIntake = async (trackerId) => {
         const token = localStorage.getItem('medVisionToken');
         if (!token) return;
@@ -1147,6 +1220,7 @@ const Dashboard = () => {
         setShowMyReturns(false);
         setShowMyVaccinations(false);
         setShowHealthManagement(false);
+        setShowHealthAssistant(false);
         setShowProfile(false);
         setShowFeedback(false);
         setShowReviewForm(false);
@@ -1178,7 +1252,10 @@ const Dashboard = () => {
         }
     }, [location, navigate]);
 
-    const hasActivePanel = showPrescriptions || showNotifications || showRaiseQuery || showMyOrders || showMyReturns || showMyVaccinations || showHealthManagement || showProfile || showFeedback;
+    const hasActivePanel = showPrescriptions || showNotifications || showRaiseQuery || showMyOrders || showMyReturns || showMyVaccinations || showHealthManagement || showHealthAssistant || showProfile || showFeedback;
+    const activeHealthTrackerCount = healthTrackers.filter((tracker) => tracker?.isActive !== false).length;
+    const nearExpiryMedicineCount = expiryReminders.length;
+    const pendingQueryCount = userQueries.filter((query) => !/(resolved|closed|answered)/i.test(String(query?.status || ''))).length;
     const reviewedStoreIds = new Set(myReviews.map((review) => getReviewStoreId(review)).filter(Boolean));
     const availableStoresForNewReview = storesForReviews.filter((store) => !reviewedStoreIds.has(String(store._id)));
 
@@ -1314,6 +1391,32 @@ const Dashboard = () => {
                 });
         };
 
+        const handleDashboardReorder = async (order) => {
+            if (!order?.items?.length) return;
+            const userData = JSON.parse(localStorage.getItem('userData') || '{}');
+            const userId = userData?._id;
+            if (!userId) { toast.error('User not found. Please log in again.'); return; }
+            setReorderingDashboardId(order.id);
+            try {
+                const token = localStorage.getItem('medVisionToken');
+                await Promise.all(
+                    order.items.map((item) =>
+                        axios.post(
+                            `${baseURL}/updateorderedmedicines`,
+                            { id: userId, medicineId: item.medicineId || item._id, name: item.name, price: item.price, quantity: item.quantity || 1 },
+                            { headers: { Authorization: `Bearer ${token}` } }
+                        )
+                    )
+                );
+                toast.success('Items added to cart! Proceeding to checkout...');
+                setTimeout(() => navigate('/cart'), 1000);
+            } catch {
+                toast.error('Failed to reorder. Please try again.');
+            } finally {
+                setReorderingDashboardId(null);
+            }
+        };
+
         const downloadDashboardOrderInvoice = async (order) => {
                 if (!order?.id) return;
 
@@ -1325,7 +1428,6 @@ const Dashboard = () => {
 
                 try {
                         setDownloadingOrderId(order.id);
-
                         const invoiceContent = document.createElement('div');
                         invoiceContent.style.cssText = 'position: absolute; left: -9999px; width: 850px; background: white; padding: 40px; font-family: Arial, sans-serif;';
 
@@ -1400,12 +1502,13 @@ const Dashboard = () => {
     };
 
     const sidebarItems = [
-        { icon: Home,        text: "Dashboard",       isActive: !showPrescriptions && !showMyOrders && !showMyReturns && !showMyVaccinations && !showHealthManagement && !showProfile && !showNotifications && !showFeedback && !showRaiseQuery, iconBg: "bg-cyan-500/20",    color: "text-cyan-400",    onClick: () => { resetDashboardPanels(); setSidebarOpen(false); } },
+        { icon: Home,        text: "Dashboard",       isActive: !showPrescriptions && !showMyOrders && !showMyReturns && !showMyVaccinations && !showHealthManagement && !showHealthAssistant && !showProfile && !showNotifications && !showFeedback && !showRaiseQuery, iconBg: "bg-cyan-500/20",    color: "text-cyan-400",    onClick: () => { resetDashboardPanels(); setSidebarOpen(false); } },
         { icon: Pill,        text: "My Prescriptions", isActive: showPrescriptions,   iconBg: "bg-sky-500/20",     color: "text-sky-400",     onClick: () => { const n = !showPrescriptions;  resetDashboardPanels(); setShowPrescriptions(n); if (n) { fetchMyPrescriptionRequests(); } setSidebarOpen(false); } },
         { icon: ShoppingBag, text: "My Orders",        isActive: showMyOrders,        iconBg: "bg-emerald-500/20", color: "text-emerald-400", onClick: () => { const n = !showMyOrders;        resetDashboardPanels(); setShowMyOrders(n);        setSidebarOpen(false); } },
         { icon: RotateCcw,   text: "My Returns",       isActive: showMyReturns, iconBg: "bg-rose-500/20", color: "text-rose-300", onClick: () => { const n = !showMyReturns; resetDashboardPanels(); setShowMyReturns(n); setSidebarOpen(false); } },
         { icon: Syringe,     text: "My Vaccinations",  isActive: showMyVaccinations,  iconBg: "bg-teal-500/20",    color: "text-teal-400",    onClick: () => { const n = !showMyVaccinations;  resetDashboardPanels(); setShowMyVaccinations(n); if (n) { loadVaccinations(); } setSidebarOpen(false); } },
         { icon: Activity,    text: "Health Management", isActive: showHealthManagement, iconBg: "bg-indigo-500/20", color: "text-indigo-400", onClick: () => { const n = !showHealthManagement; resetDashboardPanels(); setShowHealthManagement(n); if (n) { loadHealthManagementData(); } setSidebarOpen(false); } },
+        { icon: Bot,         text: "AI Health Assistant", isActive: showHealthAssistant, iconBg: "bg-violet-500/20", color: "text-violet-400", onClick: () => { const n = !showHealthAssistant; resetDashboardPanels(); setShowHealthAssistant(n); if (n) { loadHealthManagementData(); } setSidebarOpen(false); } },
         { icon: UserCircle,  text: "Profile",          isActive: showProfile,         iconBg: "bg-slate-500/20",   color: "text-slate-300",   onClick: () => { const n = !showProfile;        resetDashboardPanels(); setShowProfile(n);         setSidebarOpen(false); } },
         { icon: Bell,        text: "Notifications",    isActive: showNotifications,   iconBg: "bg-amber-500/20",   color: "text-amber-400",   onClick: () => { const n = !showNotifications;   resetDashboardPanels(); setShowNotifications(n); if (!showNotifications) fetchNotificationPreferences();   setSidebarOpen(false); } },
         {
@@ -1723,11 +1826,14 @@ const Dashboard = () => {
                                         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
                                             {[
                                                 { icon: ShoppingBag, label: 'Track Orders', sub: 'Delivery status & items', color: 'text-orange-300', bg: 'bg-orange-400/10 border-orange-400/20', onClick: () => { resetDashboardPanels(); setShowMyOrders(true); } },
-                                                { icon: RotateCcw, label: 'My Returns', sub: 'Refunds, evidence, status', color: 'text-rose-300', bg: 'bg-rose-400/10 border-rose-400/20', onClick: () => { resetDashboardPanels(); setShowMyReturns(true); } },
                                                 { icon: Pill, label: 'Prescriptions', sub: 'Medicines at a glance', color: 'text-violet-300', bg: 'bg-violet-400/10 border-violet-400/20', onClick: () => { resetDashboardPanels(); setShowPrescriptions(true); fetchMyPrescriptionRequests(); } },
+                                                { icon: Activity, label: 'Health Management', sub: 'Track dosage & timeline', color: 'text-indigo-300', bg: 'bg-indigo-400/10 border-indigo-400/20', onClick: () => { resetDashboardPanels(); setShowHealthManagement(true); loadHealthManagementData(); } },
+                                                { icon: Bot, label: 'AI Health Assistant', sub: 'Grounded health guidance', color: 'text-violet-300', bg: 'bg-violet-400/10 border-violet-400/20', onClick: () => { resetDashboardPanels(); setShowHealthAssistant(true); loadHealthManagementData(); } },
                                                 { icon: Syringe, label: 'Vaccinations', sub: 'Immunization records', color: 'text-emerald-300', bg: 'bg-emerald-400/10 border-emerald-400/20', onClick: () => { resetDashboardPanels(); setShowMyVaccinations(true); loadVaccinations(); } },
                                                 { icon: Bell, label: 'Notifications', sub: 'Alerts and preferences', color: 'text-amber-300', bg: 'bg-amber-400/10 border-amber-400/20', onClick: () => { resetDashboardPanels(); setShowNotifications(true); fetchNotificationPreferences(); } },
                                                 { icon: MessageSquare, label: 'Raise a Query', sub: 'Pharmacy support', color: 'text-cyan-300', bg: 'bg-cyan-400/10 border-cyan-400/20', onClick: () => { resetDashboardPanels(); setShowRaiseQuery(true); setShowQueryForm(false); fetchMyQueries(); fetchStoresForReviews(); } },
+                                                { icon: RotateCcw, label: 'My Returns', sub: 'Refunds, evidence, status', color: 'text-rose-300', bg: 'bg-rose-400/10 border-rose-400/20', onClick: () => { resetDashboardPanels(); setShowMyReturns(true); } },
+                                                { icon: UserCircle, label: 'My Profile', sub: 'Personal details & address', color: 'text-slate-300', bg: 'bg-slate-400/10 border-slate-400/20', onClick: () => { resetDashboardPanels(); setShowProfile(true); } },
                                             ].map((card) => (
                                                 <button
                                                     key={card.label}
@@ -1739,6 +1845,22 @@ const Dashboard = () => {
                                                     <p className="mt-0.5 text-[11px] text-slate-400">{card.sub}</p>
                                                 </button>
                                             ))}
+                                        </div>
+
+                                        <div className="mt-4 overflow-hidden rounded-xl border border-cyan-400/20 bg-gradient-to-r from-cyan-500/15 via-blue-500/10 to-emerald-500/15">
+                                            <div className="relative px-4 py-3">
+                                                <div className="absolute inset-y-0 -left-1/3 w-1/3 bg-gradient-to-r from-transparent via-white/20 to-transparent animate-pulse" />
+                                                <div className="relative flex items-center justify-between gap-3">
+                                                    <p className="text-xs sm:text-sm font-semibold text-cyan-100 leading-relaxed">
+                                                        Stay consistent today: track doses on time, keep refills planned early, and use AI Assistant for personalized guidance from your health records.
+                                                    </p>
+                                                    <div className="hidden sm:flex items-center gap-1.5 shrink-0">
+                                                        <span className="h-2 w-2 rounded-full bg-cyan-300 animate-ping" />
+                                                        <span className="h-2 w-2 rounded-full bg-emerald-300 animate-pulse" />
+                                                        <span className="h-2 w-2 rounded-full bg-sky-300 animate-pulse" />
+                                                    </div>
+                                                </div>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
@@ -1760,6 +1882,9 @@ const Dashboard = () => {
                                             { label: 'Active Prescriptions', sub: 'In your account', value: prescriptionRequests.length, bg: 'bg-sky-50', text: 'text-sky-900', sub2: 'text-sky-600', val: 'text-sky-700', bar: 'bg-sky-400', emoji: '📋', onClick: () => { resetDashboardPanels(); setShowPrescriptions(true); fetchMyPrescriptionRequests(); } },
                                             { label: 'Orders in History', sub: 'Recent purchases', value: dashboardOrders.length, bg: 'bg-amber-50', text: 'text-amber-900', sub2: 'text-amber-600', val: 'text-amber-700', bar: 'bg-amber-400', emoji: '📦', onClick: () => { resetDashboardPanels(); setShowMyOrders(true); } },
                                             { label: 'Vaccination Records', sub: 'Immunization entries', value: `${vaccinatedCount}/${vaccinationMaster.length}`, bg: 'bg-emerald-50', text: 'text-emerald-900', sub2: 'text-emerald-600', val: 'text-emerald-700', bar: 'bg-emerald-400', emoji: '💉', onClick: () => { resetDashboardPanels(); setShowMyVaccinations(true); loadVaccinations(); } },
+                                            { label: 'Active Health Trackers', sub: 'Medicine routine monitor', value: activeHealthTrackerCount, bg: 'bg-indigo-50', text: 'text-indigo-900', sub2: 'text-indigo-600', val: 'text-indigo-700', bar: 'bg-indigo-400', emoji: '🧭', onClick: () => { resetDashboardPanels(); setShowHealthManagement(true); loadHealthManagementData(); } },
+                                            { label: 'Near Expiry Medicines', sub: 'Need refill attention', value: nearExpiryMedicineCount, bg: 'bg-rose-50', text: 'text-rose-900', sub2: 'text-rose-600', val: 'text-rose-700', bar: 'bg-rose-400', emoji: '⏳', onClick: () => { resetDashboardPanels(); setShowHealthManagement(true); loadHealthManagementData(); } },
+                                            { label: 'Pending Support Queries', sub: 'Awaiting updates', value: pendingQueryCount, bg: 'bg-cyan-50', text: 'text-cyan-900', sub2: 'text-cyan-600', val: 'text-cyan-700', bar: 'bg-cyan-400', emoji: '💬', onClick: () => { resetDashboardPanels(); setShowRaiseQuery(true); setShowQueryForm(false); fetchMyQueries(); fetchStoresForReviews(); } },
                                         ].map((row) => (
                                             <button key={row.label} onClick={row.onClick} className={`w-full flex items-center justify-between rounded-xl ${row.bg} px-4 py-3.5 group hover:brightness-95 transition-all duration-150`}>
                                                 <div className="flex items-center gap-3">
@@ -2914,15 +3039,16 @@ const Dashboard = () => {
                                                         No orders match your filters.
                                                     </div>
                                                 )}
-                                        {paged.map((order, index) => (
+                                        {paged.map((order, index) => {
+                                            const paymentMeta = getPaymentMeta(order.payment);
+                                            const relatedReturns = getOrderReturnRequests(order);
+                                            const latestReturn = getLatestOrderReturnRequest(order);
+                                            return (
                                             <div
                                                 key={`${order.id}-${index}`}
                                                 className="p-5 bg-white rounded-2xl shadow-sm border border-gray-200"
                                             >
                                                 {(() => {
-                                                    const paymentMeta = getPaymentMeta(order.payment);
-                                                    const relatedReturns = getOrderReturnRequests(order);
-                                                    const latestReturn = getLatestOrderReturnRequest(order);
                                                     return (
                                                 <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between lg:gap-6">
                                                     <div className="space-y-2 min-w-0 flex-1">
@@ -2975,21 +3101,31 @@ const Dashboard = () => {
                                                         <p className="text-lg font-bold text-gray-900">{formatUsd(order.totalAmount)}</p>
                                                     </div>
 
-                                                    <div className="flex w-full flex-col gap-2 sm:w-auto lg:w-48 lg:shrink-0">
+                                                    <div className="flex w-full flex-col gap-2 rounded-2xl border border-slate-200 bg-gradient-to-b from-slate-50 to-white p-2.5 sm:w-auto lg:w-52 lg:shrink-0 shadow-sm">
                                                         <button
-                                                            className="group inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:border-slate-300 hover:bg-slate-50 transition"
+                                                            className="group inline-flex items-center gap-2 rounded-xl border border-blue-200 bg-gradient-to-r from-blue-50 to-cyan-50 px-3 py-2 text-sm font-semibold text-blue-700 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-blue-300 hover:from-blue-100 hover:to-cyan-100"
                                                             onClick={() => navigate(`/tracking/${order.id}`)}
                                                             title="Track order"
                                                         >
-                                                            <Truck className="w-4 h-4 text-slate-600 group-hover:text-slate-800" />
+                                                            <Truck className="w-4 h-4 text-blue-600 group-hover:text-blue-700" />
                                                             <span>Track</span>
                                                         </button>
 
                                                         <button
-                                                            className={`group inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-sm font-medium transition ${
+                                                            className="group inline-flex items-center gap-2 rounded-xl border border-emerald-200 bg-gradient-to-r from-emerald-50 to-teal-50 px-3 py-2 text-sm font-semibold text-emerald-700 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-emerald-300 hover:from-emerald-100 hover:to-teal-100 disabled:opacity-60"
+                                                            onClick={() => handleDashboardReorder(order)}
+                                                            disabled={reorderingDashboardId === order.id}
+                                                            title="Reorder same items"
+                                                        >
+                                                            <RefreshCw className={`w-4 h-4 ${reorderingDashboardId === order.id ? 'animate-spin' : ''}`} />
+                                                            <span>{reorderingDashboardId === order.id ? 'Adding…' : 'Reorder'}</span>
+                                                        </button>
+
+                                                        <button
+                                                            className={`group inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-sm font-semibold shadow-sm transition-all duration-200 hover:-translate-y-0.5 ${
                                                                 managedDashboardOrder === order.id
-                                                                    ? 'border-blue-300 bg-blue-50 text-blue-700'
-                                                                    : 'border-slate-200 bg-white text-slate-700 hover:border-blue-200 hover:bg-blue-50/60'
+                                                                    ? 'border-cyan-300 bg-gradient-to-r from-cyan-100 to-sky-100 text-cyan-800'
+                                                                    : 'border-cyan-200 bg-gradient-to-r from-cyan-50 to-sky-50 text-cyan-700 hover:border-cyan-300 hover:from-cyan-100 hover:to-sky-100'
                                                             }`}
                                                             onClick={() => toggleDashboardOrderManagement(order.id)}
                                                             title="Manage order"
@@ -2999,7 +3135,7 @@ const Dashboard = () => {
                                                         </button>
 
                                                         <button
-                                                            className="group inline-flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-700 hover:bg-emerald-100 transition disabled:opacity-60"
+                                                            className="group inline-flex items-center gap-2 rounded-xl border border-emerald-200 bg-gradient-to-r from-emerald-50 to-teal-50 px-3 py-2 text-sm font-semibold text-emerald-700 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-emerald-300 hover:from-emerald-100 hover:to-teal-100 disabled:opacity-60"
                                                             onClick={() => downloadDashboardOrderInvoice(order)}
                                                             disabled={downloadingOrderId === order.id}
                                                             title="Download invoice"
@@ -3009,10 +3145,10 @@ const Dashboard = () => {
                                                         </button>
 
                                                         <button
-                                                            className={`group inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-sm font-medium transition ${
+                                                            className={`group inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-sm font-semibold shadow-sm transition-all duration-200 hover:-translate-y-0.5 ${
                                                                 expandedDashboardOrder === order.id
-                                                                    ? 'border-purple-300 bg-purple-50 text-purple-700'
-                                                                    : 'border-slate-200 bg-white text-slate-700 hover:border-purple-200 hover:bg-purple-50/60'
+                                                                    ? 'border-violet-300 bg-gradient-to-r from-violet-100 to-fuchsia-100 text-violet-800'
+                                                                    : 'border-violet-200 bg-gradient-to-r from-violet-50 to-fuchsia-50 text-violet-700 hover:border-violet-300 hover:from-violet-100 hover:to-fuchsia-100'
                                                             }`}
                                                             onClick={() => toggleDashboardOrderItems(order.id)}
                                                             title="View order items"
@@ -3031,7 +3167,7 @@ const Dashboard = () => {
                                                                     resetDashboardPanels();
                                                                     setShowMyReturns(true);
                                                                 }}
-                                                                className="inline-flex items-center gap-2 rounded-xl border border-rose-200 bg-white px-3 py-2 text-sm font-medium text-rose-700 hover:bg-rose-50 transition"
+                                                                className="inline-flex items-center gap-2 rounded-xl border border-rose-200 bg-gradient-to-r from-rose-50 to-pink-50 px-3 py-2 text-sm font-semibold text-rose-700 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-rose-300 hover:from-rose-100 hover:to-pink-100"
                                                             >
                                                                 <RotateCcw className="w-4 h-4" />
                                                                 View Returns
@@ -3039,7 +3175,7 @@ const Dashboard = () => {
                                                         ) : (
                                                             <button
                                                                 onClick={() => setReturnModalOrder(order)}
-                                                                className="inline-flex items-center gap-2 rounded-xl border border-rose-200 bg-white px-3 py-2 text-sm font-medium text-rose-700 hover:bg-rose-50 transition"
+                                                                className="inline-flex items-center gap-2 rounded-xl border border-amber-200 bg-gradient-to-r from-amber-50 to-orange-50 px-3 py-2 text-sm font-semibold text-amber-700 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-amber-300 hover:from-amber-100 hover:to-orange-100"
                                                             >
                                                                 <RotateCcw className="w-4 h-4" />
                                                                 Raise Refund Request
@@ -3153,7 +3289,8 @@ const Dashboard = () => {
                                                     </div>
                                                 )}
                                             </div>
-                                        ))}
+                                        );
+                                        })}
                                                 {totalPages > 1 && (
                                                     <div className="flex items-center justify-between pt-2">
                                                         <p className="text-xs text-gray-400">
@@ -3369,6 +3506,100 @@ const Dashboard = () => {
                                 </div>
                             </div>
                         )}
+
+                        {showHealthAssistant && (
+                            <div className="bg-white rounded-2xl shadow-lg p-6 space-y-6">
+                                <div className="flex items-center justify-between gap-3">
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-10 h-10 rounded-xl bg-violet-100 flex items-center justify-center">
+                                            <Bot className="text-violet-600" size={20} />
+                                        </div>
+                                        <div>
+                                            <h2 className="text-xl font-bold text-gray-800">AI Health Assistant</h2>
+                                            <p className="text-sm text-gray-500">Provider-backed, grounded guidance from your records with medical safety guardrails.</p>
+                                        </div>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setHealthAssistantMessages([
+                                                {
+                                                    role: 'assistant',
+                                                    text: 'Hi, I am your AI Health Assistant. I can help with dosage routines, refill planning, and medicine safety questions based on your records.',
+                                                },
+                                            ]);
+                                            setHealthAssistantSuggestions([
+                                                'Help me with dosage routine',
+                                                'Do I have medicines expiring soon?',
+                                                'Check medicine interaction safety',
+                                            ]);
+                                        }}
+                                        className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                                    >
+                                        Reset Chat
+                                    </button>
+                                </div>
+
+                                <div className="rounded-2xl border border-violet-200 bg-gradient-to-br from-violet-50 via-white to-cyan-50 p-4">
+                                    <div className="mt-1 max-h-72 overflow-y-auto space-y-2 pr-1">
+                                        {healthAssistantMessages.slice(-12).map((msg, index) => (
+                                            <div
+                                                key={`${msg.role}-${index}`}
+                                                className={`rounded-xl px-3 py-2 text-xs leading-relaxed whitespace-pre-line ${
+                                                    msg.role === 'assistant'
+                                                        ? 'bg-white border border-slate-200 text-slate-700'
+                                                        : 'ml-auto max-w-[90%] bg-violet-600 text-white'
+                                                }`}
+                                            >
+                                                {msg.text}
+                                            </div>
+                                        ))}
+                                        {healthAssistantLoading && (
+                                            <div className="inline-flex items-center gap-2 rounded-xl border border-violet-100 bg-violet-50 px-3 py-2 text-xs text-violet-700">
+                                                <Sparkles size={14} /> Thinking...
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    <div className="mt-3 flex flex-wrap gap-2">
+                                        {healthAssistantSuggestions.slice(0, 4).map((prompt) => (
+                                            <button
+                                                key={prompt}
+                                                type="button"
+                                                onClick={() => handleAskHealthAssistant(prompt)}
+                                                className="rounded-full border border-violet-200 bg-white px-3 py-1.5 text-[11px] font-medium text-violet-700 hover:bg-violet-100"
+                                            >
+                                                {prompt}
+                                            </button>
+                                        ))}
+                                    </div>
+
+                                    <div className="mt-3 flex items-center gap-2">
+                                        <input
+                                            value={healthAssistantInput}
+                                            onChange={(e) => setHealthAssistantInput(e.target.value)}
+                                            onKeyDown={(e) => {
+                                                if (e.key === 'Enter') {
+                                                    e.preventDefault();
+                                                    handleAskHealthAssistant();
+                                                }
+                                            }}
+                                            placeholder="Ask about dosage, missed dose, expiry, or interaction safety"
+                                            className="flex-1 rounded-xl border border-slate-300 px-3 py-2 text-sm"
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={() => handleAskHealthAssistant()}
+                                            disabled={healthAssistantLoading || !healthAssistantInput.trim()}
+                                            className="inline-flex items-center gap-1 rounded-xl bg-violet-600 px-3 py-2 text-sm font-semibold text-white hover:bg-violet-700 disabled:opacity-50"
+                                        >
+                                            <Send size={14} /> Send
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
                         {returnModalOrder && (
                             <ReturnRequestModal
                                 order={returnModalOrder}

@@ -1642,6 +1642,32 @@ const options = {
           responses: { 200: { description: "Interaction result" } },
         },
       },
+      "/api/health/assistant": {
+        post: {
+          tags: ["Health"],
+          summary: "Ask AI health assistant with grounded user context",
+          security: [{ bearerAuth: [] }],
+          requestBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  required: ["message"],
+                  properties: {
+                    message: { type: "string", example: "I missed my morning dose, what should I do?" },
+                  },
+                },
+              },
+            },
+          },
+          responses: {
+            200: { description: "Assistant response" },
+            400: { description: "Bad request" },
+            401: { description: "Unauthorized" },
+          },
+        },
+      },
       "/api/health/timeline": {
         get: {
           tags: ["Health"],

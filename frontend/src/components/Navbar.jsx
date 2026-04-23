@@ -2,10 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { baseURL } from '../main';
 import axios from 'axios';
-import { Menu, X, LogOut, LayoutDashboard, LogIn, UserPlus, Pill, ShieldCheck, ShoppingBag, FileText, Sparkles, Moon, Sun, Globe } from 'lucide-react';
+import { Menu, X, LogOut, LayoutDashboard, LogIn, UserPlus, Pill, ShieldCheck, ShoppingBag, FileText, Sparkles, Moon, Sun } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
-import { useLanguage } from '../contexts/LanguageContext';
-
 const Navbar = () => {
     const navigate = useNavigate();
     const location = useLocation();
@@ -13,8 +11,6 @@ const Navbar = () => {
     const userType = localStorage.getItem('medVisionUserType');
     const navbarRef = useRef(null);
     const { darkMode, toggleDarkMode } = useTheme();
-    const { language, changeLanguage, SUPPORTED_LANGUAGES } = useLanguage();
-    const langMenuRef = useRef(null);
 
     const [isLoggedIn, setIsLoggedIn] = useState(false);
     const [adminData, setAdminData] = useState(null);
@@ -22,7 +18,6 @@ const Navbar = () => {
     const [currentTime, setCurrentTime] = useState(new Date());
     const [menuOpen, setMenuOpen] = useState(false);
     const [showLogoutModal, setShowLogoutModal] = useState(false);
-    const [showLangMenu, setShowLangMenu] = useState(false);
 
 
     const scrollToElement = (id) => {
@@ -39,17 +34,6 @@ const Navbar = () => {
             });
         }
     };
-
-    // Close language menu on outside click
-    useEffect(() => {
-        const handleClick = (e) => {
-            if (langMenuRef.current && !langMenuRef.current.contains(e.target)) {
-                setShowLangMenu(false);
-            }
-        };
-        document.addEventListener('mousedown', handleClick);
-        return () => document.removeEventListener('mousedown', handleClick);
-    }, []);
 
     const navigateToHomeSection = (sectionId) => {
         if (location.pathname === '/') {
@@ -375,6 +359,8 @@ const Navbar = () => {
                                     : <Moon className="w-4 h-4 text-slate-600" />
                                 }
                             </button>
+
+
                         </div>
 
                     </div>
@@ -512,17 +498,7 @@ const Navbar = () => {
                                     {darkMode ? 'Light Mode' : 'Dark Mode'}
                                 </button>
 
-                                <div className="flex-1">
-                                    <select
-                                        value={language}
-                                        onChange={(e) => changeLanguage(e.target.value)}
-                                        className="w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-white text-sm font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-cyan-400"
-                                    >
-                                        {SUPPORTED_LANGUAGES.map((lang) => (
-                                            <option key={lang.code} value={lang.code}>{lang.flag} {lang.name}</option>
-                                        ))}
-                                    </select>
-                                </div>
+
 
                             </div>
 

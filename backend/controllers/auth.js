@@ -28,6 +28,7 @@ const {
     deleteFileFromS3,
     getSignedS3Url,
 } = require("../utils/s3Service");
+const { getHealthAssistantResponse } = require("../utils/aiHealthAssistantService");
 const jwt = require("jsonwebtoken");
 const bcrypt = require('bcrypt');
 
@@ -5103,6 +5104,44 @@ const checkDrugInteractions = async (req, res) => {
     }
 };
 
+const askHealthAssistant = async (req, res) => {
+    try {
+        const userId = req.user?._id;
+        const message = String(req.body?.message || '').trim();
+        const history = Array.isArray(req.body?.history)
+            ? req.body.history
+                .filter((item) => item && typeof item === 'object')
+                .map((item) => ({ role: item.role, content: item.content }))
+            : [];
+
+        if (!userId) {
+            return res.status(StatusCodes.UNAUTHORIZED).json({ message: 'Unauthorized' });
+        }
+
+        if (!message) {
+            return res.status(StatusCodes.BAD_REQUEST).json({ message: 'message is required' });
+        }
+
+        const assistant = await getHealthAssistantResponse({ userId, message, history });
+
+        return res.status(StatusCodes.OK).json({
+            success: true,
+            reply: assistant.reply,
+            disclaimer: assistant.disclaimer,
+            suggestions: assistant.suggestions,
+            context: {
+                trackerCount: assistant.context?.trackerCount || 0,
+                nearExpiryCount: assistant.context?.nearExpiryCount || 0,
+            },
+            provider: assistant.provider,
+            safetyFlags: assistant.safetyFlags || [],
+        });
+    } catch (error) {
+        console.error('askHealthAssistant error:', error.message);
+        return res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({ message: 'Failed to process health assistant request' });
+    }
+};
+
 const getMedicalTimeline = async (req, res) => {
     try {
         const userId = req.user?._id;
@@ -6888,7 +6927,7 @@ module.exports = {
     createReview, updateReview, deleteReview, getPublicReviews, getStoreReviews, getMyReviews, getMyStoreReviews, replyToReview,
     uploadPrescriptionForAutoFill, extractMedicinesFromUploadedPrescription, getUserPrescriptionUploads, addExtractedMedicinesToCart,
     getWishlist, addToWishlist, removeFromWishlist,
-    createMedicineTracker, getMedicineTrackers, logMedicineIntake, checkDrugInteractions, getMedicalTimeline, exportHealthRecordsPdf,
+    createMedicineTracker, getMedicineTrackers, logMedicineIntake, checkDrugInteractions, askHealthAssistant, getMedicalTimeline, exportHealthRecordsPdf,
     getStoreRolePermissions,
     createStaffPerformanceRecord, getStaffPerformanceRecords,
     createStaffAttendanceRecord, getStaffAttendanceRecords, checkInStaffAttendance, checkOutStaffAttendance,

@@ -2,16 +2,16 @@ import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { baseURL } from '../main';
 import { useNavigate } from 'react-router-dom';
-import { Package, Truck, ChevronDown, ChevronUp, ClipboardList, CreditCard, Search, RotateCcw } from 'lucide-react';
+import { Package, Truck, ChevronDown, ChevronUp, ClipboardList, CreditCard, Search, RotateCcw, RefreshCw } from 'lucide-react';
 import CheckoutFooter from '../components/CheckoutFooter';
 import StatusBadge from '../components/StatusBadge';
 import ReturnRequestModal from '../components/ReturnRequestModal';
+import toast from 'react-hot-toast';
 
 const Orders = () => {
   const [userdata, setUserData] = useState([]);
   const [orders, setOrders] = useState([]);
   const navigate = useNavigate();
-
   const fetchDataFromApi = async () => {
     try {
       const token = localStorage.getItem('medVisionToken');
@@ -47,6 +47,7 @@ const Orders = () => {
   const [orderStatusFilter, setOrderStatusFilter] = useState('all');
   const [orderSearchQuery, setOrderSearchQuery] = useState('');
   const [ordersPage, setOrdersPage] = useState(1);
+  const [reorderingId, setReorderingId] = useState(null);
   const ORDERS_PER_PAGE = 5;
   const formatUSD = (value) =>
     new Intl.NumberFormat('en-US', {
@@ -60,6 +61,31 @@ const Orders = () => {
 
   const handletracking = (id) => {
     navigate(`/tracking/${id}`);
+  };
+
+  const handleReorder = async (order) => {
+    if (!order.items?.length) return;
+    const userId = userdata?._id;
+    if (!userId) { toast.error('User not found. Please log in again.'); return; }
+    setReorderingId(order.orderId);
+    try {
+      const token = localStorage.getItem('medVisionToken');
+      await Promise.all(
+        order.items.map((item) =>
+          axios.post(
+            `${baseURL}/updateorderedmedicines`,
+            { id: userId, medicineId: item.medicineId || item._id, name: item.name, price: item.price, quantity: item.quantity || 1 },
+            { headers: { Authorization: `Bearer ${token}` } }
+          )
+        )
+      );
+      toast.success('Items added to cart! Proceeding to checkout...');
+      setTimeout(() => navigate('/cart'), 1000);
+    } catch {
+      toast.error('Failed to reorder. Please try again.');
+    } finally {
+      setReorderingId(null);
+    }
   };
 
   const getOrderAmount = (order) => {
@@ -147,19 +173,28 @@ const Orders = () => {
             />
           </div>
           <div className="flex gap-1.5 flex-wrap">
-            {['all', 'Order Placed', 'Packed', 'Out for Delivery', 'Delivered'].map(s => (
-              <button
-                key={s}
-                onClick={() => { setOrderStatusFilter(s); setOrdersPage(1); }}
-                className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition whitespace-nowrap ${
-                  orderStatusFilter === s
-                    ? 'bg-blue-600 text-white border-blue-600'
-                    : 'bg-white text-gray-600 border-gray-200 hover:border-blue-300 hover:text-blue-600'
-                }`}
-              >
-                {s === 'all' ? 'All Orders' : s}
-              </button>
-            ))}
+            {['all', 'Order Placed', 'Packed', 'Out for Delivery', 'Delivered'].map(s => {
+              const labelMap = {
+                all: 'All Orders',
+                'Order Placed': 'Order Placed',
+                Packed: 'Packed',
+                'Out for Delivery': 'Out for Delivery',
+                Delivered: 'Delivered',
+              };
+              return (
+                <button
+                  key={s}
+                  onClick={() => { setOrderStatusFilter(s); setOrdersPage(1); }}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition whitespace-nowrap ${
+                    orderStatusFilter === s
+                      ? 'bg-blue-600 text-white border-blue-600'
+                      : 'bg-white text-gray-600 border-gray-200 hover:border-blue-300 hover:text-blue-600'
+                  }`}
+                >
+                  {labelMap[s]}
+                </button>
+              );
+            })}
           </div>
         </div>
 
@@ -209,7 +244,7 @@ const Orders = () => {
                       <p className="text-sm text-gray-700">
                         <span className="font-medium">Customer:</span> {userdata.name || 'N/A'}
                                              <p className="text-sm text-gray-700">
-                                               <span className="font-medium">🏪 Store:</span> {order.storeName || 'N/A'}
+                                               <span className="font-medium">🏥 Store:</span> {order.storeName || 'N/A'}
                                              </p>
                       </p>
                       <p className="text-sm text-gray-700 inline-flex items-center gap-1.5">
@@ -225,32 +260,38 @@ const Orders = () => {
                       <p className="text-lg font-bold text-gray-900">{formatUSD(amount)}</p>
                     </div>
 
-                    <div className="flex items-center gap-3 flex-wrap">
+                    <div className="flex flex-col gap-1.5 w-full sm:w-36 shrink-0">
                       <button
-                        className="bg-blue-600 hover:bg-blue-700 text-white py-2.5 px-4 rounded-xl shadow transition-colors"
+                        className="inline-flex items-center gap-2 rounded-xl border border-blue-200 bg-gradient-to-r from-blue-50 to-cyan-50 px-3 py-2 text-xs font-semibold text-blue-700 shadow-sm transition-all hover:-translate-y-0.5 hover:from-blue-100 hover:to-cyan-100 w-full"
                         onClick={() => handletracking(order.orderId)}
                       >
+                        <Truck className="w-3.5 h-3.5 shrink-0" />
                         Track Order
                       </button>
                       <button
-                        className="inline-flex items-center gap-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 py-2.5 px-4 rounded-xl shadow-sm transition-colors text-sm font-semibold"
+                        className="inline-flex items-center gap-2 rounded-xl border border-emerald-200 bg-gradient-to-r from-emerald-50 to-teal-50 px-3 py-2 text-xs font-semibold text-emerald-700 shadow-sm transition-all hover:-translate-y-0.5 hover:from-emerald-100 hover:to-teal-100 w-full disabled:opacity-60"
+                        onClick={() => handleReorder(order)}
+                        disabled={reorderingId === order.orderId}
+                        title="Add these items to your cart?"
+                      >
+                        <RefreshCw className={`w-3.5 h-3.5 shrink-0 ${reorderingId === order.orderId ? 'animate-spin' : ''}`} />
+                        Reorder
+                      </button>
+                      <button
+                        className="inline-flex items-center gap-2 rounded-xl border border-rose-200 bg-gradient-to-r from-rose-50 to-pink-50 px-3 py-2 text-xs font-semibold text-rose-700 shadow-sm transition-all hover:-translate-y-0.5 hover:from-rose-100 hover:to-pink-100 w-full"
                         onClick={() => setReturnModalOrder(order)}
                       >
-                        <RotateCcw className="w-4 h-4" />
+                        <RotateCcw className="w-3.5 h-3.5 shrink-0" />
                         Return / Refund
                       </button>
                       <button
-                        className="bg-gray-100 hover:bg-gray-200 text-gray-800 py-2.5 px-4 rounded-xl shadow transition-colors inline-flex items-center gap-1.5"
+                        className="inline-flex items-center gap-2 rounded-xl border border-violet-200 bg-gradient-to-r from-violet-50 to-fuchsia-50 px-3 py-2 text-xs font-semibold text-violet-700 shadow-sm transition-all hover:-translate-y-0.5 hover:from-violet-100 hover:to-fuchsia-100 w-full"
                         onClick={() => toggleDropdown(order.orderId)}
                       >
                         {expandedOrder === order.orderId ? (
-                          <>
-                            <ChevronUp className="w-4 h-4" /> Hide Items
-                          </>
+                          <><ChevronUp className="w-3.5 h-3.5 shrink-0" /> Hide Items</>
                         ) : (
-                          <>
-                            <ChevronDown className="w-4 h-4" /> View Items
-                          </>
+                          <><ChevronDown className="w-3.5 h-3.5 shrink-0" /> View Items</>
                         )}
                       </button>
                     </div>

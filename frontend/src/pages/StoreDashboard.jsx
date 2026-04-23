@@ -39,6 +39,7 @@ import {
   Eye,
   RefreshCw,
   RotateCcw,
+  FileDown,
 } from 'lucide-react';
 
 const MEDICINE_TYPE_OPTIONS = [
@@ -444,6 +445,68 @@ const StoreDashboard = () => {
   })();
 
   const maxMonthRevenue = monthWiseRevenue.reduce((max, item) => Math.max(max, item.revenue), 0);
+
+  // ── Analytics: Top-selling medicines ──────────────────────────────────────
+  const topSellingMedicines = useMemo(() => {
+    const map = {};
+    orders.forEach((order) => {
+      (order.items || []).forEach((item) => {
+        const name = String(item.name || '').trim() || 'Unknown';
+        if (!map[name]) map[name] = { name, totalQty: 0, totalRevenue: 0 };
+        map[name].totalQty += Number(item.quantity) || 1;
+        map[name].totalRevenue += (Number(item.price) || 0) * (Number(item.quantity) || 1);
+      });
+    });
+    return Object.values(map).sort((a, b) => b.totalQty - a.totalQty).slice(0, 10);
+  }, [orders]);
+  const maxTopMedicineQty = topSellingMedicines.reduce((max, m) => Math.max(max, m.totalQty), 0);
+
+  // ── Analytics: Repeat purchase rate ───────────────────────────────────────
+  const repeatPurchaseMetrics = useMemo(() => {
+    const customerOrderCount = {};
+    orders.forEach((order) => {
+      const cust = String(order.customer || order.userId || '').trim();
+      if (cust) customerOrderCount[cust] = (customerOrderCount[cust] || 0) + 1;
+    });
+    const totalCustomers = Object.keys(customerOrderCount).length;
+    const repeatCustomers = Object.values(customerOrderCount).filter((c) => c > 1).length;
+    const rate = totalCustomers > 0 ? Math.round((repeatCustomers / totalCustomers) * 100) : 0;
+    return { totalCustomers, repeatCustomers, newCustomers: totalCustomers - repeatCustomers, rate };
+  }, [orders]);
+
+  // ── Analytics: Medicine category breakdown ────────────────────────────────
+  const medicineCategoryBreakdown = useMemo(() => {
+    const map = {};
+    (inventoryItems || []).forEach((item) => {
+      const type = String(item.type || 'Other').trim() || 'Other';
+      if (!map[type]) map[type] = { type, count: 0, totalStock: 0, totalValue: 0 };
+      map[type].count += 1;
+      map[type].totalStock += Number(item.stock) || 0;
+      map[type].totalValue += (Number(item.stock) || 0) * (Number(item.price) || 0);
+    });
+    return Object.values(map).sort((a, b) => b.count - a.count);
+  }, [inventoryItems]);
+  const maxCategoryCount = medicineCategoryBreakdown.reduce((max, c) => Math.max(max, c.count), 0);
+
+  // ── Analytics: Customer acquisition (new customers this vs last month) ────
+  const customerAcquisitionMetrics = useMemo(() => {
+    const now = new Date();
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const firstOrderByCustomer = {};
+    orders.forEach((order) => {
+      const cust = String(order.customer || order.userId || '').trim();
+      if (!cust) return;
+      const orderDate = new Date(order.createdAt);
+      if (!firstOrderByCustomer[cust] || orderDate < firstOrderByCustomer[cust]) {
+        firstOrderByCustomer[cust] = orderDate;
+      }
+    });
+    const newThisMonth = Object.values(firstOrderByCustomer).filter((d) => d >= monthStart).length;
+    const newLastMonth = Object.values(firstOrderByCustomer).filter((d) => d >= lastMonthStart && d < monthStart).length;
+    const growth = newLastMonth > 0 ? Math.round(((newThisMonth - newLastMonth) / newLastMonth) * 100) : (newThisMonth > 0 ? 100 : 0);
+    return { newThisMonth, newLastMonth, growth };
+  }, [orders]);
 
   const handleSelectOrder = (orderId) => {
     setSelectedOrderId(orderId);
@@ -6663,155 +6726,442 @@ const StoreDashboard = () => {
             )}
 
             {selectedSection === 'reports' && (
-              <div className="space-y-6">
-                <div className="rounded-3xl border border-slate-200 bg-gradient-to-r from-slate-900 via-slate-800 to-blue-900 p-6 text-white shadow-sm">
-                  <div className="flex items-center gap-3">
-                    <BarChart3 className="text-cyan-300" size={24} />
-                    <div>
-                      <h2 className="text-xl font-semibold">Revenue Command Center</h2>
-                      <p className="text-sm text-slate-200">Precise financial snapshot for Store Admin.</p>
+              <div className="space-y-8">
+
+                {/* ══ HERO HEADER ════════════════════════════════════════════════ */}
+                <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-slate-950 via-blue-950 to-indigo-900 p-8 text-white shadow-xl">
+                  {/* decorative blobs */}
+                  <div className="pointer-events-none absolute -right-16 -top-16 h-64 w-64 rounded-full bg-blue-500/20 blur-3xl" />
+                  <div className="pointer-events-none absolute -bottom-12 left-1/3 h-48 w-48 rounded-full bg-cyan-500/15 blur-2xl" />
+                  <div className="relative">
+                    <div className="mb-1 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1 text-xs font-semibold tracking-widest uppercase text-cyan-300">
+                      <BarChart3 size={12} /> Analytics &amp; Reports
                     </div>
+                    <h2 className="mt-3 text-3xl font-black tracking-tight">Revenue Command Center</h2>
+                    <p className="mt-1 max-w-lg text-sm text-slate-300">Live financial intelligence for your store — revenue, orders, growth, and more.</p>
                   </div>
-                  <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                    <div className="rounded-2xl border border-white/15 bg-white/10 p-4">
-                      <p className="text-xs uppercase tracking-wide text-cyan-100">Month-wise Revenue</p>
-                      <p className="mt-2 text-2xl font-bold text-white">{formatUSD(revenueSummary.monthly)}</p>
+                  <div className="relative mt-7 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                    <div className="group rounded-2xl border border-white/10 bg-white/8 p-5 transition hover:bg-white/12">
+                      <p className="text-[11px] font-semibold uppercase tracking-widest text-cyan-300">This Month</p>
+                      <p className="mt-2 text-3xl font-black text-white">{formatUSD(revenueSummary.monthly)}</p>
+                      <p className="mt-1 text-xs text-slate-400">Month-wise revenue</p>
                     </div>
-                    <div className="rounded-2xl border border-white/15 bg-white/10 p-4">
-                      <p className="text-xs uppercase tracking-wide text-cyan-100">Overall Orders Revenue</p>
-                      <p className="mt-2 text-2xl font-bold text-white">{formatUSD(reportTotalRevenue)}</p>
+                    <div className="group rounded-2xl border border-white/10 bg-white/8 p-5 transition hover:bg-white/12">
+                      <p className="text-[11px] font-semibold uppercase tracking-widest text-emerald-300">All-Time</p>
+                      <p className="mt-2 text-3xl font-black text-white">{formatUSD(reportTotalRevenue)}</p>
+                      <p className="mt-1 text-xs text-slate-400">Total orders revenue</p>
                     </div>
-                    <div className="rounded-2xl border border-white/15 bg-white/10 p-4">
-                      <p className="text-xs uppercase tracking-wide text-cyan-100">Today&apos;s Revenue</p>
-                      <p className="mt-2 text-2xl font-bold text-white">{formatUSD(revenueSummary.revenueToday)}</p>
+                    <div className="group rounded-2xl border border-white/10 bg-white/8 p-5 transition hover:bg-white/12">
+                      <p className="text-[11px] font-semibold uppercase tracking-widest text-violet-300">Today</p>
+                      <p className="mt-2 text-3xl font-black text-white">{formatUSD(revenueSummary.revenueToday)}</p>
+                      <p className="mt-1 text-xs text-slate-400">Today&apos;s revenue</p>
                     </div>
-                    <div className="rounded-2xl border border-white/15 bg-white/10 p-4">
-                      <p className="text-xs uppercase tracking-wide text-cyan-100">Today&apos;s Orders</p>
-                      <p className="mt-2 text-2xl font-bold text-white">{todayOrdersCount}</p>
+                    <div className="group rounded-2xl border border-white/10 bg-white/8 p-5 transition hover:bg-white/12">
+                      <p className="text-[11px] font-semibold uppercase tracking-widest text-amber-300">Today</p>
+                      <p className="mt-2 text-3xl font-black text-white">{todayOrdersCount}</p>
+                      <p className="mt-1 text-xs text-slate-400">Orders placed today</p>
                     </div>
                   </div>
                 </div>
 
-                <div className="grid gap-6 xl:grid-cols-[1.25fr_0.9fr]">
-                  <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-                    <div className="mb-4 flex items-center justify-between">
-                      <h3 className="text-lg font-semibold text-slate-900">Monthly Order Revenue Trend</h3>
-                      <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">Last {monthWiseRevenue.length || 0} months</span>
-                    </div>
+                {/* ══ SECTION LABEL ══════════════════════════════════════════════ */}
+                <div className="flex items-center gap-3">
+                  <span className="h-px flex-1 bg-slate-200" />
+                  <span className="rounded-full border border-slate-200 bg-white px-4 py-1 text-xs font-bold uppercase tracking-widest text-slate-500">Revenue Breakdown</span>
+                  <span className="h-px flex-1 bg-slate-200" />
+                </div>
 
+                {/* ══ REVENUE TREND + KPI SIDEBAR ════════════════════════════════ */}
+                <div className="grid gap-6 xl:grid-cols-[1fr_320px]">
+                  {/* Monthly trend */}
+                  <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+                    <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+                      <div>
+                        <h3 className="text-lg font-bold text-slate-900">Monthly Revenue Trend</h3>
+                        <p className="text-sm text-slate-500">Order revenue per calendar month</p>
+                      </div>
+                      <span className="rounded-full border border-blue-100 bg-blue-50 px-3 py-1 text-xs font-bold text-blue-700">
+                        {monthWiseRevenue.length || 0} months
+                      </span>
+                    </div>
                     {monthWiseRevenue.length === 0 ? (
-                      <div className="rounded-2xl border border-slate-200 bg-slate-50 p-8 text-center text-sm text-slate-500">
+                      <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-10 text-center text-sm text-slate-500">
                         No order data available for monthly breakdown yet.
                       </div>
                     ) : (
                       <div className="space-y-3">
-                        {monthWiseRevenue.map((month) => (
-                          <div key={month.key} className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
-                            <div className="mb-2 flex items-center justify-between gap-3">
-                              <p className="text-sm font-semibold text-slate-900">{month.label}</p>
-                              <p className="text-sm font-semibold text-slate-900">{formatUSD(month.revenue)}</p>
+                        {monthWiseRevenue.map((month, i) => {
+                          const pct = maxMonthRevenue > 0 ? Math.max(8, Math.round((month.revenue / maxMonthRevenue) * 100)) : 0;
+                          const isTop = i === 0;
+                          return (
+                            <div key={month.key} className={`rounded-2xl p-4 transition ${isTop ? 'border border-sky-200 bg-sky-50' : 'border border-slate-100 bg-slate-50 hover:bg-slate-100'}`}>
+                              <div className="mb-2 flex items-center justify-between gap-3">
+                                <div className="flex items-center gap-2 min-w-0">
+                                  {isTop && <span className="shrink-0 rounded-full bg-sky-600 px-2 py-0.5 text-[10px] font-bold text-white">TOP</span>}
+                                  <p className="text-sm font-bold text-slate-900 truncate">{month.label}</p>
+                                </div>
+                                <p className="shrink-0 text-sm font-bold text-slate-900">{formatUSD(month.revenue)}</p>
+                              </div>
+                              <div className="h-3 overflow-hidden rounded-full bg-white/70 shadow-inner">
+                                <div
+                                  className={`h-full rounded-full ${isTop ? 'bg-gradient-to-r from-sky-500 to-cyan-400' : 'bg-gradient-to-r from-slate-400 to-slate-300'}`}
+                                  style={{ width: `${pct}%` }}
+                                />
+                              </div>
+                              <p className="mt-2 text-xs text-slate-500">{month.orders} orders</p>
                             </div>
-                            <div className="h-2 overflow-hidden rounded-full bg-slate-200">
-                              <div
-                                className="h-full rounded-full bg-gradient-to-r from-sky-500 to-cyan-500"
-                                style={{ width: `${maxMonthRevenue > 0 ? Math.max(8, Math.round((month.revenue / maxMonthRevenue) * 100)) : 0}%` }}
-                              />
-                            </div>
-                            <p className="mt-2 text-xs text-slate-500">Orders: {month.orders}</p>
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     )}
                   </div>
 
-                  <div className="space-y-4">
-                    <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-                      <p className="text-xs uppercase tracking-wide text-slate-500">Order Health</p>
-                      <p className="mt-2 text-2xl font-bold text-slate-900">{reportCompletionRate}%</p>
-                      <p className="mt-1 text-sm text-slate-600">Completion rate</p>
-                      <p className="mt-3 text-sm text-slate-700">{reportCompletedOrders} completed / {reportOrdersTotal} total orders</p>
+                  {/* KPI sidebar */}
+                  <div className="flex flex-col gap-4">
+                    <div className="rounded-3xl border border-emerald-200 bg-gradient-to-br from-emerald-50 to-teal-50 p-5 shadow-sm">
+                      <div className="flex items-center gap-3 mb-3">
+                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-600 text-white">
+                          <CheckCircle2 size={18} />
+                        </div>
+                        <p className="text-xs font-bold uppercase tracking-wide text-emerald-700">Order Health</p>
+                      </div>
+                      <p className="text-4xl font-black text-emerald-800">{reportCompletionRate}%</p>
+                      <p className="mt-1 text-xs font-medium text-emerald-600">completion rate</p>
+                      <div className="mt-3 h-2 overflow-hidden rounded-full bg-emerald-200">
+                        <div className="h-full rounded-full bg-emerald-500" style={{ width: `${reportCompletionRate}%` }} />
+                      </div>
+                      <p className="mt-2 text-xs text-emerald-700">{reportCompletedOrders} completed / {reportOrdersTotal} total</p>
                     </div>
 
-                    <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-                      <p className="text-xs uppercase tracking-wide text-slate-500">Average Order Value</p>
-                      <p className="mt-2 text-2xl font-bold text-slate-900">{formatUSD(reportAverageOrderValue)}</p>
-                      <p className="mt-1 text-sm text-slate-600">Across all fulfilled and active orders</p>
+                    <div className="rounded-3xl border border-violet-200 bg-gradient-to-br from-violet-50 to-fuchsia-50 p-5 shadow-sm">
+                      <div className="flex items-center gap-3 mb-3">
+                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-violet-600 text-white">
+                          <ShoppingBag size={18} />
+                        </div>
+                        <p className="text-xs font-bold uppercase tracking-wide text-violet-700">Avg Order Value</p>
+                      </div>
+                      <p className="text-4xl font-black text-violet-800">{formatUSD(reportAverageOrderValue)}</p>
+                      <p className="mt-1 text-xs font-medium text-violet-600">per fulfilled order</p>
                     </div>
 
-                    <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-                      <p className="text-xs uppercase tracking-wide text-slate-500">Week-over-Week Growth</p>
-                      <p className={`mt-2 text-2xl font-bold ${revenueSummary.growth >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                    <div className={`rounded-3xl border p-5 shadow-sm ${revenueSummary.growth >= 0 ? 'border-emerald-200 bg-gradient-to-br from-emerald-50 to-sky-50' : 'border-rose-200 bg-gradient-to-br from-rose-50 to-orange-50'}`}>
+                      <div className="flex items-center gap-3 mb-3">
+                        <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-white ${revenueSummary.growth >= 0 ? 'bg-emerald-600' : 'bg-rose-600'}`}>
+                          <TrendingUp size={18} />
+                        </div>
+                        <p className={`text-xs font-bold uppercase tracking-wide ${revenueSummary.growth >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>Week-over-Week</p>
+                      </div>
+                      <p className={`text-4xl font-black ${revenueSummary.growth >= 0 ? 'text-emerald-800' : 'text-rose-700'}`}>
                         {revenueSummary.growth >= 0 ? '+' : ''}{revenueSummary.growth}%
                       </p>
-                      <p className="mt-1 text-sm text-slate-600">Compared with the previous week</p>
+                      <p className={`mt-1 text-xs font-medium ${revenueSummary.growth >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>vs previous week</p>
                     </div>
                   </div>
                 </div>
 
+                {/* ══ SECTION LABEL ══════════════════════════════════════════════ */}
+                <div className="flex items-center gap-3">
+                  <span className="h-px flex-1 bg-slate-200" />
+                  <span className="rounded-full border border-slate-200 bg-white px-4 py-1 text-xs font-bold uppercase tracking-widest text-slate-500">Operational Reports</span>
+                  <span className="h-px flex-1 bg-slate-200" />
+                </div>
+
+                {/* ══ DOWNLOADABLE REPORTS ════════════════════════════════════════ */}
                 <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-                  <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                  <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
                     <div>
-                      <h3 className="text-lg font-semibold text-slate-900">Downloadable Operational Reports</h3>
-                      <p className="text-sm text-slate-500">Generate and download operational CSV files for daily close, prescription turnaround, and inventory risk.</p>
+                      <h3 className="text-lg font-bold text-slate-900">Downloadable Operational Reports</h3>
+                      <p className="mt-0.5 text-sm text-slate-500">Generate and export CSV snapshots for your operations team.</p>
                     </div>
                     <button
                       type="button"
                       onClick={loadReportSnapshots}
                       disabled={reportSnapshotsLoading}
-                      className="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                      className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
                     >
-                      {reportSnapshotsLoading ? 'Refreshing...' : 'Refresh Report Data'}
+                      <RefreshCw size={14} className={reportSnapshotsLoading ? 'animate-spin' : ''} />
+                      {reportSnapshotsLoading ? 'Refreshing...' : 'Refresh Data'}
                     </button>
                   </div>
 
-                  <div className="grid gap-4 lg:grid-cols-3">
-                    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                      <p className="text-xs font-semibold uppercase text-slate-600">Daily Close Report</p>
-                      <p className="mt-2 text-sm text-slate-700">Orders: <span className="font-semibold text-slate-900">{reportSnapshots.dailyClose?.totalOrders ?? 0}</span></p>
-                      <p className="text-sm text-slate-700">Revenue: <span className="font-semibold text-slate-900">{formatUSD(reportSnapshots.dailyClose?.totalRevenue ?? 0)}</span></p>
-                      <p className="text-sm text-slate-700">Rejections: <span className="font-semibold text-slate-900">{reportSnapshots.dailyClose?.rejectedPrescriptions ?? 0}</span></p>
-                      <p className="text-sm text-slate-700">Pending: <span className="font-semibold text-slate-900">{(reportSnapshots.dailyClose?.pendingOrders ?? 0) + (reportSnapshots.dailyClose?.pendingPrescriptions ?? 0)}</span></p>
+                  <div className="grid gap-5 lg:grid-cols-3">
+                    {/* Daily Close */}
+                    <div className="group flex flex-col rounded-2xl border border-slate-200 bg-slate-50 p-5 transition hover:border-slate-300 hover:shadow-md">
+                      <div className="mb-4 flex items-center gap-3">
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-900 text-white">
+                          <FileDown size={18} />
+                        </div>
+                        <p className="text-sm font-bold text-slate-800">Daily Close Report</p>
+                      </div>
+                      <div className="flex-1 space-y-2 text-sm">
+                        <div className="flex justify-between text-slate-700"><span>Orders</span><span className="font-semibold">{reportSnapshots.dailyClose?.totalOrders ?? 0}</span></div>
+                        <div className="flex justify-between text-slate-700"><span>Revenue</span><span className="font-semibold">{formatUSD(reportSnapshots.dailyClose?.totalRevenue ?? 0)}</span></div>
+                        <div className="flex justify-between text-slate-700"><span>Rejections</span><span className="font-semibold">{reportSnapshots.dailyClose?.rejectedPrescriptions ?? 0}</span></div>
+                        <div className="flex justify-between text-slate-700"><span>Pending</span><span className="font-semibold">{(reportSnapshots.dailyClose?.pendingOrders ?? 0) + (reportSnapshots.dailyClose?.pendingPrescriptions ?? 0)}</span></div>
+                      </div>
                       <button
                         type="button"
                         onClick={() => exportOperationalReport('dailyClose')}
                         disabled={reportExportingType === 'dailyClose'}
-                        className="mt-4 w-full rounded-xl bg-slate-900 px-3 py-2 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+                        className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-slate-900 px-3 py-2.5 text-sm font-bold text-white transition hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-60"
                       >
-                        {reportExportingType === 'dailyClose' ? 'Downloading...' : 'Download Daily Close CSV'}
+                        <FileDown size={14} />
+                        {reportExportingType === 'dailyClose' ? 'Downloading...' : 'Export Daily Close'}
                       </button>
                     </div>
 
-                    <div className="rounded-2xl border border-indigo-200 bg-indigo-50 p-4">
-                      <p className="text-xs font-semibold uppercase text-indigo-700">Prescription Turnaround Report</p>
-                      <p className="mt-2 text-sm text-indigo-900">Reviewed: <span className="font-semibold">{reportSnapshots.prescriptionTurnaround?.reviewedCount ?? 0}</span></p>
-                      <p className="text-sm text-indigo-900">Pending: <span className="font-semibold">{reportSnapshots.prescriptionTurnaround?.pendingCount ?? 0}</span></p>
-                      <p className="text-sm text-indigo-900">Avg turnaround: <span className="font-semibold">{reportSnapshots.prescriptionTurnaround?.avgTurnaroundHours ?? 0} hrs</span></p>
+                    {/* Prescription Turnaround */}
+                    <div className="group flex flex-col rounded-2xl border border-indigo-200 bg-indigo-50 p-5 transition hover:border-indigo-300 hover:shadow-md">
+                      <div className="mb-4 flex items-center gap-3">
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-indigo-700 text-white">
+                          <ClipboardList size={18} />
+                        </div>
+                        <p className="text-sm font-bold text-indigo-900">Prescription Turnaround</p>
+                      </div>
+                      <div className="flex-1 space-y-2 text-sm">
+                        <div className="flex justify-between text-indigo-900"><span>Reviewed</span><span className="font-semibold">{reportSnapshots.prescriptionTurnaround?.reviewedCount ?? 0}</span></div>
+                        <div className="flex justify-between text-indigo-900"><span>Pending</span><span className="font-semibold">{reportSnapshots.prescriptionTurnaround?.pendingCount ?? 0}</span></div>
+                        <div className="flex justify-between text-indigo-900"><span>Avg turnaround</span><span className="font-semibold">{reportSnapshots.prescriptionTurnaround?.avgTurnaroundHours ?? 0} hrs</span></div>
+                      </div>
                       <button
                         type="button"
                         onClick={() => exportOperationalReport('prescriptionTurnaround')}
                         disabled={reportExportingType === 'prescriptionTurnaround'}
-                        className="mt-4 w-full rounded-xl bg-indigo-700 px-3 py-2 text-sm font-semibold text-white transition hover:bg-indigo-800 disabled:cursor-not-allowed disabled:opacity-60"
+                        className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-indigo-700 px-3 py-2.5 text-sm font-bold text-white transition hover:bg-indigo-800 disabled:cursor-not-allowed disabled:opacity-60"
                       >
-                        {reportExportingType === 'prescriptionTurnaround' ? 'Downloading...' : 'Download Turnaround CSV'}
+                        <FileDown size={14} />
+                        {reportExportingType === 'prescriptionTurnaround' ? 'Downloading...' : 'Export Turnaround'}
                       </button>
                     </div>
 
-                    <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
-                      <p className="text-xs font-semibold uppercase text-amber-700">Inventory Risk Report</p>
-                      <p className="mt-2 text-sm text-amber-900">Out of stock: <span className="font-semibold">{reportSnapshots.inventoryRisk?.outOfStockCount ?? 0}</span></p>
-                      <p className="text-sm text-amber-900">Near stockout: <span className="font-semibold">{reportSnapshots.inventoryRisk?.nearStockoutCount ?? 0}</span></p>
-                      <p className="text-sm text-amber-900">Items tracked: <span className="font-semibold">{reportSnapshots.inventoryRisk?.totalItems ?? 0}</span></p>
+                    {/* Inventory Risk */}
+                    <div className="group flex flex-col rounded-2xl border border-amber-200 bg-amber-50 p-5 transition hover:border-amber-300 hover:shadow-md">
+                      <div className="mb-4 flex items-center gap-3">
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-700 text-white">
+                          <AlertCircle size={18} />
+                        </div>
+                        <p className="text-sm font-bold text-amber-900">Inventory Risk Report</p>
+                      </div>
+                      <div className="flex-1 space-y-2 text-sm">
+                        <div className="flex justify-between text-amber-900"><span>Out of stock</span><span className="font-semibold">{reportSnapshots.inventoryRisk?.outOfStockCount ?? 0}</span></div>
+                        <div className="flex justify-between text-amber-900"><span>Near stockout</span><span className="font-semibold">{reportSnapshots.inventoryRisk?.nearStockoutCount ?? 0}</span></div>
+                        <div className="flex justify-between text-amber-900"><span>Items tracked</span><span className="font-semibold">{reportSnapshots.inventoryRisk?.totalItems ?? 0}</span></div>
+                      </div>
                       <button
                         type="button"
                         onClick={() => exportOperationalReport('inventoryRisk')}
                         disabled={reportExportingType === 'inventoryRisk'}
-                        className="mt-4 w-full rounded-xl bg-amber-700 px-3 py-2 text-sm font-semibold text-white transition hover:bg-amber-800 disabled:cursor-not-allowed disabled:opacity-60"
+                        className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-amber-700 px-3 py-2.5 text-sm font-bold text-white transition hover:bg-amber-800 disabled:cursor-not-allowed disabled:opacity-60"
                       >
-                        {reportExportingType === 'inventoryRisk' ? 'Downloading...' : 'Download Inventory Risk CSV'}
+                        <FileDown size={14} />
+                        {reportExportingType === 'inventoryRisk' ? 'Downloading...' : 'Export Inventory Risk'}
                       </button>
                     </div>
                   </div>
                 </div>
+
+                {/* ══ SECTION LABEL ══════════════════════════════════════════════ */}
+                <div className="flex items-center gap-3">
+                  <span className="h-px flex-1 bg-slate-200" />
+                  <span className="rounded-full border border-slate-200 bg-white px-4 py-1 text-xs font-bold uppercase tracking-widest text-slate-500">Sales &amp; Customer Intelligence</span>
+                  <span className="h-px flex-1 bg-slate-200" />
+                </div>
+
+                {/* ══ TOP-SELLING MEDICINES ═══════════════════════════════════════ */}
+                <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+                  <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-600 text-white">
+                        <TrendingUp size={18} />
+                      </div>
+                      <div>
+                        <h3 className="text-lg font-bold text-slate-900">Top-Selling Medicines</h3>
+                        <p className="text-sm text-slate-500">Ranked by units sold across all orders</p>
+                      </div>
+                    </div>
+                    {topSellingMedicines.length > 0 && (
+                      <span className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700">Top {topSellingMedicines.length}</span>
+                    )}
+                  </div>
+                  {topSellingMedicines.length === 0 ? (
+                    <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-10 text-center text-sm text-slate-500">No order data found. Complete some orders to see rankings.</div>
+                  ) : (
+                    <div className="space-y-3">
+                      {topSellingMedicines.map((med, idx) => {
+                        const pct = maxTopMedicineQty > 0 ? Math.max(6, Math.round((med.totalQty / maxTopMedicineQty) * 100)) : 0;
+                        const medal = idx === 0 ? { bg: 'bg-amber-400', text: '🥇' } : idx === 1 ? { bg: 'bg-slate-400', text: '🥈' } : idx === 2 ? { bg: 'bg-orange-400', text: '🥉' } : null;
+                        return (
+                          <div key={med.name} className={`flex items-center gap-4 rounded-2xl p-4 transition ${idx < 3 ? 'border border-slate-200 bg-slate-50' : 'border border-transparent hover:bg-slate-50'}`}>
+                            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl text-center text-base">
+                              {medal ? medal.text : <span className="text-xs font-bold text-slate-400">{idx + 1}</span>}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="mb-1.5 flex items-center justify-between gap-2">
+                                <p className="text-sm font-bold text-slate-800 truncate">{med.name}</p>
+                                <div className="flex shrink-0 items-center gap-2">
+                                  <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-700">{med.totalQty} units</span>
+                                  <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-700">{formatUSD(med.totalRevenue)}</span>
+                                </div>
+                              </div>
+                              <div className="h-2.5 overflow-hidden rounded-full bg-slate-100">
+                                <div
+                                  className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-teal-400"
+                                  style={{ width: `${pct}%` }}
+                                />
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+
+                {/* ══ REPEAT PURCHASE RATE + CUSTOMER ACQUISITION ══════════════════ */}
+                <div className="grid gap-6 lg:grid-cols-2">
+                  {/* Repeat Purchase Rate */}
+                  <div className="rounded-3xl border border-violet-200 bg-white p-6 shadow-sm">
+                    <div className="mb-5 flex items-center gap-3">
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-violet-600 text-white">
+                        <Users size={18} />
+                      </div>
+                      <div>
+                        <h3 className="text-lg font-bold text-slate-900">Repeat Purchase Rate</h3>
+                        <p className="text-sm text-slate-500">Customers with more than one order</p>
+                      </div>
+                    </div>
+                    <div className="flex items-end gap-3">
+                      <p className="text-6xl font-black leading-none text-violet-600">{repeatPurchaseMetrics.rate}</p>
+                      <div className="mb-1">
+                        <p className="text-2xl font-black text-violet-400">%</p>
+                        <p className="text-xs text-slate-500">repeat buyers</p>
+                      </div>
+                    </div>
+                    <div className="mt-4 h-3 overflow-hidden rounded-full bg-slate-100 shadow-inner">
+                      <div
+                        className="h-full rounded-full bg-gradient-to-r from-violet-500 to-fuchsia-500"
+                        style={{ width: `${repeatPurchaseMetrics.rate}%` }}
+                      />
+                    </div>
+                    <div className="mt-5 grid grid-cols-3 gap-3">
+                      <div className="rounded-2xl border border-violet-100 bg-violet-50 p-3 text-center">
+                        <p className="text-xl font-black text-violet-700">{repeatPurchaseMetrics.totalCustomers}</p>
+                        <p className="mt-0.5 text-[11px] font-semibold text-violet-500">Total</p>
+                      </div>
+                      <div className="rounded-2xl border border-emerald-100 bg-emerald-50 p-3 text-center">
+                        <p className="text-xl font-black text-emerald-700">{repeatPurchaseMetrics.repeatCustomers}</p>
+                        <p className="mt-0.5 text-[11px] font-semibold text-emerald-500">Repeat</p>
+                      </div>
+                      <div className="rounded-2xl border border-sky-100 bg-sky-50 p-3 text-center">
+                        <p className="text-xl font-black text-sky-700">{repeatPurchaseMetrics.newCustomers}</p>
+                        <p className="mt-0.5 text-[11px] font-semibold text-sky-500">First-time</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Customer Acquisition */}
+                  <div className="rounded-3xl border border-cyan-200 bg-white p-6 shadow-sm">
+                    <div className="mb-5 flex items-center gap-3">
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-cyan-600 text-white">
+                        <UserPlus size={18} />
+                      </div>
+                      <div>
+                        <h3 className="text-lg font-bold text-slate-900">Customer Acquisition</h3>
+                        <p className="text-sm text-slate-500">First-time customers month over month</p>
+                      </div>
+                    </div>
+                    <div className="flex items-end gap-3">
+                      <p className="text-6xl font-black leading-none text-cyan-600">{customerAcquisitionMetrics.newThisMonth}</p>
+                      <div className="mb-1">
+                        <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-bold ${customerAcquisitionMetrics.growth >= 0 ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}`}>
+                          {customerAcquisitionMetrics.growth >= 0 ? '▲' : '▼'} {Math.abs(customerAcquisitionMetrics.growth)}%
+                        </span>
+                        <p className="mt-1 text-xs text-slate-500">vs last month</p>
+                      </div>
+                    </div>
+                    <div className="mt-5 grid grid-cols-2 gap-3">
+                      <div className="rounded-2xl border border-cyan-200 bg-cyan-50 p-4">
+                        <p className="text-[11px] font-bold uppercase tracking-wide text-cyan-600">This Month</p>
+                        <p className="mt-2 text-3xl font-black text-cyan-700">{customerAcquisitionMetrics.newThisMonth}</p>
+                        <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-cyan-200">
+                          <div
+                            className="h-full rounded-full bg-cyan-500"
+                            style={{ width: customerAcquisitionMetrics.newLastMonth > 0 ? `${Math.min(100, Math.round((customerAcquisitionMetrics.newThisMonth / Math.max(customerAcquisitionMetrics.newThisMonth, customerAcquisitionMetrics.newLastMonth)) * 100))}%` : '100%' }}
+                          />
+                        </div>
+                      </div>
+                      <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                        <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Last Month</p>
+                        <p className="mt-2 text-3xl font-black text-slate-600">{customerAcquisitionMetrics.newLastMonth}</p>
+                        <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-200">
+                          <div
+                            className="h-full rounded-full bg-slate-400"
+                            style={{ width: customerAcquisitionMetrics.newLastMonth > 0 ? `${Math.min(100, Math.round((customerAcquisitionMetrics.newLastMonth / Math.max(customerAcquisitionMetrics.newThisMonth, customerAcquisitionMetrics.newLastMonth)) * 100))}%` : '0%' }}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* ══ MEDICINE CATEGORY BREAKDOWN ════════════════════════════════ */}
+                <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+                  <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-sky-600 text-white">
+                        <Package size={18} />
+                      </div>
+                      <div>
+                        <h3 className="text-lg font-bold text-slate-900">Medicine Category Breakdown</h3>
+                        <p className="text-sm text-slate-500">Inventory SKUs, stock, and value by category</p>
+                      </div>
+                    </div>
+                    {medicineCategoryBreakdown.length > 0 && (
+                      <span className="rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-xs font-bold text-sky-700">{medicineCategoryBreakdown.length} categories</span>
+                    )}
+                  </div>
+                  {medicineCategoryBreakdown.length === 0 ? (
+                    <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-10 text-center text-sm text-slate-500">No inventory items found. Add medicines to see category breakdown.</div>
+                  ) : (
+                    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                      {medicineCategoryBreakdown.map((cat, idx) => {
+                        const palettes = [
+                          { bar: 'from-sky-500 to-cyan-400', border: 'border-sky-200', bg: 'bg-sky-50', label: 'text-sky-700', tag: 'bg-sky-100 text-sky-700' },
+                          { bar: 'from-violet-500 to-fuchsia-400', border: 'border-violet-200', bg: 'bg-violet-50', label: 'text-violet-700', tag: 'bg-violet-100 text-violet-700' },
+                          { bar: 'from-emerald-500 to-teal-400', border: 'border-emerald-200', bg: 'bg-emerald-50', label: 'text-emerald-700', tag: 'bg-emerald-100 text-emerald-700' },
+                          { bar: 'from-amber-500 to-orange-400', border: 'border-amber-200', bg: 'bg-amber-50', label: 'text-amber-700', tag: 'bg-amber-100 text-amber-700' },
+                          { bar: 'from-rose-500 to-pink-400', border: 'border-rose-200', bg: 'bg-rose-50', label: 'text-rose-700', tag: 'bg-rose-100 text-rose-700' },
+                          { bar: 'from-indigo-500 to-blue-400', border: 'border-indigo-200', bg: 'bg-indigo-50', label: 'text-indigo-700', tag: 'bg-indigo-100 text-indigo-700' },
+                          { bar: 'from-lime-500 to-green-400', border: 'border-lime-200', bg: 'bg-lime-50', label: 'text-lime-700', tag: 'bg-lime-100 text-lime-700' },
+                        ];
+                        const p = palettes[idx % palettes.length];
+                        const pct = maxCategoryCount > 0 ? Math.round((cat.count / maxCategoryCount) * 100) : 0;
+                        return (
+                          <div key={cat.type} className={`rounded-2xl border ${p.border} ${p.bg} p-5`}>
+                            <div className="mb-3 flex items-start justify-between gap-2">
+                              <p className={`text-sm font-bold ${p.label}`}>{cat.type}</p>
+                              <span className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-bold ${p.tag}`}>{cat.count} SKUs</span>
+                            </div>
+                            <div className="h-2.5 overflow-hidden rounded-full bg-white/70 shadow-inner">
+                              <div className={`h-full rounded-full bg-gradient-to-r ${p.bar}`} style={{ width: `${Math.max(6, pct)}%` }} />
+                            </div>
+                            <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
+                              <div>
+                                <p className="text-slate-500">Stock</p>
+                                <p className="font-bold text-slate-800">{cat.totalStock.toLocaleString()} units</p>
+                              </div>
+                              <div>
+                                <p className="text-slate-500">Value</p>
+                                <p className="font-bold text-slate-800">{formatUSD(cat.totalValue)}</p>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+
               </div>
             )}
 
