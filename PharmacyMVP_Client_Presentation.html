@@ -434,7 +434,7 @@
 
   <div class="intro-stats avoid-break">
     <div class="intro-stat"><div class="num">4</div><div class="lbl">User Roles</div></div>
-    <div class="intro-stat"><div class="num">15+</div><div class="lbl">Core Modules</div></div>
+    <div class="intro-stat"><div class="num">18+</div><div class="lbl">Core Modules</div></div>
     <div class="intro-stat"><div class="num">50+</div><div class="lbl">REST APIs</div></div>
     <div class="intro-stat"><div class="num">25+</div><div class="lbl">DB Collections</div></div>
     <div class="intro-stat"><div class="num">100%</div><div class="lbl">Dynamic Data</div></div>
@@ -455,6 +455,10 @@
       <span class="hb-item">Bulk Patient Import</span>
       <span class="hb-item">Pincode Availability Check</span>
       <span class="hb-item">Insurance Profile</span>
+      <span class="hb-item">Refill Predictor &amp; Auto-Reorder</span>
+      <span class="hb-item">Drug Interaction Checker</span>
+      <span class="hb-item">Family Profiles (Caregiver Mode)</span>
+      <span class="hb-item">Maternity &amp; Baby-Mother Guides</span>
     </div>
   </div>
 
@@ -623,6 +627,62 @@
           <li>Lung Cancer Risk Assessment</li>
           <li>General Disease Prediction</li>
           <li>Critical Disease Guide &amp; Emergency Care info</li>
+        </ul>
+      </div>
+    </div>
+    <div class="feature-card fc-top-patient">
+      <div class="fc-header">
+        <div class="fc-icon ic-cyan">🔁</div>
+        <div><div class="fc-title">Refill Predictor</div><div class="fc-subtitle">Medication continuity support</div></div>
+      </div>
+      <div class="fc-body">
+        <ul class="fc-list bl-cyan">
+          <li>Track quantity on hand and dosage-per-day for active medicines</li>
+          <li>Automatic refill timeline suggestions based on intake history</li>
+          <li>One-click quick reorder for soon-to-end medicines</li>
+          <li>Visible inside Health Management section on dashboard</li>
+        </ul>
+      </div>
+    </div>
+    <div class="feature-card fc-top-patient">
+      <div class="fc-header">
+        <div class="fc-icon ic-cyan">🛡️</div>
+        <div><div class="fc-title">Drug Interaction &amp; Contraindication Checker</div><div class="fc-subtitle">Pre-checkout medicine safety</div></div>
+      </div>
+      <div class="fc-body">
+        <ul class="fc-list bl-cyan">
+          <li>Checks cart medicines for pair-wise interaction risks</li>
+          <li>Evaluates profile-based contraindications from patient conditions/allergies</li>
+          <li>Warns users before checkout and gates high-risk confirmations</li>
+          <li>Improves medication safety with actionable alerts</li>
+        </ul>
+      </div>
+    </div>
+    <div class="feature-card fc-top-patient">
+      <div class="fc-header">
+        <div class="fc-icon ic-green">👨‍👩‍👧</div>
+        <div><div class="fc-title">Family Profiles (Caregiver Mode)</div><div class="fc-subtitle">Multi-member care in one account</div></div>
+      </div>
+      <div class="fc-body">
+        <ul class="fc-list bl-green">
+          <li>Create, update, and remove family member profiles</li>
+          <li>Store member-specific age, relation, conditions, and allergies</li>
+          <li>List-first management UI with add-form toggle for smooth workflow</li>
+          <li>Supports caregiver-led medicine and profile management</li>
+        </ul>
+      </div>
+    </div>
+    <div class="feature-card fc-top-patient">
+      <div class="fc-header">
+        <div class="fc-icon ic-rose">🤰</div>
+        <div><div class="fc-title">Maternity &amp; Baby-Mother Care Guides</div><div class="fc-subtitle">Dedicated knowledge pages</div></div>
+      </div>
+      <div class="fc-body">
+        <ul class="fc-list bl-rose">
+          <li>Separate route pages for Maternity Care and Baby &amp; Mother Care</li>
+          <li>Month-wise pregnancy support sections and checklists</li>
+          <li>Postpartum and newborn care guidance with warning-sign prompts</li>
+          <li>Direct access from landing page service tiles</li>
         </ul>
       </div>
     </div>
@@ -1476,6 +1536,34 @@
         </ul>
       </div>
     </div>
+    <div class="feature-card fc-top-shared">
+      <div class="fc-header">
+        <div class="fc-icon ic-cyan">🧪</div>
+        <div><div class="fc-title">Medication Safety Intelligence</div><div class="fc-subtitle">Interaction + contraindication engine</div></div>
+      </div>
+      <div class="fc-body">
+        <ul class="fc-list bl-cyan">
+          <li>Cross-checks selected medicines against known interaction patterns</li>
+          <li>Evaluates patient condition/allergy contraindication scenarios</li>
+          <li>Highlights risk severity before order confirmation</li>
+          <li>Integrated into cart and checkout safety workflow</li>
+        </ul>
+      </div>
+    </div>
+    <div class="feature-card fc-top-shared">
+      <div class="fc-header">
+        <div class="fc-icon ic-cyan">📈</div>
+        <div><div class="fc-title">Refill Prediction Intelligence</div><div class="fc-subtitle">Proactive adherence support</div></div>
+      </div>
+      <div class="fc-body">
+        <ul class="fc-list bl-cyan">
+          <li>Uses medicine tracker quantities + dosage to estimate refill date</li>
+          <li>Generates auto-reorder suggestions for continuity of care</li>
+          <li>Reduces missed doses for chronic medication users</li>
+          <li>Works with intake logging and dashboard cards</li>
+        </ul>
+      </div>
+    </div>
   </div>
 
   <hr class="divider" />
@@ -1584,6 +1672,10 @@
       <tr><td>AI MedBot Assistant</td><td>✓</td><td>✓</td><td>✓</td><td>—</td><td><span class="tag tag-done">Complete</span></td></tr>
       <tr><td>Disease Prediction Tools</td><td>✓</td><td>—</td><td>—</td><td>—</td><td><span class="tag tag-done">Complete</span></td></tr>
       <tr><td>AI Prescription Extraction</td><td>✓</td><td>✓</td><td>—</td><td>—</td><td><span class="tag tag-done">Complete</span></td></tr>
+      <tr><td>Refill Predictor &amp; Auto-Reorder</td><td>✓</td><td>—</td><td>—</td><td>—</td><td><span class="tag tag-done">Complete</span></td></tr>
+      <tr><td>Drug Interaction &amp; Contraindication Checker</td><td>✓</td><td>—</td><td>—</td><td>—</td><td><span class="tag tag-done">Complete</span></td></tr>
+      <tr><td>Family Profiles (Caregiver Mode)</td><td>✓</td><td>—</td><td>—</td><td>—</td><td><span class="tag tag-done">Complete</span></td></tr>
+      <tr><td>Maternity &amp; Baby-Mother Care Guides</td><td>✓</td><td>—</td><td>—</td><td>—</td><td><span class="tag tag-done">Complete</span></td></tr>
       <tr><td>Bulk Patient Import (CSV)</td><td>—</td><td>✓</td><td>—</td><td>—</td><td><span class="tag tag-done">Complete</span></td></tr>
       <tr><td>Payment Gateway</td><td>✓</td><td>—</td><td>—</td><td>—</td><td><span class="tag tag-ready">UI Ready</span></td></tr>
       <tr><td>SMS / Email Notifications</td><td>✓</td><td>✓</td><td>—</td><td>—</td><td><span class="tag tag-ready">Infra Ready</span></td></tr>
