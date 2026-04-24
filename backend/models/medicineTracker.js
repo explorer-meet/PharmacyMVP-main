@@ -20,6 +20,8 @@ const medicineTrackerSchema = new mongoose.Schema(
     medicineName: { type: String, required: true, trim: true },
     dosage: { type: String, required: true, trim: true },
     frequency: { type: String, required: true, trim: true },
+    quantityOnHand: { type: Number, default: 0 },
+    dosagePerDay: { type: Number, default: 1 },
     startDate: { type: Date, required: true },
     endDate: { type: Date, default: null },
     expiryDate: { type: Date, default: null },

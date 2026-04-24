@@ -6,6 +6,16 @@ const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
 const S3_BUCKET = process.env.AWS_S3_BUCKET;
 const S3_REGION = process.env.AWS_REGION;
 const S3_PRESIGNED_URL_EXPIRES = Number(process.env.AWS_S3_PRESIGNED_URL_EXPIRES || 900);
+const MAX_PRESIGNED_URL_EXPIRES = 3600;
+const MIN_PRESIGNED_URL_EXPIRES = 60;
+
+const ALLOWED_MIME_TYPES = new Set([
+  'application/pdf',
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+  'application/octet-stream',
+]);
 
 let cachedClient = null;
 
@@ -25,7 +35,7 @@ const getS3Client = () => {
 };
 
 const sanitizeFileName = (originalName = 'file') => {
-  const ext = path.extname(originalName || '').toLowerCase();
+  const ext = path.extname(originalName || '').toLowerCase().slice(0, 10);
   const baseName = path.basename(originalName || 'file', ext)
     .replace(/[^a-zA-Z0-9-_]+/g, '-')
     .replace(/-+/g, '-')
@@ -36,7 +46,10 @@ const sanitizeFileName = (originalName = 'file') => {
 };
 
 const buildObjectKey = (folder = 'prescriptions', originalName = 'file') => {
-  const safeFolder = String(folder).replace(/(^\/|\/$)/g, '');
+  const safeFolder = String(folder)
+    .replace(/(^\/|\/$)/g, '')
+    .replace(/[^a-zA-Z0-9/_-]+/g, '')
+    .slice(0, 60) || 'prescriptions';
   const stamp = new Date().toISOString().replace(/[:.]/g, '-');
   const randomPart = crypto.randomBytes(8).toString('hex');
   const safeName = sanitizeFileName(originalName);
@@ -62,7 +75,8 @@ const uploadBufferToS3 = async ({ buffer, contentType, originalName, folder }) =
       Bucket: S3_BUCKET,
       Key: key,
       Body: buffer,
-      ContentType: contentType || 'application/octet-stream',
+      ContentType: ALLOWED_MIME_TYPES.has(contentType) ? contentType : 'application/octet-stream',
+      ServerSideEncryption: 'AES256',
     })
   );
 
@@ -95,6 +109,11 @@ const getSignedS3Url = async (key, expiresIn = S3_PRESIGNED_URL_EXPIRES) => {
     return '';
   }
 
+  const safeExpiresIn = Math.min(
+    MAX_PRESIGNED_URL_EXPIRES,
+    Math.max(MIN_PRESIGNED_URL_EXPIRES, Number(expiresIn) || S3_PRESIGNED_URL_EXPIRES)
+  );
+
   const client = getS3Client();
   return getSignedUrl(
     client,
@@ -102,7 +121,7 @@ const getSignedS3Url = async (key, expiresIn = S3_PRESIGNED_URL_EXPIRES) => {
       Bucket: S3_BUCKET,
       Key: key,
     }),
-    { expiresIn }
+    { expiresIn: safeExpiresIn }
   );
 };
 

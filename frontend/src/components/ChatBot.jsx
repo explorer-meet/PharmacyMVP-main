@@ -151,7 +151,7 @@ const ChatBot = () => {
       <button
         onClick={() => setOpen((o) => !o)}
         aria-label="Open chat"
-        className="fixed bottom-24 right-6 z-[9998] group flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-cyan-500 via-teal-500 to-emerald-500 shadow-[0_8px_32px_rgba(6,182,212,0.45)] hover:shadow-[0_12px_40px_rgba(6,182,212,0.6)] hover:scale-110 active:scale-95 transition-all duration-300"
+        className="fixed bottom-28 right-4 z-[9998] group flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-cyan-500 via-teal-500 to-emerald-500 shadow-[0_8px_24px_rgba(6,182,212,0.32)] hover:shadow-[0_12px_30px_rgba(6,182,212,0.42)] hover:scale-105 active:scale-95 transition-all duration-300 sm:bottom-32 sm:right-6 sm:h-16 sm:w-16"
         style={{ borderRadius: '1.25rem' }}
       >
         {/* Shimmer ring */}
@@ -162,14 +162,14 @@ const ChatBot = () => {
         ) : (
           <div className="flex flex-col items-center justify-center gap-0.5">
             {/* Custom pill chat icon */}
-            <svg width="28" height="26" viewBox="0 0 28 26" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <svg width="26" height="24" viewBox="0 0 28 26" fill="none" xmlns="http://www.w3.org/2000/svg">
               <rect x="1" y="1" width="26" height="18" rx="9" fill="white" fillOpacity="0.18" stroke="white" strokeWidth="1.5"/>
               <circle cx="8.5" cy="10" r="2" fill="white"/>
               <circle cx="14" cy="10" r="2" fill="white"/>
               <circle cx="19.5" cy="10" r="2" fill="white"/>
               <path d="M7 19L4 24" stroke="white" strokeWidth="1.5" strokeLinecap="round"/>
             </svg>
-            <span className="text-[9px] font-bold text-white/90 leading-none tracking-wide">ASK ME</span>
+            <span className="text-[8px] font-bold text-white/90 leading-none tracking-[0.18em]">ASK ME</span>
           </div>
         )}
 
@@ -188,7 +188,7 @@ const ChatBot = () => {
 
       {/* Chat Window */}
       {open && (
-        <div className="fixed bottom-40 right-6 z-[9997] w-80 sm:w-96 flex flex-col rounded-2xl shadow-2xl border border-cyan-100 overflow-hidden bg-white dark:bg-slate-900 dark:border-slate-700 animate-in fade-in slide-in-from-bottom-4 duration-200">
+        <div className="fixed bottom-44 right-4 z-[9997] flex w-[min(22rem,calc(100vw-2rem))] flex-col overflow-hidden rounded-2xl border border-cyan-100 bg-white shadow-2xl animate-in fade-in slide-in-from-bottom-4 duration-200 dark:border-slate-700 dark:bg-slate-900 sm:bottom-48 sm:right-6 sm:w-96">
           {/* Header */}
           <div className="flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-cyan-500 via-teal-500 to-emerald-500 relative overflow-hidden">
             {/* Decorative blobs */}

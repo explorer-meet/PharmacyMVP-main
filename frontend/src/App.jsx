@@ -1,3 +1,4 @@
+import { Suspense, lazy } from 'react'
 import { Navigate, Route, Routes } from 'react-router-dom'
 import './App.css'
 import ProtectedRoute from './components/Route/ProtectedRoute';
@@ -9,37 +10,46 @@ import Home from './pages/Home';
 import Login from './pages/Login';
 import ForgotPassword from './pages/ForgotPassword';
 import Signup from './pages/Signup';
-import OnlinePharmacy from './pages/OnlinePharmacy';
-import Dashboard from './pages/Dashboard';
-import AdminDashboard from './pages/AdminDashboard';
-import DiseasePrediction from './pages/DiseasePrediction';
-import HeartPrediction from './pages/HeartPrediction';
-import PatientProfile from './pages/PatientProfile';
-import StoreDashboard from './pages/StoreDashboard';
-import EmergencyCare from './pages/EmergencyCare';
-import CriticalDiseaseGuide from './pages/CriticalDiseaseGuide';
-import AddMedicine from './pages/AddMedicine';
-import DeleteMedicine from './pages/DeleteMedicine';
-import UpdateMedicine from './pages/UpdateMedicine';
-import Tracking from './pages/Tracking';
-import { AddressPage } from './pages/AddressPage';
-import { PaymentPage } from './pages/PaymentPage';
-import { OrderConfirmationPage } from './pages/OrderConfirmationPage';
-import Orders from './pages/Orders';
-import AdminTracking from './pages/AdminTracking';
-import LungCancer from './pages/LungCancer';
-import KidneyPrediction from './pages/KidneyPrediction';
-import MyVaccination from './pages/MyVaccinations';
-import PrivacyPolicy from './pages/PrivacyPolicy';
-import TermsAndConditions from './pages/TermsAndConditions';
-import ContactUs from './pages/ContactUs';
-import NotFound from './pages/NotFound';
-import CartPage from './pages/Cart';
+
+const OnlinePharmacy = lazy(() => import('./pages/OnlinePharmacy'));
+const Dashboard = lazy(() => import('./pages/Dashboard'));
+const AdminDashboard = lazy(() => import('./pages/AdminDashboard'));
+const DiseasePrediction = lazy(() => import('./pages/DiseasePrediction'));
+const HeartPrediction = lazy(() => import('./pages/HeartPrediction'));
+const PatientProfile = lazy(() => import('./pages/PatientProfile'));
+const StoreDashboard = lazy(() => import('./pages/StoreDashboard'));
+const EmergencyCare = lazy(() => import('./pages/EmergencyCare'));
+const CriticalDiseaseGuide = lazy(() => import('./pages/CriticalDiseaseGuide'));
+const MaternityCareGuide = lazy(() => import('./pages/MaternityCareGuide'));
+const BabyMotherCareGuide = lazy(() => import('./pages/BabyMotherCareGuide'));
+const AddMedicine = lazy(() => import('./pages/AddMedicine'));
+const DeleteMedicine = lazy(() => import('./pages/DeleteMedicine'));
+const UpdateMedicine = lazy(() => import('./pages/UpdateMedicine'));
+const Tracking = lazy(() => import('./pages/Tracking'));
+const AddressPage = lazy(() => import('./pages/AddressPage').then((module) => ({ default: module.AddressPage })));
+const PaymentPage = lazy(() => import('./pages/PaymentPage').then((module) => ({ default: module.PaymentPage })));
+const OrderConfirmationPage = lazy(() => import('./pages/OrderConfirmationPage').then((module) => ({ default: module.OrderConfirmationPage })));
+const Orders = lazy(() => import('./pages/Orders'));
+const AdminTracking = lazy(() => import('./pages/AdminTracking'));
+const LungCancer = lazy(() => import('./pages/LungCancer'));
+const KidneyPrediction = lazy(() => import('./pages/KidneyPrediction'));
+const MyVaccination = lazy(() => import('./pages/MyVaccinations'));
+const PrivacyPolicy = lazy(() => import('./pages/PrivacyPolicy'));
+const TermsAndConditions = lazy(() => import('./pages/TermsAndConditions'));
+const ContactUs = lazy(() => import('./pages/ContactUs'));
+const NotFound = lazy(() => import('./pages/NotFound'));
+const CartPage = lazy(() => import('./pages/Cart'));
+
+const RouteFallback = () => (
+  <div className="min-h-screen flex items-center justify-center bg-slate-50 text-slate-600 text-sm">
+    Loading...
+  </div>
+);
 
 function App() {
 
   return (
-    <>
+    <Suspense fallback={<RouteFallback />}>
       <Routes>
         <Route path="/" element={<Layout />}>
           <Route index element={<Home />} />
@@ -98,6 +108,8 @@ function App() {
           <Route path="/heart-disease" element={<HeartPrediction />} />
           <Route path="/emergencyguidelines" element={<EmergencyCare />} />
           <Route path="/critical-disease-guide" element={<CriticalDiseaseGuide />} />
+          <Route path="/maternity-care" element={<MaternityCareGuide />} />
+          <Route path="/baby-mother-care" element={<BabyMotherCareGuide />} />
           <Route path="/addmedicine" element={<AddMedicine />} />
           <Route path="/updatemedicine" element={<UpdateMedicine />} />
           <Route path="/deletemedicine" element={<DeleteMedicine />} />
@@ -132,7 +144,7 @@ function App() {
           />
         </Route>
       </Routes>
-    </>
+    </Suspense>
   )
 }
 

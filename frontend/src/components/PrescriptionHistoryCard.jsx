@@ -1,4 +1,5 @@
 import { FileText, Trash2, ChevronRight } from 'lucide-react';
+import PropTypes from 'prop-types';
 import StatusBadge from './StatusBadge';
 
 const PrescriptionHistoryCard = ({
@@ -116,6 +117,22 @@ const PrescriptionHistoryCard = ({
       </div>
     </div>
   );
+};
+
+PrescriptionHistoryCard.propTypes = {
+  prescription: PropTypes.shape({
+    _id: PropTypes.string,
+    fileName: PropTypes.string,
+    createdAt: PropTypes.oneOfType([PropTypes.string, PropTypes.instanceOf(Date)]),
+    status: PropTypes.string,
+    fileSize: PropTypes.number,
+    extractedMedicines: PropTypes.arrayOf(PropTypes.object),
+    addedToCart: PropTypes.bool,
+    errorMessage: PropTypes.string,
+  }).isRequired,
+  onExtract: PropTypes.func.isRequired,
+  onDelete: PropTypes.func.isRequired,
+  isLoading: PropTypes.bool,
 };
 
 export default PrescriptionHistoryCard;

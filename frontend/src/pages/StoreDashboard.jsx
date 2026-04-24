@@ -40,6 +40,10 @@ import {
   RefreshCw,
   RotateCcw,
   FileDown,
+  Settings,
+  MapPin,
+  CreditCard,
+  Upload,
 } from 'lucide-react';
 
 const MEDICINE_TYPE_OPTIONS = [
@@ -57,6 +61,10 @@ const MEDICINE_TYPE_OPTIONS = [
 ];
 
 const PAGINATION_PAGE_SIZE_OPTIONS = [10, 20];
+const INVENTORY_PAGE_SIZE_OPTIONS = [12, 24];
+
+const getPaginationOptions = (key) => (key === 'inventory' ? INVENTORY_PAGE_SIZE_OPTIONS : PAGINATION_PAGE_SIZE_OPTIONS);
+const getDefaultPageSize = (key) => getPaginationOptions(key)[0];
 
 const STORE_RETURN_STATUS_FILTERS = [
   { value: 'all', label: 'All', icon: RotateCcw },
@@ -87,7 +95,7 @@ const getQueryPatientDisplayName = (query) => {
   return fullName || String(user.email || '').trim() || String(user.mobile || '').trim() || 'Unknown Patient';
 };
 
-const renderPaginationControls = ({ meta, onPageChange, onPageSizeChange, className = '' }) => {
+const renderPaginationControls = ({ meta, onPageChange, onPageSizeChange, className = '', pageSizeOptions = PAGINATION_PAGE_SIZE_OPTIONS }) => {
   if (!meta || meta.totalItems === 0) {
     return null;
   }
@@ -105,7 +113,7 @@ const renderPaginationControls = ({ meta, onPageChange, onPageSizeChange, classN
             onChange={(event) => onPageSizeChange(Number(event.target.value))}
             className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs text-slate-700 focus:border-blue-500 focus:outline-none"
           >
-            {PAGINATION_PAGE_SIZE_OPTIONS.map((sizeOption) => (
+            {pageSizeOptions.map((sizeOption) => (
               <option key={`page-size-${sizeOption}`} value={sizeOption}>{sizeOption}</option>
             ))}
           </select>
@@ -165,6 +173,29 @@ const StoreDashboard = () => {
   });
   const [storeProfileSaving, setStoreProfileSaving] = useState(false);
   const { countryOptions, stateOptions: storeStateOptions } = useLocationOptions(storeProfileDraft.countryCode);
+
+  // Store photo
+  const storePhotoInputRef = useRef(null);
+  const [storePhotoUrl, setStorePhotoUrl] = useState('');
+  const [storePhotoUploading, setStorePhotoUploading] = useState(false);
+
+  // Store settings
+  const DAYS_OF_WEEK = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+  const PAYMENT_OPTIONS = ['Cash', 'UPI', 'Card', 'Net Banking', 'Credit'];
+  const defaultDayHours = { open: '09:00', close: '21:00', closed: false };
+  const defaultSundayHours = { open: '10:00', close: '18:00', closed: true };
+  const buildDefaultHours = () =>
+    DAYS_OF_WEEK.reduce((acc, day) => {
+      acc[day] = day === 'sunday' ? { ...defaultSundayHours } : { ...defaultDayHours };
+      return acc;
+    }, {});
+  const [storeSettings, setStoreSettings] = useState({
+    storeHours: buildDefaultHours(),
+    deliveryRadiusKm: 10,
+    acceptedPayments: ['Cash', 'UPI', 'Card'],
+  });
+  const [storeSettingsLoading, setStoreSettingsLoading] = useState(false);
+  const [storeSettingsSaving, setStoreSettingsSaving] = useState(false);
   const [loggedInAccount, setLoggedInAccount] = useState({
     staffId: '',
     name: '',
@@ -190,6 +221,9 @@ const StoreDashboard = () => {
     loginPassword: '',
   });
   const [staffProfileSaving, setStaffProfileSaving] = useState(false);
+  // Staff profile photo upload
+  const staffPhotoInputRef = useRef(null);
+  const [staffPhotoUploading, setStaffPhotoUploading] = useState(false);
   const [staffMembers, setStaffMembers] = useState([]);
   const [staffLoading, setStaffLoading] = useState(false);
   const [newStaff, setNewStaff] = useState({
@@ -216,17 +250,18 @@ const StoreDashboard = () => {
   const [newMedicine, setNewMedicine] = useState({
     name: '',
     providerId: '',
-    manufacturer: '',
+    manufacturer: 'Sun Pharma',
     dosage: '',
     type: '',
     price: '',
     stock: '',
   });
+  const [showAddMedicineModal, setShowAddMedicineModal] = useState(false);
   const [editingMedicineId, setEditingMedicineId] = useState(null);
   const [editMedicine, setEditMedicine] = useState({
     name: '',
     providerId: '',
-    manufacturer: '',
+    manufacturer: 'Sun Pharma',
     dosage: '',
     type: '',
     price: '',
@@ -237,6 +272,10 @@ const StoreDashboard = () => {
   const [barcodeLastCode, setBarcodeLastCode] = useState('');
   const [barcodeMatchedItemId, setBarcodeMatchedItemId] = useState('');
   const [barcodeActionQty, setBarcodeActionQty] = useState('1');
+  const [inventoryManufacturerFilter, setInventoryManufacturerFilter] = useState('all');
+  const [inventoryTypeFilter, setInventoryTypeFilter] = useState('all');
+  const [inventoryPriceMin, setInventoryPriceMin] = useState('');
+  const [inventoryPriceMax, setInventoryPriceMax] = useState('');
   const barcodeVideoRef = useRef(null);
   const barcodeStreamRef = useRef(null);
   const barcodeRafRef = useRef(null);
@@ -339,10 +378,8 @@ const StoreDashboard = () => {
   };
   const reportOrdersTotal = orders.length;
   const reportCompletedOrders = orders.filter((order) => isCompletedOrder(order)).length;
-  const reportPendingOrders = orders.filter((order) => !isCompletedOrder(order)).length;
   const reportTotalRevenue = orders.reduce((sum, order) => sum + parseCurrencyAmount(order.total), 0);
   const reportAverageOrderValue = reportOrdersTotal ? reportTotalRevenue / reportOrdersTotal : 0;
-  const reportUniqueCustomers = new Set(orders.map((order) => order.customer)).size;
   const reportCompletionRate = reportOrdersTotal ? Math.round((reportCompletedOrders / reportOrdersTotal) * 100) : 0;
   const [auditLogs, setAuditLogs] = useState([]);
   const [auditLoading, setAuditLoading] = useState(false);
@@ -1065,7 +1102,7 @@ const StoreDashboard = () => {
     invoices: { page: 1, pageSize: 10 },
     suppliers: { page: 1, pageSize: 10 },
     campaigns: { page: 1, pageSize: 10 },
-    inventory: { page: 1, pageSize: 10 },
+    inventory: { page: 1, pageSize: 12 },
     orders: { page: 1, pageSize: 10 },
     prescriptions: { page: 1, pageSize: 10 },
     queries: { page: 1, pageSize: 10 },
@@ -1079,7 +1116,7 @@ const StoreDashboard = () => {
     setPaginationState((prev) => ({
       ...prev,
       [key]: {
-        ...(prev[key] || { page: 1, pageSize: 10 }),
+        ...(prev[key] || { page: 1, pageSize: getDefaultPageSize(key) }),
         ...updates,
       },
     }));
@@ -1087,8 +1124,10 @@ const StoreDashboard = () => {
 
   const getPaginationMeta = (key, items) => {
     const safeItems = Array.isArray(items) ? items : [];
-    const state = paginationState[key] || { page: 1, pageSize: 10 };
-    const pageSize = PAGINATION_PAGE_SIZE_OPTIONS.includes(Number(state.pageSize)) ? Number(state.pageSize) : 10;
+    const pageSizeOptions = getPaginationOptions(key);
+    const defaultPageSize = getDefaultPageSize(key);
+    const state = paginationState[key] || { page: 1, pageSize: defaultPageSize };
+    const pageSize = pageSizeOptions.includes(Number(state.pageSize)) ? Number(state.pageSize) : defaultPageSize;
     const totalItems = safeItems.length;
     const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
     const currentPage = Math.min(Math.max(Number(state.page) || 1, 1), totalPages);
@@ -1597,6 +1636,7 @@ const StoreDashboard = () => {
           address: staffAccount.address || '',
           role: staffAccount.role || userData?.dashboardAccessRole || '',
           status: staffAccount.status || 'Active',
+          profilePhotoUrl: staffAccount.profilePhotoUrl || '',
         }
         : {
           staffId: '',
@@ -1609,6 +1649,7 @@ const StoreDashboard = () => {
           address: userData?.address || '',
           role: userData?.dashboardAccessRole || 'Store Admin',
           status: 'Active',
+          profilePhotoUrl: '',
         };
       setLoggedInAccount(accountProfile);
       setStaffProfileDraft({
@@ -1780,6 +1821,125 @@ const StoreDashboard = () => {
     } finally {
       setStaffProfileSaving(false);
     }
+  };
+
+  // ── Store Photo Upload ──────────────────────────────────────────────────────
+  const handleStorePhotoUpload = async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    const token = localStorage.getItem('medVisionToken');
+    if (!token) return;
+    try {
+      setStorePhotoUploading(true);
+      const formData = new FormData();
+      formData.append('profileImage', file);
+      const response = await axios.post(`${baseURL}/store/photo`, formData, {
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'multipart/form-data' },
+      });
+      setStorePhotoUrl(response.data?.storePhotoUrl || '');
+      toast.success('Store photo updated!');
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Failed to upload store photo');
+    } finally {
+      setStorePhotoUploading(false);
+      if (storePhotoInputRef.current) storePhotoInputRef.current.value = '';
+    }
+  };
+
+  // ── Staff Photo Upload ──────────────────────────────────────────────────────
+  const handleStaffPhotoUpload = async (event, staffId) => {
+    const file = event.target.files?.[0];
+    if (!file || !staffId) return;
+    const token = localStorage.getItem('medVisionToken');
+    if (!token) return;
+    try {
+      setStaffPhotoUploading(true);
+      const formData = new FormData();
+      formData.append('profileImage', file);
+      const response = await axios.post(`${baseURL}/store-staff/${staffId}/photo`, formData, {
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'multipart/form-data' },
+      });
+      const updatedUrl = response.data?.profilePhotoUrl || '';
+      // Update in staffMembers list
+      setStaffMembers((prev) =>
+        prev.map((m) => (m._id === staffId ? { ...m, profilePhotoUrl: updatedUrl } : m)),
+      );
+      // Update own profile if it's their own upload
+      if (String(loggedInAccount.staffId) === String(staffId)) {
+        setLoggedInAccount((prev) => ({ ...prev, profilePhotoUrl: updatedUrl }));
+      }
+      toast.success('Profile photo updated!');
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Failed to upload photo');
+    } finally {
+      setStaffPhotoUploading(false);
+      if (staffPhotoInputRef.current) staffPhotoInputRef.current.value = '';
+    }
+  };
+
+  // ── Store Settings ──────────────────────────────────────────────────────────
+  const loadStoreSettings = async () => {
+    const token = localStorage.getItem('medVisionToken');
+    if (!token) return;
+    try {
+      setStoreSettingsLoading(true);
+      const response = await axios.get(`${baseURL}/store/settings`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = response.data || {};
+      if (data.settings) {
+        setStoreSettings((prev) => ({
+          storeHours: data.settings.storeHours || prev.storeHours,
+          deliveryRadiusKm: data.settings.deliveryRadiusKm ?? prev.deliveryRadiusKm,
+          acceptedPayments: (Array.isArray(data.settings.acceptedPayments)
+            ? data.settings.acceptedPayments.filter((method) => method !== 'Insurance')
+            : prev.acceptedPayments),
+        }));
+      }
+      if (data.storePhotoUrl) setStorePhotoUrl(data.storePhotoUrl);
+    } catch (error) {
+      console.error('Failed to load store settings:', error.message);
+    } finally {
+      setStoreSettingsLoading(false);
+    }
+  };
+
+  const saveStoreSettings = async () => {
+    const token = localStorage.getItem('medVisionToken');
+    if (!token) return;
+    try {
+      setStoreSettingsSaving(true);
+      await axios.put(`${baseURL}/store/settings`, storeSettings, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      toast.success('Store settings saved!');
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Failed to save settings');
+    } finally {
+      setStoreSettingsSaving(false);
+    }
+  };
+
+  const togglePaymentMethod = (method) => {
+    setStoreSettings((prev) => {
+      const existing = prev.acceptedPayments || [];
+      return {
+        ...prev,
+        acceptedPayments: existing.includes(method)
+          ? existing.filter((m) => m !== method)
+          : [...existing, method],
+      };
+    });
+  };
+
+  const updateDayHours = (day, field, value) => {
+    setStoreSettings((prev) => ({
+      ...prev,
+      storeHours: {
+        ...prev.storeHours,
+        [day]: { ...(prev.storeHours[day] || {}), [field]: value },
+      },
+    }));
   };
 
   const loadRolePermissions = async () => {
@@ -2265,10 +2425,11 @@ const StoreDashboard = () => {
     { key: 'reviews', label: 'Reviews', icon: Star },
     { key: 'myProfile', label: 'My Profile', icon: UserCheck },
     { key: 'reports', label: 'Reports', icon: BarChart3 },
+    { key: 'storeSettings', label: 'Store Settings', icon: Settings },
   ];
 
   const roleSectionAccess = {
-    'Store Admin': ['home', 'auditTrail', 'staff', 'promotions', 'importPatients', 'inventory', 'orders', 'returns', 'financialManagement', 'prescription', 'queries', 'reviews', 'myProfile', 'reports'],
+    'Store Admin': ['home', 'auditTrail', 'staff', 'promotions', 'importPatients', 'inventory', 'orders', 'returns', 'financialManagement', 'prescription', 'queries', 'reviews', 'myProfile', 'reports', 'storeSettings'],
     Pharmacist: ['home', 'prescription', 'inventory', 'orders', 'returns', 'queries', 'reviews', 'myProfile'],
     Operator: ['home', 'prescription', 'inventory', 'orders', 'returns', 'queries', 'reviews', 'myProfile'],
   };
@@ -2279,7 +2440,7 @@ const StoreDashboard = () => {
     { title: 'Overview', keys: ['home', 'reports', 'auditTrail'] },
     { title: 'Operations', keys: ['inventory', 'orders', 'returns', 'prescription', 'financialManagement'] },
     { title: 'People & Communication', keys: ['staff', 'queries', 'reviews'] },
-    { title: 'Growth & Setup', keys: ['promotions', 'importPatients', 'myProfile'] },
+    { title: 'Growth & Setup', keys: ['promotions', 'importPatients', 'myProfile', 'storeSettings'] },
   ]), []);
   const groupedVisibleSectionConfig = useMemo(() => {
     const sectionByKey = visibleSectionConfig.reduce((acc, section) => {
@@ -2342,7 +2503,6 @@ const StoreDashboard = () => {
     { total: 0, approved: 0, rejected: 0, pending: 0, ordered: 0, byReviewer: {} }
   );
 
-  const prescriptionReviewerStats = Object.values(prescriptionSummary.byReviewer).sort((a, b) => b.total - a.total);
   const reviewerFilterOptions = Array.from(
     new Set(
       [
@@ -2556,7 +2716,7 @@ const StoreDashboard = () => {
       setNewMedicine((prev) => ({
         ...prev,
         providerId: value,
-        manufacturer: matched?.name || '',
+        manufacturer: matched?.name || 'Sun Pharma',
       }));
       return;
     }
@@ -2577,7 +2737,7 @@ const StoreDashboard = () => {
         {
           name: newMedicine.name.trim(),
           providerId: newMedicine.providerId || undefined,
-          manufacturer: newMedicine.manufacturer.trim(),
+          manufacturer: newMedicine.manufacturer.trim() || 'Sun Pharma',
           dosage: newMedicine.dosage.trim(),
           type: newMedicine.type.trim(),
           price: Number(newMedicine.price) || 0,
@@ -2590,7 +2750,8 @@ const StoreDashboard = () => {
       if (created) {
         setInventoryItems((prev) => [created, ...prev]);
       }
-      setNewMedicine({ name: '', providerId: '', manufacturer: '', dosage: '', type: '', price: '', stock: '' });
+      setNewMedicine({ name: '', providerId: '', manufacturer: 'Sun Pharma', dosage: '', type: '', price: '', stock: '' });
+      setShowAddMedicineModal(false);
       toast.success('Medicine added to inventory');
     } catch (error) {
       console.error('Failed to add medicine:', error.message);
@@ -2605,7 +2766,7 @@ const StoreDashboard = () => {
     setEditMedicine({
       name: item.name || '',
       providerId: item.providerId || '',
-      manufacturer: item.manufacturer || '',
+      manufacturer: item.manufacturer || 'Sun Pharma',
       dosage: item.dosage || '',
       type: item.type || '',
       price: String(item.price ?? ''),
@@ -2620,7 +2781,7 @@ const StoreDashboard = () => {
       setEditMedicine((prev) => ({
         ...prev,
         providerId: value,
-        manufacturer: matched?.name || '',
+        manufacturer: matched?.name || 'Sun Pharma',
       }));
       return;
     }
@@ -2640,7 +2801,7 @@ const StoreDashboard = () => {
         {
           name: editMedicine.name.trim(),
           providerId: editMedicine.providerId || undefined,
-          manufacturer: editMedicine.manufacturer.trim(),
+          manufacturer: editMedicine.manufacturer.trim() || 'Sun Pharma',
           dosage: editMedicine.dosage.trim(),
           type: editMedicine.type.trim(),
           price: Number(editMedicine.price) || 0,
@@ -2654,7 +2815,7 @@ const StoreDashboard = () => {
         setInventoryItems((prev) => prev.map((item) => (item._id === id ? updated : item)));
       }
       setEditingMedicineId(null);
-      setEditMedicine({ name: '', providerId: '', manufacturer: '', dosage: '', type: '', price: '', stock: '' });
+      setEditMedicine({ name: '', providerId: '', manufacturer: 'Sun Pharma', dosage: '', type: '', price: '', stock: '' });
       toast.success('Medicine updated');
     } catch (error) {
       console.error('Failed to update medicine:', error.message);
@@ -2666,7 +2827,7 @@ const StoreDashboard = () => {
 
   const cancelEditMedicine = () => {
     setEditingMedicineId(null);
-    setEditMedicine({ name: '', providerId: '', manufacturer: '', dosage: '', type: '', price: '', stock: '' });
+    setEditMedicine({ name: '', providerId: '', manufacturer: 'Sun Pharma', dosage: '', type: '', price: '', stock: '' });
   };
 
   const updateMedicineStock = async (item, delta) => {
@@ -2885,6 +3046,12 @@ const StoreDashboard = () => {
     }
     if (selectedSection === 'myProfile') {
       loadStoreStaffMembers();
+      if (dashboardAccessRole === 'Store Admin') {
+        loadStoreSettings();
+      }
+    }
+    if (selectedSection === 'storeSettings' && dashboardAccessRole === 'Store Admin') {
+      loadStoreSettings();
     }
     if (selectedSection === 'queries' && allowedSectionKeys.includes('queries')) {
       loadStoreQueries();
@@ -3031,10 +3198,6 @@ const StoreDashboard = () => {
     );
   };
 
-  const handleAddApprovalItem = () => {
-    setApprovalItems((prev) => [...prev, createEmptyApprovalItem()]);
-  };
-
   const handleRemoveApprovalItem = (index) => {
     setApprovalItems((prev) => {
       const next = prev.filter((_, itemIndex) => itemIndex !== index);
@@ -3169,6 +3332,52 @@ const StoreDashboard = () => {
     return firstNameMatch && lastNameMatch && contactMatch && emailMatch;
   });
 
+  const inventoryManufacturerOptions = useMemo(() => (
+    Array.from(
+      new Set(
+        (inventoryItems || [])
+          .map((item) => String(item?.manufacturer || '').trim())
+          .filter(Boolean)
+      )
+    ).sort((a, b) => a.localeCompare(b))
+  ), [inventoryItems]);
+
+  const inventoryTypeOptions = useMemo(() => (
+    Array.from(
+      new Set(
+        (inventoryItems || [])
+          .map((item) => String(item?.type || '').trim())
+          .filter(Boolean)
+      )
+    ).sort((a, b) => a.localeCompare(b))
+  ), [inventoryItems]);
+
+  const filteredInventoryItems = useMemo(() => {
+    const minPrice = inventoryPriceMin === '' ? null : Number(inventoryPriceMin);
+    const maxPrice = inventoryPriceMax === '' ? null : Number(inventoryPriceMax);
+
+    return (inventoryItems || []).filter((item) => {
+      const manufacturer = String(item?.manufacturer || '').trim();
+      const type = String(item?.type || '').trim();
+      const price = Number(item?.price || 0);
+
+      if (inventoryManufacturerFilter !== 'all' && manufacturer !== inventoryManufacturerFilter) {
+        return false;
+      }
+      if (inventoryTypeFilter !== 'all' && type !== inventoryTypeFilter) {
+        return false;
+      }
+      if (minPrice !== null && Number.isFinite(minPrice) && price < minPrice) {
+        return false;
+      }
+      if (maxPrice !== null && Number.isFinite(maxPrice) && price > maxPrice) {
+        return false;
+      }
+
+      return true;
+    });
+  }, [inventoryItems, inventoryManufacturerFilter, inventoryTypeFilter, inventoryPriceMin, inventoryPriceMax]);
+
   const staffPagination = getPaginationMeta('staff', filteredStaffMembers);
   const performancePagination = getPaginationMeta('performance', performanceRecords);
   const attendancePagination = getPaginationMeta('attendance', attendanceRecords);
@@ -3177,7 +3386,7 @@ const StoreDashboard = () => {
   const invoicePagination = getPaginationMeta('invoices', invoices);
   const supplierPagination = getPaginationMeta('suppliers', suppliers);
   const campaignPagination = getPaginationMeta('campaigns', campaigns);
-  const inventoryPagination = getPaginationMeta('inventory', inventoryItems);
+  const inventoryPagination = getPaginationMeta('inventory', filteredInventoryItems);
   const ordersPagination = getPaginationMeta('orders', filteredOrders);
   const prescriptionsPagination = getPaginationMeta('prescriptions', filteredPrescriptions);
   const queriesPagination = getPaginationMeta('queries', queries);
@@ -3197,6 +3406,10 @@ const StoreDashboard = () => {
   useEffect(() => {
     updatePagination('prescriptions', { page: 1 });
   }, [prescriptionStatusFilter, prescriptionReviewerFilter, reviewerSearchQuery]);
+
+  useEffect(() => {
+    updatePagination('inventory', { page: 1 });
+  }, [inventoryManufacturerFilter, inventoryTypeFilter, inventoryPriceMin, inventoryPriceMax]);
 
   const staffCompliancePermissionPrefixes = ['staff.', 'attendance.', 'performance.', 'training.', 'compliance.'];
   const staffCompliancePermissions = staffPermissions.filter((permission) =>
@@ -3661,6 +3874,42 @@ const StoreDashboard = () => {
                 {isStaffSelfProfile ? (
                   !isEditingStaffProfile ? (
                     <div className="space-y-4">
+                      {/* Staff profile photo */}
+                      <div className="flex items-center gap-5 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                        <div className="relative h-20 w-20 flex-shrink-0">
+                          {loggedInAccount.profilePhotoUrl ? (
+                            <img src={loggedInAccount.profilePhotoUrl} alt="Profile" className="h-20 w-20 rounded-full object-cover border border-slate-200" />
+                          ) : (
+                            <div className="flex h-20 w-20 items-center justify-center rounded-full bg-indigo-100 text-indigo-600 text-2xl font-bold">
+                              {(loggedInAccount.firstName?.[0] || '?').toUpperCase()}
+                            </div>
+                          )}
+                          {staffPhotoUploading && (
+                            <div className="absolute inset-0 flex items-center justify-center rounded-full bg-white/70">
+                              <span className="text-xs text-slate-500">...</span>
+                            </div>
+                          )}
+                        </div>
+                        <div>
+                          <p className="text-sm font-semibold text-slate-900">Profile Photo</p>
+                          <p className="text-xs text-slate-500 mb-2">Upload your profile picture</p>
+                          <input
+                            ref={staffPhotoInputRef}
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            onChange={(e) => handleStaffPhotoUpload(e, loggedInAccount.staffId)}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => staffPhotoInputRef.current?.click()}
+                            disabled={staffPhotoUploading}
+                            className="inline-flex items-center gap-2 rounded-2xl bg-indigo-600 px-4 py-2 text-xs font-semibold text-white hover:bg-indigo-700 transition disabled:opacity-50"
+                          >
+                            <Upload size={14} /> {loggedInAccount.profilePhotoUrl ? 'Change Photo' : 'Upload Photo'}
+                          </button>
+                        </div>
+                      </div>
                       <div className="grid gap-4 sm:grid-cols-2">
                         <div className="rounded-2xl bg-emerald-50 p-4">
                           <p className="text-xs text-emerald-600">First Name</p>
@@ -3816,6 +4065,36 @@ const StoreDashboard = () => {
                   )
                 ) : (!isEditingStoreProfile ? (
                   <div className="space-y-4">
+                    {/* Store Photo */}
+                    <div className="flex items-center gap-5 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                      <div className="relative h-20 w-20 flex-shrink-0">
+                        {storePhotoUrl ? (
+                          <img src={storePhotoUrl} alt="Store" className="h-20 w-20 rounded-2xl object-cover border border-slate-200" />
+                        ) : (
+                          <div className="flex h-20 w-20 items-center justify-center rounded-2xl bg-indigo-100 text-indigo-400">
+                            <Building2 size={32} />
+                          </div>
+                        )}
+                        {storePhotoUploading && (
+                          <div className="absolute inset-0 flex items-center justify-center rounded-2xl bg-white/70">
+                            <span className="text-xs text-slate-500">Uploading...</span>
+                          </div>
+                        )}
+                      </div>
+                      <div>
+                        <p className="text-sm font-semibold text-slate-900">Store Photo</p>
+                        <p className="text-xs text-slate-500 mb-2">Upload a photo of your pharmacy store</p>
+                        <input ref={storePhotoInputRef} type="file" accept="image/*" className="hidden" onChange={handleStorePhotoUpload} />
+                        <button
+                          type="button"
+                          onClick={() => storePhotoInputRef.current?.click()}
+                          disabled={storePhotoUploading}
+                          className="inline-flex items-center gap-2 rounded-2xl bg-indigo-600 px-4 py-2 text-xs font-semibold text-white hover:bg-indigo-700 transition disabled:opacity-50"
+                        >
+                          <Upload size={14} /> {storePhotoUrl ? 'Change Photo' : 'Upload Photo'}
+                        </button>
+                      </div>
+                    </div>
                     <div className="grid gap-4 sm:grid-cols-2">
                       <div className="rounded-2xl bg-emerald-50 p-4">
                         <p className="text-xs text-emerald-600">Owner Name</p>
@@ -4102,20 +4381,30 @@ const StoreDashboard = () => {
                       ) : filteredStaffMembers.length ? (
                         staffPagination.items.map((member) => (
                           <div key={member._id} className="flex flex-col gap-3 rounded-3xl border border-slate-200 p-4 sm:flex-row sm:items-center sm:justify-between">
-                            <div>
-                              <p className="text-sm text-slate-700">
-                                <span className="font-semibold text-slate-900">Name:</span>{' '}
-                                {`${member.firstName} ${member.middleName ? `${member.middleName} ` : ''}${member.lastName}`}
-                              </p>
-                              <p className="text-sm text-slate-700">
-                                <span className="font-semibold text-slate-900">Role:</span> {member.role}
-                              </p>
-                              <p className="text-sm text-slate-700">
-                                <span className="font-semibold text-slate-900">Contact Number:</span> {member.contact}
-                              </p>
-                              <p className="text-sm text-slate-700">
-                                <span className="font-semibold text-slate-900">Email ID:</span> {member.email}
-                              </p>
+                            <div className="flex items-center gap-3">
+                              {/* Staff avatar */}
+                              {member.profilePhotoUrl ? (
+                                <img src={member.profilePhotoUrl} alt={member.firstName} className="h-12 w-12 rounded-full object-cover border border-slate-200 flex-shrink-0" />
+                              ) : (
+                                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-indigo-100 text-indigo-600 text-lg font-bold flex-shrink-0">
+                                  {(member.firstName?.[0] || '?').toUpperCase()}
+                                </div>
+                              )}
+                              <div>
+                                <p className="text-sm text-slate-700">
+                                  <span className="font-semibold text-slate-900">Name:</span>{' '}
+                                  {`${member.firstName} ${member.middleName ? `${member.middleName} ` : ''}${member.lastName}`}
+                                </p>
+                                <p className="text-sm text-slate-700">
+                                  <span className="font-semibold text-slate-900">Role:</span> {member.role}
+                                </p>
+                                <p className="text-sm text-slate-700">
+                                  <span className="font-semibold text-slate-900">Contact Number:</span> {member.contact}
+                                </p>
+                                <p className="text-sm text-slate-700">
+                                  <span className="font-semibold text-slate-900">Email ID:</span> {member.email}
+                                </p>
+                              </div>
                             </div>
                             <div className="flex flex-wrap gap-2">
                               <button
@@ -5200,15 +5489,23 @@ const StoreDashboard = () => {
             )}
 
             {selectedSection === 'inventory' && (
-              <div className="grid gap-6 xl:grid-cols-[1fr_420px]">
-                <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-                  <div className="flex items-center gap-3 mb-6">
+              <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+                <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
+                  <div className="flex items-center gap-3">
                     <Package className="text-emerald-600" size={24} />
                     <div>
                       <h2 className="text-xl font-semibold text-slate-900">Inventory Management</h2>
                       <p className="text-sm text-slate-500">Track stock, update quantities, and manage products mapped to your store only.</p>
                     </div>
                   </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowAddMedicineModal(true)}
+                    className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-700"
+                  >
+                    <Plus size={16} /> Add Medicine
+                  </button>
+                </div>
 
                   <div className="mb-6 rounded-2xl border border-cyan-200 bg-cyan-50 p-4">
                     <div className="flex flex-wrap items-center justify-between gap-3">
@@ -5289,18 +5586,92 @@ const StoreDashboard = () => {
                     )}
                   </div>
 
+                  <div className="mb-6 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                    <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                      <p className="text-sm font-semibold text-slate-800">Filter Medicines</p>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setInventoryManufacturerFilter('all');
+                          setInventoryTypeFilter('all');
+                          setInventoryPriceMin('');
+                          setInventoryPriceMax('');
+                        }}
+                        className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100"
+                      >
+                        Clear Filters
+                      </button>
+                    </div>
+                    <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                      <div>
+                        <label className="block text-xs font-medium text-slate-600">Manufacturer</label>
+                        <select
+                          value={inventoryManufacturerFilter}
+                          onChange={(event) => setInventoryManufacturerFilter(event.target.value)}
+                          className="mt-1 block w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900"
+                        >
+                          <option value="all">All Manufacturers</option>
+                          {inventoryManufacturerOptions.map((manufacturer) => (
+                            <option key={`manufacturer-filter-${manufacturer}`} value={manufacturer}>{manufacturer}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-slate-600">Medicine Type</label>
+                        <select
+                          value={inventoryTypeFilter}
+                          onChange={(event) => setInventoryTypeFilter(event.target.value)}
+                          className="mt-1 block w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900"
+                        >
+                          <option value="all">All Types</option>
+                          {inventoryTypeOptions.map((typeValue) => (
+                            <option key={`inventory-type-filter-${typeValue}`} value={typeValue}>{typeValue}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-slate-600">Min Price</label>
+                        <input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={inventoryPriceMin}
+                          onChange={(event) => setInventoryPriceMin(event.target.value)}
+                          placeholder="e.g. 20"
+                          className="mt-1 block w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-slate-600">Max Price</label>
+                        <input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={inventoryPriceMax}
+                          onChange={(event) => setInventoryPriceMax(event.target.value)}
+                          placeholder="e.g. 500"
+                          className="mt-1 block w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900"
+                        />
+                      </div>
+                    </div>
+                    <p className="mt-3 text-xs text-slate-500">
+                      Showing {filteredInventoryItems.length} of {inventoryItems.length} medicines.
+                    </p>
+                  </div>
+
                   {inventoryLoading ? (
                     <div className="rounded-2xl border border-slate-200 bg-slate-50 p-8 text-center text-sm text-slate-500">
                       Loading store inventory...
                     </div>
-                  ) : inventoryItems.length === 0 ? (
+                    ) : filteredInventoryItems.length === 0 ? (
                     <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-8 text-center text-sm text-slate-500">
-                      No medicines in this store inventory yet. Add your first medicine from the panel on the right.
+                        No medicines matched the selected filters.
                     </div>
                   ) : (
                     <div className="space-y-4">
-                      {inventoryPagination.items.map((item) => (
-                      <div key={item._id} className="rounded-3xl border border-slate-200 p-4">
+                      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+                        {inventoryPagination.items.map((item) => (
+                        <div key={item._id} className="rounded-3xl border border-slate-200 p-4">
                         {editingMedicineId === item._id ? (
                           <div className="space-y-3">
                             <div>
@@ -5452,113 +5823,139 @@ const StoreDashboard = () => {
                             </div>
                           </div>
                         )}
+                        </div>
+                      ))}
                       </div>
-                    ))}
                       {renderPaginationControls({
                         meta: inventoryPagination,
                         onPageChange: (page) => updatePagination('inventory', { page }),
                         onPageSizeChange: (pageSize) => updatePagination('inventory', { page: 1, pageSize }),
+                        pageSizeOptions: INVENTORY_PAGE_SIZE_OPTIONS,
                       })}
                     </div>
                   )}
-                </div>
-                <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-                  <div className="flex items-center gap-3 mb-6">
-                    <Package className="text-slate-700" size={24} />
-                    <div>
-                      <h2 className="text-xl font-semibold text-slate-900">Add Medicine</h2>
-                      <p className="text-sm text-slate-500">Create new inventory entries quickly.</p>
+
+                {showAddMedicineModal && (
+                  <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4">
+                    <div className="w-full max-w-2xl rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl">
+                      <div className="mb-6 flex items-start justify-between gap-3">
+                        <div className="flex items-center gap-3">
+                          <Package className="text-slate-700" size={24} />
+                          <div>
+                            <h3 className="text-xl font-semibold text-slate-900">Add Medicine</h3>
+                            <p className="text-sm text-slate-500">Create new inventory entries quickly.</p>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setShowAddMedicineModal(false)}
+                          className="rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-200"
+                        >
+                          Close
+                        </button>
+                      </div>
+
+                      <form className="space-y-4" onSubmit={addMedicine}>
+                        <div>
+                          <label className="block text-sm font-medium text-slate-700">Medicine Name</label>
+                          <input
+                            name="name"
+                            value={newMedicine.name}
+                            onChange={handleNewMedicineChange}
+                            className="mt-1 block w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-blue-500"
+                            placeholder="e.g. Paracetamol 500mg"
+                            required
+                          />
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          <div>
+                            <label className="block text-sm font-medium text-slate-700">Manufacturer</label>
+                            <select
+                              name="providerId"
+                              value={newMedicine.providerId}
+                              onChange={handleNewMedicineChange}
+                              className="mt-1 block w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-blue-500"
+                            >
+                              <option value="">Select Manufacturer</option>
+                              {providerMaster.map((provider) => (
+                                <option key={`new-provider-${provider._id}`} value={provider._id}>{provider.name}</option>
+                              ))}
+                            </select>
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-slate-700">Dosage</label>
+                            <input
+                              name="dosage"
+                              value={newMedicine.dosage}
+                              onChange={handleNewMedicineChange}
+                              className="mt-1 block w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-blue-500"
+                              placeholder="e.g. 500mg"
+                            />
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          <div>
+                            <label className="block text-sm font-medium text-slate-700">Type</label>
+                            <select
+                              name="type"
+                              value={newMedicine.type}
+                              onChange={handleNewMedicineChange}
+                              className="mt-1 block w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-blue-500"
+                            >
+                              <option value="">Select Type</option>
+                              {MEDICINE_TYPE_OPTIONS.map((typeValue) => (
+                                <option key={`new-type-${typeValue}`} value={typeValue}>{typeValue}</option>
+                              ))}
+                            </select>
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-slate-700">Price</label>
+                            <input
+                              name="price"
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              value={newMedicine.price}
+                              onChange={handleNewMedicineChange}
+                              className="mt-1 block w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-blue-500"
+                              placeholder="e.g. 49.99"
+                            />
+                          </div>
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-slate-700">Stock</label>
+                          <input
+                            name="stock"
+                            type="number"
+                            min="0"
+                            value={newMedicine.stock}
+                            onChange={handleNewMedicineChange}
+                            className="mt-1 block w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-blue-500"
+                            placeholder="Enter starting stock"
+                            required
+                          />
+                        </div>
+
+                        <div className="flex flex-wrap justify-end gap-2 pt-2">
+                          <button
+                            type="button"
+                            onClick={() => setShowAddMedicineModal(false)}
+                            className="rounded-2xl bg-slate-100 px-5 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-200 transition"
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            type="submit"
+                            disabled={inventorySaving}
+                            className="rounded-2xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white hover:bg-blue-700 transition"
+                          >
+                            {inventorySaving ? 'Adding...' : 'Add Medicine'}
+                          </button>
+                        </div>
+                      </form>
                     </div>
                   </div>
-                  <form className="space-y-4" onSubmit={addMedicine}>
-                    <div>
-                      <label className="block text-sm font-medium text-slate-700">Medicine Name</label>
-                      <input
-                        name="name"
-                        value={newMedicine.name}
-                        onChange={handleNewMedicineChange}
-                        className="mt-1 block w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-blue-500"
-                        placeholder="e.g. Paracetamol 500mg"
-                        required
-                      />
-                    </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      <div>
-                        <label className="block text-sm font-medium text-slate-700">Manufacturer</label>
-                        <select
-                          name="providerId"
-                          value={newMedicine.providerId}
-                          onChange={handleNewMedicineChange}
-                          className="mt-1 block w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-blue-500"
-                        >
-                          <option value="">Select Manufacturer</option>
-                          {providerMaster.map((provider) => (
-                            <option key={`new-provider-${provider._id}`} value={provider._id}>{provider.name}</option>
-                          ))}
-                        </select>
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-slate-700">Dosage</label>
-                        <input
-                          name="dosage"
-                          value={newMedicine.dosage}
-                          onChange={handleNewMedicineChange}
-                          className="mt-1 block w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-blue-500"
-                          placeholder="e.g. 500mg"
-                        />
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      <div>
-                        <label className="block text-sm font-medium text-slate-700">Type</label>
-                        <select
-                          name="type"
-                          value={newMedicine.type}
-                          onChange={handleNewMedicineChange}
-                          className="mt-1 block w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-blue-500"
-                        >
-                          <option value="">Select Type</option>
-                          {MEDICINE_TYPE_OPTIONS.map((typeValue) => (
-                            <option key={`new-type-${typeValue}`} value={typeValue}>{typeValue}</option>
-                          ))}
-                        </select>
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-slate-700">Price</label>
-                        <input
-                          name="price"
-                          type="number"
-                          min="0"
-                          step="0.01"
-                          value={newMedicine.price}
-                          onChange={handleNewMedicineChange}
-                          className="mt-1 block w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-blue-500"
-                          placeholder="e.g. 49.99"
-                        />
-                      </div>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-slate-700">Stock</label>
-                      <input
-                        name="stock"
-                        type="number"
-                        min="0"
-                        value={newMedicine.stock}
-                        onChange={handleNewMedicineChange}
-                        className="mt-1 block w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-blue-500"
-                        placeholder="Enter starting stock"
-                        required
-                      />
-                    </div>
-                    <button
-                      type="submit"
-                      disabled={inventorySaving}
-                      className="w-full rounded-2xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white hover:bg-blue-700 transition"
-                    >
-                      {inventorySaving ? 'Adding...' : 'Add Medicine'}
-                    </button>
-                  </form>
-                </div>
+                )}
               </div>
             )}
 
@@ -7350,6 +7747,162 @@ const StoreDashboard = () => {
                 </div>
               </div>
             )}
+
+            {/* ── Store Settings ──────────────────────────────────────────── */}
+            {selectedSection === 'storeSettings' && dashboardAccessRole === 'Store Admin' && (
+              <div className="space-y-6">
+                <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+                  <div className="flex items-center gap-3 mb-6">
+                    <Settings className="text-indigo-600" size={24} />
+                    <div>
+                      <h2 className="text-xl font-semibold text-slate-900">Store Settings</h2>
+                      <p className="text-sm text-slate-500">Configure store hours, delivery radius, and payment methods.</p>
+                    </div>
+                  </div>
+
+                  {storeSettingsLoading ? (
+                    <div className="py-10 text-center text-sm text-slate-500">Loading settings...</div>
+                  ) : (
+                    <div className="space-y-8">
+
+                      {/* ── Store Hours ── */}
+                      <div>
+                        <div className="flex items-center gap-2 mb-4">
+                          <Clock className="text-indigo-500" size={18} />
+                          <h3 className="text-base font-semibold text-slate-900">Store Hours</h3>
+                        </div>
+                        <div className="overflow-x-auto rounded-2xl border border-slate-200">
+                          <table className="w-full text-sm">
+                            <thead>
+                              <tr className="bg-slate-50 border-b border-slate-200">
+                                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase">Day</th>
+                                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase">Open</th>
+                                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase">Close</th>
+                                <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase">Closed All Day</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {DAYS_OF_WEEK.map((day, idx) => {
+                                const hours = storeSettings.storeHours?.[day] || {};
+                                return (
+                                  <tr key={day} className={`border-b border-slate-100 ${idx % 2 === 0 ? '' : 'bg-slate-50/50'}`}>
+                                    <td className="px-4 py-3 font-medium text-slate-800 capitalize">{day}</td>
+                                    <td className="px-4 py-3">
+                                      <input
+                                        type="time"
+                                        value={hours.open || '09:00'}
+                                        disabled={hours.closed}
+                                        onChange={(e) => updateDayHours(day, 'open', e.target.value)}
+                                        className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-slate-900 text-sm focus:border-indigo-400 focus:outline-none disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
+                                      />
+                                    </td>
+                                    <td className="px-4 py-3">
+                                      <input
+                                        type="time"
+                                        value={hours.close || '21:00'}
+                                        disabled={hours.closed}
+                                        onChange={(e) => updateDayHours(day, 'close', e.target.value)}
+                                        className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-slate-900 text-sm focus:border-indigo-400 focus:outline-none disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
+                                      />
+                                    </td>
+                                    <td className="px-4 py-3">
+                                      <label className="flex items-center gap-2 cursor-pointer">
+                                        <input
+                                          type="checkbox"
+                                          checked={Boolean(hours.closed)}
+                                          onChange={(e) => updateDayHours(day, 'closed', e.target.checked)}
+                                          className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                                        />
+                                        <span className="text-sm text-slate-600">Closed</span>
+                                      </label>
+                                    </td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+
+                      {/* ── Delivery Radius ── */}
+                      <div>
+                        <div className="flex items-center gap-2 mb-4">
+                          <MapPin className="text-emerald-500" size={18} />
+                          <h3 className="text-base font-semibold text-slate-900">Delivery Radius</h3>
+                        </div>
+                        <div className="flex items-center gap-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                          <input
+                            type="range"
+                            min="1"
+                            max="50"
+                            step="1"
+                            value={storeSettings.deliveryRadiusKm || 10}
+                            onChange={(e) => setStoreSettings((prev) => ({ ...prev, deliveryRadiusKm: Number(e.target.value) }))}
+                            className="flex-1 accent-indigo-600"
+                          />
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="number"
+                              min="1"
+                              max="50"
+                              value={storeSettings.deliveryRadiusKm || 10}
+                              onChange={(e) => setStoreSettings((prev) => ({ ...prev, deliveryRadiusKm: Math.min(50, Math.max(1, Number(e.target.value) || 1)) }))}
+                              className="w-20 rounded-xl border border-slate-200 bg-white px-3 py-2 text-center text-slate-900 font-semibold focus:border-indigo-400 focus:outline-none"
+                            />
+                            <span className="text-sm text-slate-600 font-medium">km</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* ── Accepted Payment Methods ── */}
+                      <div>
+                        <div className="flex items-center gap-2 mb-4">
+                          <CreditCard className="text-blue-500" size={18} />
+                          <h3 className="text-base font-semibold text-slate-900">Accepted Payment Methods</h3>
+                        </div>
+                        <div className="flex flex-wrap gap-3">
+                          {PAYMENT_OPTIONS.map((method) => {
+                            const selected = (storeSettings.acceptedPayments || []).includes(method);
+                            return (
+                              <button
+                                key={method}
+                                type="button"
+                                onClick={() => togglePaymentMethod(method)}
+                                className={`inline-flex items-center gap-2 rounded-2xl border px-4 py-2 text-sm font-semibold transition ${
+                                  selected
+                                    ? 'border-indigo-600 bg-indigo-50 text-indigo-700'
+                                    : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                                }`}
+                              >
+                                {selected && <CheckCircle2 size={14} />}
+                                {method}
+                              </button>
+                            );
+                          })}
+                        </div>
+                        {(storeSettings.acceptedPayments || []).length === 0 && (
+                          <p className="mt-2 text-xs text-amber-600">Please select at least one payment method.</p>
+                        )}
+                      </div>
+
+                      {/* ── Save ── */}
+                      <div className="flex justify-end">
+                        <button
+                          type="button"
+                          onClick={saveStoreSettings}
+                          disabled={storeSettingsSaving || (storeSettings.acceptedPayments || []).length === 0}
+                          className="inline-flex items-center gap-2 rounded-2xl bg-indigo-600 px-6 py-3 text-sm font-semibold text-white hover:bg-indigo-700 transition disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          {storeSettingsSaving ? 'Saving...' : 'Save Settings'}
+                        </button>
+                      </div>
+
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
           </main>
         </div>
 

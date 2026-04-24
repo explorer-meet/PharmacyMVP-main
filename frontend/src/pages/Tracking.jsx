@@ -176,7 +176,7 @@ function Tracking() {
           return result;
         }
       }
-    } catch (error) {
+    } catch {
       clearTimeout(photonTimeout);
     }
 
@@ -189,7 +189,7 @@ function Tracking() {
         `https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&limit=1&countrycodes=${encodeURIComponent(countryHint)}&q=${encodeURIComponent(query)}`,
         { signal: controller.signal }
       );
-    } catch (error) {
+    } catch {
       clearTimeout(timeout);
       throw new Error(`Request failed for query: "${query}"`);
     }
@@ -326,7 +326,7 @@ function Tracking() {
     for (const query of queries) {
       try {
         return await geocodeAddress(query);
-      } catch (error) {
+      } catch {
         attempted.push(query);
       }
     }

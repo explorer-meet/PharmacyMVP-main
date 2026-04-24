@@ -9,6 +9,19 @@ export default defineConfig({
     port: process.env.PORT || 3000, // Use Render's PORT or fallback to 3000
   },
   build: {
-    outDir: 'build', 
-  }
+    outDir: 'build',
+    cssCodeSplit: true,
+    chunkSizeWarningLimit: 900,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          react: ['react', 'react-dom', 'react-router-dom'],
+          charts: ['recharts'],
+          maps: ['leaflet', 'react-leaflet', '@react-google-maps/api'],
+          web3: ['ethers'],
+          http: ['axios'],
+        },
+      },
+    },
+  },
 });

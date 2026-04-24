@@ -1,6 +1,42 @@
 const mongoose = require("mongoose");
 const bcrypt = require("bcrypt");
 
+const familyProfileSchema = new mongoose.Schema({
+   fullName: {
+      type: String,
+      trim: true,
+      required: true,
+   },
+   relation: {
+      type: String,
+      trim: true,
+      required: true,
+   },
+   dob: {
+      type: String,
+      default: '',
+      trim: true,
+   },
+   sex: {
+      type: String,
+      default: '',
+      trim: true,
+   },
+   medicalConditions: {
+      type: [String],
+      default: [],
+   },
+   allergies: {
+      type: [String],
+      default: [],
+   },
+   notes: {
+      type: String,
+      default: '',
+      trim: true,
+   },
+}, { _id: true });
+
 const userSchema = new mongoose.Schema({
    // Core User Identity
    name: {
@@ -88,6 +124,18 @@ const userSchema = new mongoose.Schema({
    bloodgroup: {
       type: String,
       require: true,
+   },
+   medicalConditions: {
+      type: [String],
+      default: [],
+   },
+   allergies: {
+      type: [String],
+      default: [],
+   },
+   familyProfiles: {
+      type: [familyProfileSchema],
+      default: [],
    },
 
    // Pharmacy/Store Owner Information (if applicable)

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { ShoppingCart, X, Trash, Lock, Plus, Minus, ArrowLeft, Gift, Sparkles, Tag, CheckCircle2 } from 'lucide-react';
+import { ShoppingCart, X, Trash, Lock, Plus, Minus, ArrowLeft, Gift, Sparkles, Tag, CheckCircle2, AlertTriangle } from 'lucide-react';
 import axios from 'axios';
 import { baseURL } from '../main';
 import { useNavigate } from 'react-router-dom';
@@ -29,6 +29,9 @@ const CartPage = ({ appliedCampaign = null, selectedStoreId = null }) => {
     }
   });
   const [isLoading, setIsLoading] = useState(true);
+  const [interactionCheckLoading, setInteractionCheckLoading] = useState(false);
+  const [interactionWarnings, setInteractionWarnings] = useState([]);
+  const [contraindicationWarnings, setContraindicationWarnings] = useState([]);
   const navigate = useNavigate();
   
   // Use passed selectedStoreId or retrieve from localStorage
@@ -120,6 +123,45 @@ const CartPage = ({ appliedCampaign = null, selectedStoreId = null }) => {
   useEffect(() => {
     fetchCartData();
   }, []);
+
+  useEffect(() => {
+    const runInteractionCheck = async () => {
+      const token = localStorage.getItem('medVisionToken');
+      if (!token || cartItems.length === 0) {
+        setInteractionWarnings([]);
+        setContraindicationWarnings([]);
+        return;
+      }
+
+      const medicineNames = cartItems.map((item) => item.name).filter(Boolean);
+      if (medicineNames.length < 2) {
+        setInteractionWarnings([]);
+      }
+
+      try {
+        setInteractionCheckLoading(true);
+        const response = await axios.post(`${baseURL}/health/interactions/check`, {
+          medicineNames,
+          profileConditions: Array.isArray(userData?.medicalConditions) ? userData.medicalConditions : [],
+        }, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        setInteractionWarnings(response.data?.warnings || []);
+        setContraindicationWarnings(response.data?.contraindications || []);
+      } catch (error) {
+        console.error('Error checking interactions:', error.message);
+        setInteractionWarnings([]);
+        setContraindicationWarnings([]);
+      } finally {
+        setInteractionCheckLoading(false);
+      }
+    };
+
+    runInteractionCheck();
+  }, [cartItems, userData]);
 
   useEffect(() => {
     const handleCartUpdated = () => {
@@ -306,6 +348,16 @@ const CartPage = ({ appliedCampaign = null, selectedStoreId = null }) => {
   };
 
   const handleProceedToCheckout = async () => {
+    if (contraindicationWarnings.length > 0) {
+      const shouldProceed = window.confirm('Potential contraindications detected with your profile conditions. Do you still want to proceed to checkout?');
+      if (!shouldProceed) return;
+    }
+
+    if (interactionWarnings.some((warning) => String(warning.severity || '').toLowerCase() === 'high')) {
+      const shouldProceed = window.confirm('High-severity medicine interactions detected. Do you still want to proceed to checkout?');
+      if (!shouldProceed) return;
+    }
+
     try {
       localStorage.setItem(checkoutCartStorageKey, JSON.stringify(cartItems));
       const checkoutSummary = {
@@ -570,6 +622,30 @@ const CartPage = ({ appliedCampaign = null, selectedStoreId = null }) => {
 
               {/* Checkout Button */}
               <div className="p-6 bg-gradient-to-br from-blue-600 to-cyan-600">
+                {(interactionCheckLoading || interactionWarnings.length > 0 || contraindicationWarnings.length > 0) && (
+                  <div className="mb-4 rounded-xl border border-amber-200 bg-white/95 p-3 text-left">
+                    <div className="flex items-center gap-2">
+                      <AlertTriangle className="w-4 h-4 text-amber-600" />
+                      <p className="text-xs font-bold text-amber-800">Safety Check Before Checkout</p>
+                    </div>
+                    {interactionCheckLoading ? (
+                      <p className="mt-1 text-xs text-amber-700">Checking interactions and contraindications...</p>
+                    ) : (
+                      <>
+                        {interactionWarnings.slice(0, 3).map((warning, index) => (
+                          <p key={`interaction-${index}`} className="mt-1 text-xs text-slate-700">
+                            <span className="font-semibold text-amber-700">{warning.severity} interaction:</span> {warning.medicines?.join(' + ')} - {warning.note}
+                          </p>
+                        ))}
+                        {contraindicationWarnings.slice(0, 3).map((warning, index) => (
+                          <p key={`contraindication-${index}`} className="mt-1 text-xs text-slate-700">
+                            <span className="font-semibold text-rose-700">{warning.severity} contraindication:</span> {warning.condition} with {warning.medicines?.join(', ')} - {warning.note}
+                          </p>
+                        ))}
+                      </>
+                    )}
+                  </div>
+                )}
                 <button
                   onClick={handleProceedToCheckout}
                   disabled={!paylock}

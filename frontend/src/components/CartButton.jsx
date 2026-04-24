@@ -345,24 +345,55 @@ const CartButton = ({ openOnMount = false, appliedCampaign = null, selectedStore
 
   return (
     <>
-      <button
-        onClick={userData?._id ? viewCartModal : null}
-        className={`fixed bottom-6 right-6 z-50 w-16 h-16 rounded-2xl shadow-xl border flex items-center justify-center transition-all duration-300 ${
-          userData?._id
-            ? 'bg-gradient-to-br from-blue-600 to-cyan-500 text-white border-blue-400/40 hover:scale-110 hover:shadow-blue-400/40 active:scale-95'
-            : 'bg-gray-300 text-gray-500 border-gray-200 cursor-not-allowed'
-        }`}
-        disabled={!userData?._id}
-        aria-label="Open Cart"
-      >
-        <ShoppingCart className="w-7 h-7" />
-
-        {cartItems.length > 0 && (
-          <div className="absolute -top-2 -right-2 bg-rose-500 text-white text-xs font-bold rounded-full min-w-6 h-6 px-1.5 flex items-center justify-center ring-2 ring-white">
-            {cartItems.length}
-          </div>
+      <div className="fixed bottom-4 right-4 z-50 sm:bottom-5 sm:right-5">
+        {userData?._id && cartItems.length > 0 && (
+          <div className="pointer-events-none absolute inset-0 rounded-[24px] bg-cyan-200/40 blur-xl" />
         )}
-      </button>
+        <button
+          onClick={userData?._id ? viewCartModal : null}
+          className={`relative flex min-w-[176px] items-center gap-3 rounded-[24px] border px-3.5 py-3 text-left shadow-lg transition-all duration-300 sm:min-w-[192px] ${
+            userData?._id
+              ? 'bg-white/95 text-slate-900 border-slate-200 backdrop-blur-md hover:-translate-y-0.5 hover:border-cyan-200 hover:shadow-cyan-100 active:translate-y-0'
+              : 'bg-slate-200/95 text-slate-500 border-slate-300 cursor-not-allowed'
+          }`}
+          disabled={!userData?._id}
+          aria-label={cartItems.length > 0 ? `View cart with ${cartItems.length} items` : 'Open cart'}
+        >
+          <div className={`relative inline-flex h-12 w-12 items-center justify-center rounded-2xl border ${
+            userData?._id
+              ? 'border-cyan-100 bg-gradient-to-br from-cyan-50 to-emerald-50 text-cyan-700'
+              : 'border-slate-300 bg-white/60'
+          }`}>
+            <ShoppingCart className="h-6 w-6" />
+            {cartItems.length > 0 && (
+              <div className="absolute -right-1.5 -top-1.5 flex h-6 min-w-6 items-center justify-center rounded-full bg-rose-500 px-1.5 text-[11px] font-bold text-white ring-2 ring-white">
+                {cartItems.length}
+              </div>
+            )}
+          </div>
+
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center justify-between gap-2">
+              <p className="truncate text-sm font-bold tracking-wide">
+                {cartItems.length > 0 ? 'View Cart' : 'Cart'}
+              </p>
+              <span className={`rounded-full px-2 py-1 text-[10px] font-bold uppercase tracking-[0.14em] ${
+                userData?._id
+                  ? 'bg-slate-100 text-slate-500'
+                  : 'bg-white/70 text-slate-500'
+              }`}>
+                {cartItems.length > 0 ? `${cartItems.length}` : '0'}
+              </span>
+            </div>
+            <p className={`mt-1 text-[11px] ${userData?._id ? 'text-slate-500' : 'text-slate-500'}`}>
+              {cartItems.length > 0 ? 'Ready for checkout' : 'Add medicines'}
+            </p>
+            <p className={`mt-1 text-sm font-extrabold ${userData?._id ? 'text-cyan-700' : 'text-slate-600'}`}>
+              {formatUsd(finalAmount)}
+            </p>
+          </div>
+        </button>
+      </div>
 
 
       {/* Modal */}

@@ -22,6 +22,20 @@ const ExistingStoreSchema = new mongoose.Schema(
     status: { type: String, required: true },
     reviewNotes: { type: String, default: '' },
     reviewedAt: { type: Date },
+    storePhotoUrl: { type: String, default: '' },
+    settings: {
+      storeHours: {
+        monday:    { open: { type: String, default: '09:00' }, close: { type: String, default: '21:00' }, closed: { type: Boolean, default: false } },
+        tuesday:   { open: { type: String, default: '09:00' }, close: { type: String, default: '21:00' }, closed: { type: Boolean, default: false } },
+        wednesday: { open: { type: String, default: '09:00' }, close: { type: String, default: '21:00' }, closed: { type: Boolean, default: false } },
+        thursday:  { open: { type: String, default: '09:00' }, close: { type: String, default: '21:00' }, closed: { type: Boolean, default: false } },
+        friday:    { open: { type: String, default: '09:00' }, close: { type: String, default: '21:00' }, closed: { type: Boolean, default: false } },
+        saturday:  { open: { type: String, default: '09:00' }, close: { type: String, default: '21:00' }, closed: { type: Boolean, default: false } },
+        sunday:    { open: { type: String, default: '10:00' }, close: { type: String, default: '18:00' }, closed: { type: Boolean, default: true } },
+      },
+      deliveryRadiusKm: { type: Number, default: 10 },
+      acceptedPayments: { type: [String], default: ['Cash', 'UPI', 'Card'] },
+    },
   },
   { timestamps: true },
 );

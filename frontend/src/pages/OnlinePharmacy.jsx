@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { Pill, HeartPulse, Activity, Brain, ShieldPlus, Thermometer, MapPin, ChevronDown, AlertCircle, Star, Upload } from 'lucide-react';
+import { useState, useEffect, useMemo } from 'react';
+import { Pill, HeartPulse, Activity, Brain, ShieldPlus, Thermometer, MapPin, ChevronDown, AlertCircle, Star, Upload, Clock3 } from 'lucide-react';
 import SearchBar from '../components/SearchBar';
 import CartButton from '../components/CartButton';
 import PrescriptionUploadModal from '../components/PrescriptionUploadModal';
@@ -344,6 +344,22 @@ function OnlinePharmacy() {
   // Derived State
 
   const currentStore = selectedStore ? stores.find(store => store._id === selectedStore) : null;
+  const dayLookup = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+  const todayKey = dayLookup[new Date().getDay()];
+
+  const currentStoreTodaySchedule = useMemo(() => {
+    const dayConfig = currentStore?.settings?.storeHours?.[todayKey] || null;
+    if (!dayConfig) return null;
+
+    const open = String(dayConfig.open || '').trim();
+    const close = String(dayConfig.close || '').trim();
+    const closed = Boolean(dayConfig.closed);
+
+    return {
+      closed,
+      text: closed ? 'Closed Today' : `Open Today: ${open || '--:--'} - ${close || '--:--'}`,
+    };
+  }, [currentStore, todayKey]);
 
   const activeCondition = healthConditions.find((condition) => condition.key === selectedCondition) || healthConditions[0];
   const conditionFilteredMedicines = selectedCondition === 'favorites'
@@ -370,6 +386,16 @@ function OnlinePharmacy() {
     filterRequiresPrescription !== 'all'
   );
 
+  const manufacturerFilterOptions = useMemo(() => (
+    Array.from(
+      new Set(
+        (medicines || [])
+          .map((medicine) => String(medicine?.manufacturer || '').trim())
+          .filter(Boolean)
+      )
+    ).sort((a, b) => a.localeCompare(b))
+  ), [medicines]);
+
   const filteredMedicines = conditionFilteredMedicines.filter((medicine) => {
     // Text search
     const normalizedSearch = searchTerm.trim().toLowerCase();
@@ -387,7 +413,7 @@ function OnlinePharmacy() {
     // Manufacturer filter
     if (filterManufacturer.trim()) {
       const mfr = filterManufacturer.trim().toLowerCase();
-      if (!(medicine.manufacturer || '').toLowerCase().includes(mfr)) return false;
+      if ((medicine.manufacturer || '').toLowerCase() !== mfr) return false;
     }
     // Composition filter (matches dosage, uses, medicaluse, description)
     if (filterComposition.trim()) {
@@ -487,34 +513,36 @@ function OnlinePharmacy() {
             </div>
           </div>
         )}
-        <div className="relative bg-gradient-to-r from-slate-900 via-cyan-950 to-emerald-900 pt-10 pb-16">
+        <div className="relative bg-gradient-to-r from-slate-900 via-cyan-950 to-emerald-900 pt-6 pb-10">
           <div className="absolute -right-16 -top-16 h-56 w-56 rounded-full bg-cyan-400/10 blur-3xl" />
           <div className="absolute -left-10 -bottom-10 h-56 w-56 rounded-full bg-emerald-400/10 blur-3xl" />
 
           <div className="max-w-6xl mx-auto px-4 relative z-10">
-            {/* Header Top Section */}
-            <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-8 mb-10">
-              {/* Brand & Title */}
-              <div className="flex items-center gap-4">
-              </div>
-              {/* Stats Section */}
-            </div>
-
             {/* Current Store & Store Selection */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 items-start">
               {/* Current Store Info */}
               {currentStore && (
                 <div className="lg:col-span-2">
-                  <p className="text-xs font-semibold uppercase tracking-widest text-cyan-300 mb-2">Currently Viewing</p>
-                  <div className="bg-white/5 border border-white/20 rounded-2xl px-6 py-4">
-                    <h2 className="text-2xl font-black text-white mb-1">{currentStore.storeName || currentStore.name}</h2>
+                  <p className="text-[11px] font-semibold uppercase tracking-widest text-cyan-300 mb-1.5">Currently Viewing</p>
+                  <div className="bg-white/5 border border-white/20 rounded-2xl px-5 py-3">
+                    <h2 className="text-xl font-black text-white mb-1">{currentStore.storeName || currentStore.name}</h2>
                     <p className="text-cyan-100 text-sm">{currentStore.address}</p>
-                    <div className="mt-3 flex items-center gap-2">
+                    <div className="mt-2 flex items-center gap-2">
                       <MapPin className="w-4 h-4 text-cyan-300" />
                       <span className="inline-block px-3 py-1 bg-cyan-500/20 text-cyan-200 rounded-lg text-xs font-semibold">
                         Pincode: {currentStore.pincode}
                       </span>
                     </div>
+
+                    {currentStoreTodaySchedule && (
+                      <div className="mt-2 flex items-center gap-2">
+                        <Clock3 className="w-4 h-4 text-cyan-300" />
+                        <span className={`inline-block px-3 py-1 rounded-lg text-xs font-semibold ${currentStoreTodaySchedule.closed ? 'bg-rose-500/20 text-rose-200' : 'bg-emerald-500/20 text-emerald-200'}`}>
+                          {currentStoreTodaySchedule.text}
+                        </span>
+                      </div>
+                    )}
+
                   </div>
                 </div>
               )}
@@ -524,7 +552,7 @@ function OnlinePharmacy() {
                 <button
                   type="button"
                   onClick={() => setIsStoreDropdownOpen(!isStoreDropdownOpen)}
-                  className="w-full flex items-center gap-3 bg-gradient-to-br from-cyan-500 to-emerald-500 hover:from-cyan-600 hover:to-emerald-600 border border-white/20 rounded-2xl px-5 py-4 text-white transition-all duration-200 shadow-lg hover:shadow-xl"
+                  className="w-full flex items-center gap-3 bg-gradient-to-br from-cyan-500 to-emerald-500 hover:from-cyan-600 hover:to-emerald-600 border border-white/20 rounded-2xl px-4 py-3 text-white transition-all duration-200 shadow-lg hover:shadow-xl"
                 >
                   <MapPin className="w-5 h-5 flex-shrink-0" />
                   <div className="flex-1 text-left">
@@ -590,7 +618,7 @@ function OnlinePharmacy() {
 
         <CartButton openOnMount={openCartOnLoad} appliedCampaign={appliedCampaign} selectedStoreId={selectedStore} />
 
-        <div className="max-w-6xl mx-auto px-4 pb-8 mt-6">
+        <div className="max-w-6xl mx-auto px-4 pb-28 mt-6 sm:pb-32 lg:pb-24">
 
           {/* Search + Advanced Filters — unified card */}
           <div className="mb-8 bg-white/80 backdrop-blur-sm border border-slate-200 rounded-2xl shadow-sm p-4 transition-all duration-300">
@@ -648,7 +676,7 @@ function OnlinePharmacy() {
             >
               <div className="border-t border-slate-100 pt-4">
                 <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-4">Refine Results</p>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-[1.2fr_1fr_1.2fr_0.8fr_0.8fr_1fr_auto] xl:items-end">
                   <div>
                     <label className="block text-xs font-semibold text-slate-500 mb-1.5">Brand / Product Name</label>
                     <input
@@ -661,13 +689,16 @@ function OnlinePharmacy() {
                   </div>
                   <div>
                     <label className="block text-xs font-semibold text-slate-500 mb-1.5">Manufacturer</label>
-                    <input
-                      type="text"
+                    <select
                       value={filterManufacturer}
                       onChange={(e) => setFilterManufacturer(e.target.value)}
-                      placeholder="e.g. Cipla, Sun Pharma"
-                      className="w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:border-transparent focus:bg-white transition-all duration-200"
-                    />
+                      className="w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:border-transparent focus:bg-white transition-all duration-200"
+                    >
+                      <option value="">All Manufacturers</option>
+                      {manufacturerFilterOptions.map((manufacturer) => (
+                        <option key={`mfr-filter-${manufacturer}`} value={manufacturer}>{manufacturer}</option>
+                      ))}
+                    </select>
                   </div>
                   <div>
                     <label className="block text-xs font-semibold text-slate-500 mb-1.5">Composition / Active Ingredient</label>
@@ -701,7 +732,7 @@ function OnlinePharmacy() {
                       className="w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:border-transparent focus:bg-white transition-all duration-200"
                     />
                   </div>
-                  <div className="flex flex-col justify-between gap-3">
+                  <div className="flex flex-col gap-3 xl:pb-0.5">
                     <label className="flex items-center gap-2.5 cursor-pointer group">
                       <input
                         type="checkbox"
@@ -723,6 +754,15 @@ function OnlinePharmacy() {
                         <option value="yes">Prescription Required</option>
                       </select>
                     </div>
+                  </div>
+                  <div className="xl:pb-0.5">
+                    <button
+                      type="button"
+                      onClick={clearAdvancedFilters}
+                      className="w-full rounded-xl border border-rose-200 bg-rose-50 px-3 py-2.5 text-sm font-semibold text-rose-600 transition hover:bg-rose-100"
+                    >
+                      Reset Filters
+                    </button>
                   </div>
                 </div>
               </div>

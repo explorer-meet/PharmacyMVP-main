@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import axios from 'axios';
-import { Activity, Calendar, Pill, FileText, Clock, User, Menu, X, Home, CircleUser as UserCircle, ShoppingBag, Syringe, Bell, MessageSquare, Mail as MailIcon, Pencil, ClipboardList, DollarSign, Package, Truck, ChevronDown, ChevronUp, CreditCard, Plus, Minus, Trash2, CheckCircle2, Star, AlertTriangle, Info, Download, Search, RotateCcw, RefreshCw, Bot, Sparkles, Send } from 'lucide-react';
+import { Activity, Calendar, Pill, FileText, Clock, User, Menu, X, Home, CircleUser as UserCircle, ShoppingBag, Syringe, Bell, MessageSquare, Mail as MailIcon, Pencil, ClipboardList, DollarSign, Package, Truck, ChevronDown, ChevronUp, CreditCard, Plus, Trash2, CheckCircle2, Star, AlertTriangle, Info, Download, Search, RotateCcw, RefreshCw, Bot, Sparkles, Send } from 'lucide-react';
 import { baseURL } from '../main';
 import toast from 'react-hot-toast';
 import Loader from '../components/Loader';
@@ -82,6 +82,8 @@ const Dashboard = () => {
         city: '',
         state: '',
         pincode: '',
+        medicalConditions: '',
+        allergies: '',
     });
     const { countryOptions, stateOptions: profileStateOptions, getCountryLabelByDialCode } = useLocationOptions(profileForm.countryCode);
     const { lookupPincode, lookupLoading: profilePincodeLoading, lookupError: profilePincodeError, lookupDetails: profilePincodeDetails, pincodeOptions: profilePincodeOptions, resetPincodeLookup: resetProfilePincodeLookup } = usePincodeLookup();
@@ -155,6 +157,7 @@ const Dashboard = () => {
     const [prescriptionOrderPayment, setPrescriptionOrderPayment] = useState('COD');
     const [healthTrackers, setHealthTrackers] = useState([]);
     const [expiryReminders, setExpiryReminders] = useState([]);
+    const [refillPredictions, setRefillPredictions] = useState([]);
     const [medicalTimeline, setMedicalTimeline] = useState([]);
     const [healthLoading, setHealthLoading] = useState(false);
     const [healthExporting, setHealthExporting] = useState(false);
@@ -178,9 +181,23 @@ const Dashboard = () => {
         medicineName: '',
         dosage: '',
         frequency: '',
+        quantityOnHand: '',
+        dosagePerDay: '1',
         startDate: '',
         expiryDate: '',
     });
+    const [familyProfiles, setFamilyProfiles] = useState([]);
+    const [familyProfileLoading, setFamilyProfileLoading] = useState(false);
+    const [familyProfileForm, setFamilyProfileForm] = useState({
+        fullName: '',
+        relation: '',
+        dob: '',
+        sex: '',
+        medicalConditions: '',
+        allergies: '',
+        notes: '',
+    });
+    const [showFamilyProfileForm, setShowFamilyProfileForm] = useState(false);
     const [refillDraft, setRefillDraft] = useState({
         prescriptionId: null,
         prescriptionTitle: '',
@@ -546,6 +563,8 @@ const Dashboard = () => {
             city: userData?.city || '',
             state: userData?.state || '',
             pincode: userData?.pincode || '',
+            medicalConditions: Array.isArray(userData?.medicalConditions) ? userData.medicalConditions.join(', ') : '',
+            allergies: Array.isArray(userData?.allergies) ? userData.allergies.join(', ') : '',
         });
         setProfileErrors({});
         setProfileImageFile(null);
@@ -565,6 +584,8 @@ const Dashboard = () => {
             city: userData?.city || '',
             state: userData?.state || '',
             pincode: userData?.pincode || '',
+            medicalConditions: Array.isArray(userData?.medicalConditions) ? userData.medicalConditions.join(', ') : '',
+            allergies: Array.isArray(userData?.allergies) ? userData.allergies.join(', ') : '',
         });
         setProfileErrors({});
         setProfileImageFile(null);
@@ -583,6 +604,8 @@ const Dashboard = () => {
         const trimmedCity = profileForm.city.trim();
         const trimmedState = profileForm.state.trim();
         const trimmedPincode = profileForm.pincode.trim();
+        const trimmedMedicalConditions = profileForm.medicalConditions.trim();
+        const trimmedAllergies = profileForm.allergies.trim();
 
         const fullName = [trimmedFirstName, trimmedMiddleName, trimmedLastName].filter(Boolean).join(' ');
 
@@ -626,6 +649,8 @@ const Dashboard = () => {
             payload.append('city', trimmedCity);
             payload.append('state', trimmedState);
             payload.append('pincode', trimmedPincode);
+            payload.append('medicalConditions', trimmedMedicalConditions);
+            payload.append('allergies', trimmedAllergies);
 
             if (profileImageFile) {
                 payload.append('profileImage', profileImageFile);
@@ -1040,14 +1065,34 @@ const Dashboard = () => {
 
             setHealthTrackers(trackersRes.data.trackers || []);
             setExpiryReminders(trackersRes.data.expiryReminders || []);
+            setRefillPredictions(trackersRes.data.refillPredictions || []);
             setMedicalTimeline(timelineRes.data.events || []);
         } catch (error) {
             console.error('Error loading health data:', error.message);
             setHealthTrackers([]);
             setExpiryReminders([]);
+            setRefillPredictions([]);
             setMedicalTimeline([]);
         } finally {
             setHealthLoading(false);
+        }
+    };
+
+    const loadFamilyProfiles = async () => {
+        const token = localStorage.getItem('medVisionToken');
+        if (!token) return;
+
+        try {
+            setFamilyProfileLoading(true);
+            const response = await axios.get(`${baseURL}/family-profiles`, {
+                headers: { Authorization: `Bearer ${token}` },
+            });
+            setFamilyProfiles(response.data.familyProfiles || []);
+        } catch (error) {
+            console.error('Error loading family profiles:', error.message);
+            setFamilyProfiles([]);
+        } finally {
+            setFamilyProfileLoading(false);
         }
     };
 
@@ -1066,7 +1111,7 @@ const Dashboard = () => {
             await axios.post(`${baseURL}/health/trackers`, newTracker, {
                 headers: { Authorization: `Bearer ${token}` },
             });
-            setNewTracker({ medicineName: '', dosage: '', frequency: '', startDate: '', expiryDate: '' });
+            setNewTracker({ medicineName: '', dosage: '', frequency: '', quantityOnHand: '', dosagePerDay: '1', startDate: '', expiryDate: '' });
             setShowAddTrackerForm(false);
             setHealthActionType('success');
             setHealthActionMessage('Dosage tracker saved successfully.');
@@ -1183,6 +1228,98 @@ const Dashboard = () => {
         }
     };
 
+    const getEstimatedPriceForMedicine = (medicineName) => {
+        const normalizedName = String(medicineName || '').trim().toLowerCase();
+        if (!normalizedName || !Array.isArray(userOrders)) return 0;
+
+        for (const order of userOrders) {
+            const matchedItem = (order.items || []).find((item) => String(item.name || '').trim().toLowerCase() === normalizedName);
+            if (matchedItem?.price) {
+                return Number(matchedItem.price) || 0;
+            }
+        }
+
+        return 0;
+    };
+
+    const handleOneClickRefill = async (medicineName) => {
+        const token = localStorage.getItem('medVisionToken');
+        if (!token || !userData?._id) return;
+
+        const estimatedPrice = getEstimatedPriceForMedicine(medicineName);
+        if (!estimatedPrice) {
+            setHealthActionType('error');
+            setHealthActionMessage(`Unable to auto-refill ${medicineName} because price history is not available yet.`);
+            return;
+        }
+
+        try {
+            await axios.post(`${baseURL}/updateorderedmedicines`, {
+                id: userData._id,
+                name: medicineName,
+                price: estimatedPrice,
+            }, {
+                headers: { Authorization: `Bearer ${token}` },
+            });
+            setHealthActionType('success');
+            setHealthActionMessage(`${medicineName} added to cart for refill.`);
+            window.dispatchEvent(new CustomEvent('cart-updated'));
+        } catch (error) {
+            console.error('Error adding refill to cart:', error.message);
+            setHealthActionType('error');
+            setHealthActionMessage(`Failed to add ${medicineName} to cart.`);
+        }
+    };
+
+    const handleCreateFamilyProfile = async (event) => {
+        event.preventDefault();
+        const token = localStorage.getItem('medVisionToken');
+        if (!token) return;
+
+        if (!familyProfileForm.fullName.trim() || !familyProfileForm.relation.trim()) {
+            setHealthActionType('error');
+            setHealthActionMessage('Family profile requires full name and relation.');
+            return;
+        }
+
+        try {
+            const response = await axios.post(`${baseURL}/family-profiles`, familyProfileForm, {
+                headers: { Authorization: `Bearer ${token}` },
+            });
+            setFamilyProfiles(response.data.familyProfiles || []);
+            setFamilyProfileForm({
+                fullName: '',
+                relation: '',
+                dob: '',
+                sex: '',
+                medicalConditions: '',
+                allergies: '',
+                notes: '',
+            });
+            setShowFamilyProfileForm(false);
+        } catch (error) {
+            console.error('Error creating family profile:', error.message);
+            setHealthActionType('error');
+            setHealthActionMessage('Failed to add family profile.');
+        }
+    };
+
+    const handleDeleteFamilyProfile = async (profileId) => {
+        const token = localStorage.getItem('medVisionToken');
+        if (!token) return;
+
+        try {
+            const response = await axios.delete(`${baseURL}/family-profiles/${profileId}`, {
+                headers: { Authorization: `Bearer ${token}` },
+            });
+            setFamilyProfiles(response.data.familyProfiles || []);
+        } catch (error) {
+            console.error('Error deleting family profile:', error.message);
+            setHealthActionType('error');
+            setHealthActionMessage('Failed to remove family profile.');
+        }
+    };
+
     useEffect(() => {
         fetchDataFromApi();
         fetchMyOrders();
@@ -1192,6 +1329,7 @@ const Dashboard = () => {
         fetchMyQueries();
         loadVaccinations();
         loadHealthManagementData();
+        loadFamilyProfiles();
     }, []);
 
     useEffect(() => {
@@ -1208,6 +1346,8 @@ const Dashboard = () => {
             city: userData.city || '',
             state: userData.state || '',
             pincode: userData.pincode || '',
+            medicalConditions: Array.isArray(userData.medicalConditions) ? userData.medicalConditions.join(', ') : '',
+            allergies: Array.isArray(userData.allergies) ? userData.allergies.join(', ') : '',
         });
     }, [userData]);
 
@@ -1425,10 +1565,26 @@ const Dashboard = () => {
                 const totalAmount = Number(order?.totalAmount || subtotalAmount || 0);
                 const discountAmount = Math.max(0, subtotalAmount - totalAmount);
                 const finalAmount = Math.max(0, subtotalAmount - discountAmount);
+                const customerName = userData?.name || [userData?.firstName, userData?.lastName].filter(Boolean).join(' ') || 'N/A';
+                const customerEmail = userData?.email || 'N/A';
+                const customerMobile = userData?.mobile || 'N/A';
+                const deliveryAddress = String(order?.address || [userData?.address, userData?.city, userData?.state, userData?.pincode].filter(Boolean).join(', ') || 'Not provided');
+                const storeName = order?.storeName || order?.store?.storeName || order?.store?.name || 'N/A';
+                const storeAddress = [order?.storeAddress, order?.storeCity, order?.storeState, order?.storePincode].filter(Boolean).join(', ') || order?.store?.address || 'Not provided';
+                const storeMobile = order?.storeMobile || order?.store?.mobile || 'N/A';
+                const storeEmail = order?.storeEmail || order?.store?.email || 'N/A';
+                const orderStatusLabel = order?.trackingStatus || order?.status || 'Order Placed';
+                const deliveryTypeLabel = order?.deliveryType === 'pickup' ? 'Store Pick-up' : 'Home Delivery';
+                const invoiceDate = formatDashboardOrderDate(order?.date || order?.createdAt || new Date());
+                const expectedDelivery = order?.expectedDeliveryDate
+                    ? formatDashboardOrderDate(order.expectedDeliveryDate)
+                    : formatDashboardOrderDate(new Date(Date.now() + 3 * 24 * 60 * 60 * 1000));
+                const paymentLabel = getPaymentMeta(order.payment).label;
+            let invoiceContent = null;
 
                 try {
                         setDownloadingOrderId(order.id);
-                        const invoiceContent = document.createElement('div');
+                invoiceContent = document.createElement('div');
                         invoiceContent.style.cssText = 'position: absolute; left: -9999px; width: 850px; background: white; padding: 40px; font-family: Arial, sans-serif;';
 
                         const invoiceHTML = `
@@ -1438,11 +1594,36 @@ const Dashboard = () => {
                                     <p style="margin: 10px 0; color: #666; font-size: 14px;">Pharmacy MVP - Your Trusted Medicine Store</p>
                                 </div>
 
+                                <div style="display: inline-block; background-color: #10b981; color: white; padding: 8px 16px; border-radius: 20px; font-size: 12px; font-weight: bold; margin-bottom: 20px;">
+                                    ORDER CONFIRMED
+                                </div>
+
                                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 24px; padding: 16px; background-color: #f8fafc; border-radius: 10px;">
                                     <div><p style="font-size:12px;color:#666;margin:0 0 4px 0;">ORDER ID</p><p style="font-size:16px;margin:0;font-weight:600;">#${order.id}</p></div>
-                                    <div><p style="font-size:12px;color:#666;margin:0 0 4px 0;">DATE</p><p style="font-size:16px;margin:0;font-weight:600;">${formatDashboardOrderDate(order.date)}</p></div>
-                                    <div><p style="font-size:12px;color:#666;margin:0 0 4px 0;">CUSTOMER</p><p style="font-size:16px;margin:0;font-weight:600;">${userData?.name || 'N/A'}</p></div>
-                                    <div><p style="font-size:12px;color:#666;margin:0 0 4px 0;">PAYMENT</p><p style="font-size:16px;margin:0;font-weight:600;">${getPaymentMeta(order.payment).label}</p></div>
+                                    <div><p style="font-size:12px;color:#666;margin:0 0 4px 0;">INVOICE DATE</p><p style="font-size:16px;margin:0;font-weight:600;">${invoiceDate}</p></div>
+                                    <div><p style="font-size:12px;color:#666;margin:0 0 4px 0;">CUSTOMER</p><p style="font-size:16px;margin:0;font-weight:600;">${customerName}</p></div>
+                                    <div><p style="font-size:12px;color:#666;margin:0 0 4px 0;">PAYMENT</p><p style="font-size:16px;margin:0;font-weight:600;">${paymentLabel}</p></div>
+                                </div>
+
+                                <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:24px;">
+                                    <div style="padding:16px;background:#f0fdfa;border-radius:10px;border-left:4px solid #0f766e;">
+                                        <p style="font-size:12px;color:#666;margin:0 0 8px 0;text-transform:uppercase;font-weight:700;">Store Details</p>
+                                        <p style="margin:0;color:#111827;font-size:14px;line-height:1.5;">
+                                            <strong>${storeName}</strong><br/>
+                                            ${storeAddress}<br/>
+                                            <strong>Phone:</strong> ${storeMobile}<br/>
+                                            <strong>Email:</strong> ${storeEmail}
+                                        </p>
+                                    </div>
+                                    <div style="padding:16px;background:#f8fafc;border-radius:10px;border-left:4px solid #0284c7;">
+                                        <p style="font-size:12px;color:#666;margin:0 0 8px 0;text-transform:uppercase;font-weight:700;">Customer & Delivery</p>
+                                        <p style="margin:0;color:#111827;font-size:14px;line-height:1.5;">
+                                            <strong>${customerName}</strong><br/>
+                                            ${deliveryAddress}<br/>
+                                            <strong>Mobile:</strong> ${customerMobile}<br/>
+                                            <strong>Email:</strong> ${customerEmail}
+                                        </p>
+                                    </div>
                                 </div>
 
                                 <table style="width:100%; border-collapse: collapse; margin-bottom:24px;">
@@ -1466,10 +1647,26 @@ const Dashboard = () => {
                                     </tbody>
                                 </table>
 
-                                <div style="margin-left:auto; width:320px; border:1px solid #d1fae5; border-radius:10px; padding:14px; background:#f0fdfa;">
-                                    <div style="display:flex;justify-content:space-between;padding:6px 0;"><span>Subtotal</span><span>INR ${subtotalAmount.toFixed(2)}</span></div>
-                                    ${discountAmount > 0 ? `<div style="display:flex;justify-content:space-between;padding:6px 0;color:#0f766e;"><span>Discount</span><span>- INR ${discountAmount.toFixed(2)}</span></div>` : ''}
-                                    <div style="display:flex;justify-content:space-between;padding:10px 0 6px 0;border-top:2px solid #0f766e;font-weight:700;"><span>Total</span><span>INR ${finalAmount.toFixed(2)}</span></div>
+                                <div style="display:grid;grid-template-columns:1fr 320px;gap:16px;align-items:start;">
+                                    <div style="border:1px solid #e2e8f0;border-radius:10px;padding:14px;background:#f8fafc;">
+                                        <p style="font-size:12px;color:#666;margin:0 0 10px 0;text-transform:uppercase;font-weight:700;">Order Details</p>
+                                        <div style="display:flex;justify-content:space-between;padding:5px 0;font-size:13px;"><span style="color:#475569;">Order Status</span><span style="font-weight:600;color:#0f172a;">${orderStatusLabel}</span></div>
+                                        <div style="display:flex;justify-content:space-between;padding:5px 0;font-size:13px;"><span style="color:#475569;">Delivery Type</span><span style="font-weight:600;color:#0f172a;">${deliveryTypeLabel}</span></div>
+                                        <div style="display:flex;justify-content:space-between;padding:5px 0;font-size:13px;"><span style="color:#475569;">Expected Delivery</span><span style="font-weight:600;color:#0f172a;">${expectedDelivery}</span></div>
+                                        <div style="display:flex;justify-content:space-between;padding:5px 0;font-size:13px;"><span style="color:#475569;">Items</span><span style="font-weight:600;color:#0f172a;">${items.length}</span></div>
+                                    </div>
+
+                                    <div style="margin-left:auto; width:320px; border:1px solid #d1fae5; border-radius:10px; padding:14px; background:#f0fdfa;">
+                                        <p style="font-size:12px;color:#666;margin:0 0 10px 0;text-transform:uppercase;font-weight:700;">Price Summary</p>
+                                        <div style="display:flex;justify-content:space-between;padding:6px 0;"><span>Subtotal</span><span>INR ${subtotalAmount.toFixed(2)}</span></div>
+                                        ${discountAmount > 0 ? `<div style="display:flex;justify-content:space-between;padding:6px 0;color:#0f766e;"><span>Discount</span><span>- INR ${discountAmount.toFixed(2)}</span></div>` : ''}
+                                        <div style="display:flex;justify-content:space-between;padding:6px 0;"><span>Taxes & Fees</span><span>INR 0.00</span></div>
+                                        <div style="display:flex;justify-content:space-between;padding:10px 0 6px 0;border-top:2px solid #0f766e;font-weight:700;"><span>Total</span><span>INR ${finalAmount.toFixed(2)}</span></div>
+                                    </div>
+                                </div>
+
+                                <div style="text-align:center; border-top:1px solid #e2e8f0; margin-top:24px; padding-top:12px; color:#6b7280; font-size:12px;">
+                                    Thank you for ordering with Pharmacy MVP. Generated on ${new Date().toLocaleString('en-IN')}.
                                 </div>
                             </div>
                         `;
@@ -1486,17 +1683,30 @@ const Dashboard = () => {
 
                         const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
                         const imgData = canvas.toDataURL('image/png');
-                        const pdfWidth = pdf.internal.pageSize.getWidth();
-                        const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+                        const pageWidth = pdf.internal.pageSize.getWidth();
+                        const pageHeight = pdf.internal.pageSize.getHeight();
+                        const imageHeight = (canvas.height * pageWidth) / canvas.width;
 
-                        pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+                        let remainingHeight = imageHeight;
+                        let yPosition = 0;
+
+                        pdf.addImage(imgData, 'PNG', 0, yPosition, pageWidth, imageHeight);
+                        remainingHeight -= pageHeight;
+
+                        while (remainingHeight > 0) {
+                            yPosition = remainingHeight - imageHeight;
+                            pdf.addPage();
+                            pdf.addImage(imgData, 'PNG', 0, yPosition, pageWidth, imageHeight);
+                            remainingHeight -= pageHeight;
+                        }
                         pdf.save(`Invoice_${order.id}_${new Date().getTime()}.pdf`);
-
-                        document.body.removeChild(invoiceContent);
                 } catch (error) {
                         console.error('Error downloading dashboard invoice:', error);
                         alert('Failed to download invoice. Please try again.');
                 } finally {
+                        if (invoiceContent?.parentNode) {
+                            document.body.removeChild(invoiceContent);
+                        }
                         setDownloadingOrderId(null);
                 }
     };
@@ -2876,11 +3086,149 @@ const Dashboard = () => {
                                             )}
                                         </div>
 
+                                        <div className="md:col-span-2">
+                                            <label className="block text-sm font-medium text-gray-700 mb-2">Medical Conditions (comma separated)</label>
+                                            {isEditingProfile ? (
+                                                <textarea
+                                                    name="medicalConditions"
+                                                    value={profileForm.medicalConditions}
+                                                    onChange={handleProfileChange}
+                                                    rows={2}
+                                                    className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-white text-gray-800 focus:outline-none focus:ring-2 focus:ring-green-500"
+                                                    placeholder="e.g. Diabetes, Hypertension"
+                                                />
+                                            ) : (
+                                                <div className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-gray-50 text-gray-800">
+                                                    {Array.isArray(userData?.medicalConditions) && userData.medicalConditions.length > 0 ? userData.medicalConditions.join(', ') : 'Not provided'}
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        <div className="md:col-span-2">
+                                            <label className="block text-sm font-medium text-gray-700 mb-2">Allergies (comma separated)</label>
+                                            {isEditingProfile ? (
+                                                <textarea
+                                                    name="allergies"
+                                                    value={profileForm.allergies}
+                                                    onChange={handleProfileChange}
+                                                    rows={2}
+                                                    className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-white text-gray-800 focus:outline-none focus:ring-2 focus:ring-green-500"
+                                                    placeholder="e.g. Penicillin, NSAIDs"
+                                                />
+                                            ) : (
+                                                <div className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-gray-50 text-gray-800">
+                                                    {Array.isArray(userData?.allergies) && userData.allergies.length > 0 ? userData.allergies.join(', ') : 'Not provided'}
+                                                </div>
+                                            )}
+                                        </div>
+
                                         <datalist id="dashboard-profile-city-options">
                                             {profilePincodeOptions.map((locality) => (
                                                 <option key={locality} value={locality} />
                                             ))}
                                         </datalist>
+                                    </div>
+
+                                    {/* Family Profiles */}
+                                    <div className="bg-blue-50 border border-blue-200 rounded-xl p-6">
+                                        <div className="flex items-center justify-between mb-4 gap-3">
+                                            <div>
+                                                <h3 className="text-lg font-semibold text-blue-900">Family Profiles (Caregiver Mode)</h3>
+                                                {familyProfileLoading ? <span className="text-xs text-blue-700">Loading...</span> : null}
+                                            </div>
+                                            <button
+                                                type="button"
+                                                onClick={() => setShowFamilyProfileForm((prev) => !prev)}
+                                                className="rounded-lg bg-blue-600 px-4 py-2 text-xs font-semibold text-white hover:bg-blue-700"
+                                            >
+                                                {showFamilyProfileForm ? 'Close Add' : 'Add Family Member'}
+                                            </button>
+                                        </div>
+
+                                        <div className="space-y-2">
+                                            {familyProfiles.length === 0 ? (
+                                                <p className="text-sm text-blue-800">No family profiles added yet.</p>
+                                            ) : familyProfiles.map((member) => (
+                                                <div key={member._id} className="rounded-lg border border-blue-100 bg-white px-4 py-3">
+                                                    <div className="flex items-start justify-between gap-3">
+                                                        <div>
+                                                            <p className="text-sm font-semibold text-slate-900">{member.fullName} <span className="text-xs text-slate-500">({member.relation})</span></p>
+                                                            <p className="text-xs text-slate-600 mt-1">DOB: {member.dob || 'N/A'} • Sex: {member.sex || 'N/A'}</p>
+                                                            {Array.isArray(member.medicalConditions) && member.medicalConditions.length > 0 ? <p className="text-xs text-slate-600 mt-1">Conditions: {member.medicalConditions.join(', ')}</p> : null}
+                                                            {Array.isArray(member.allergies) && member.allergies.length > 0 ? <p className="text-xs text-slate-600 mt-1">Allergies: {member.allergies.join(', ')}</p> : null}
+                                                            {member.notes ? <p className="text-xs text-slate-600 mt-1">Notes: {member.notes}</p> : null}
+                                                        </div>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => handleDeleteFamilyProfile(member._id)}
+                                                            className="rounded-md bg-rose-100 px-3 py-1.5 text-xs font-semibold text-rose-700 hover:bg-rose-200"
+                                                        >
+                                                            Remove
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+
+                                        {showFamilyProfileForm && (
+                                            <form onSubmit={handleCreateFamilyProfile} className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-4 rounded-xl border border-blue-100 bg-white p-4">
+                                                <input
+                                                    value={familyProfileForm.fullName}
+                                                    onChange={(event) => setFamilyProfileForm((prev) => ({ ...prev, fullName: event.target.value }))}
+                                                    placeholder="Family member full name"
+                                                    className="rounded-lg border border-blue-200 px-3 py-2 text-sm"
+                                                />
+                                                <input
+                                                    value={familyProfileForm.relation}
+                                                    onChange={(event) => setFamilyProfileForm((prev) => ({ ...prev, relation: event.target.value }))}
+                                                    placeholder="Relation (e.g. Father, Child)"
+                                                    className="rounded-lg border border-blue-200 px-3 py-2 text-sm"
+                                                />
+                                                <input
+                                                    type="date"
+                                                    value={familyProfileForm.dob}
+                                                    onChange={(event) => setFamilyProfileForm((prev) => ({ ...prev, dob: event.target.value }))}
+                                                    className="rounded-lg border border-blue-200 px-3 py-2 text-sm"
+                                                />
+                                                <input
+                                                    value={familyProfileForm.sex}
+                                                    onChange={(event) => setFamilyProfileForm((prev) => ({ ...prev, sex: event.target.value }))}
+                                                    placeholder="Sex"
+                                                    className="rounded-lg border border-blue-200 px-3 py-2 text-sm"
+                                                />
+                                                <input
+                                                    value={familyProfileForm.medicalConditions}
+                                                    onChange={(event) => setFamilyProfileForm((prev) => ({ ...prev, medicalConditions: event.target.value }))}
+                                                    placeholder="Medical conditions (comma separated)"
+                                                    className="rounded-lg border border-blue-200 px-3 py-2 text-sm md:col-span-2"
+                                                />
+                                                <input
+                                                    value={familyProfileForm.allergies}
+                                                    onChange={(event) => setFamilyProfileForm((prev) => ({ ...prev, allergies: event.target.value }))}
+                                                    placeholder="Allergies (comma separated)"
+                                                    className="rounded-lg border border-blue-200 px-3 py-2 text-sm md:col-span-2"
+                                                />
+                                                <textarea
+                                                    value={familyProfileForm.notes}
+                                                    onChange={(event) => setFamilyProfileForm((prev) => ({ ...prev, notes: event.target.value }))}
+                                                    placeholder="Notes"
+                                                    rows={2}
+                                                    className="rounded-lg border border-blue-200 px-3 py-2 text-sm md:col-span-2"
+                                                />
+                                                <div className="md:col-span-2 flex justify-end gap-2">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setShowFamilyProfileForm(false)}
+                                                        className="rounded-lg border border-blue-200 px-4 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50"
+                                                    >
+                                                        Cancel
+                                                    </button>
+                                                    <button type="submit" className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700">
+                                                        Add Family Profile
+                                                    </button>
+                                                </div>
+                                            </form>
+                                        )}
                                     </div>
 
                                     {/* Account Stats */}
@@ -3041,7 +3389,6 @@ const Dashboard = () => {
                                                 )}
                                         {paged.map((order, index) => {
                                             const paymentMeta = getPaymentMeta(order.payment);
-                                            const relatedReturns = getOrderReturnRequests(order);
                                             const latestReturn = getLatestOrderReturnRequest(order);
                                             return (
                                             <div
@@ -3665,6 +4012,34 @@ const Dashboard = () => {
                                             )}
                                         </div>
 
+                                        {/* Refill Predictor */}
+                                        <div className="rounded-xl border border-cyan-200 bg-cyan-50 p-4">
+                                            <h3 className="text-sm font-semibold text-cyan-900 mb-2">Refill Predictor And Auto-Reorder</h3>
+                                            {refillPredictions.length === 0 ? (
+                                                <p className="text-xs text-cyan-800">Add quantity on hand and daily dose in tracker to see days-left prediction.</p>
+                                            ) : (
+                                                <ul className="space-y-2 text-xs text-cyan-900">
+                                                    {refillPredictions.slice(0, 8).map((prediction) => (
+                                                        <li key={`refill-${prediction.trackerId}`} className="rounded-lg border border-cyan-100 bg-white px-3 py-2">
+                                                            <div className="flex items-start justify-between gap-3">
+                                                                <div>
+                                                                    <p className="font-semibold text-sm text-slate-900">{prediction.medicineName}</p>
+                                                                    <p className="text-slate-600 mt-0.5">{prediction.quantityOnHand} unit(s) left • {prediction.dosagePerDay} dose/day • {prediction.daysLeft} day(s) left</p>
+                                                                </div>
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => handleOneClickRefill(prediction.medicineName)}
+                                                                    className="rounded-md bg-cyan-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-cyan-700"
+                                                                >
+                                                                    One-click refill
+                                                                </button>
+                                                            </div>
+                                                        </li>
+                                                    ))}
+                                                </ul>
+                                            )}
+                                        </div>
+
                                         {/* Dosage Tracker */}
                                         <div className="rounded-xl border border-slate-200 p-4">
                                             <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
@@ -3700,6 +4075,24 @@ const Dashboard = () => {
                                                     />
                                                     <div className="grid grid-cols-2 gap-3">
                                                         <input
+                                                            type="number"
+                                                            min="0"
+                                                            value={newTracker.quantityOnHand}
+                                                            onChange={(e) => setNewTracker((prev) => ({ ...prev, quantityOnHand: e.target.value }))}
+                                                            placeholder="Quantity on hand"
+                                                            className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                                                        />
+                                                        <input
+                                                            type="number"
+                                                            min="1"
+                                                            value={newTracker.dosagePerDay}
+                                                            onChange={(e) => setNewTracker((prev) => ({ ...prev, dosagePerDay: e.target.value }))}
+                                                            placeholder="Dose per day"
+                                                            className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                                                        />
+                                                    </div>
+                                                    <div className="grid grid-cols-2 gap-3">
+                                                        <input
                                                             type="date"
                                                             value={newTracker.startDate}
                                                             onChange={(e) => setNewTracker((prev) => ({ ...prev, startDate: e.target.value }))}
@@ -3728,14 +4121,24 @@ const Dashboard = () => {
                                                     <div key={tracker._id} className="rounded-lg border border-slate-200 bg-slate-50 p-3">
                                                         <p className="text-sm font-semibold text-slate-900">{tracker.medicineName}</p>
                                                         <p className="text-xs text-slate-600">{tracker.dosage} • {tracker.frequency}</p>
+                                                        <p className="text-xs text-cyan-700 mt-1">Qty: {Number(tracker.quantityOnHand || 0)} • Daily dose: {Number(tracker.dosagePerDay || 1)} • Estimated days left: {Number(tracker.quantityOnHand || 0) > 0 ? Math.floor(Number(tracker.quantityOnHand || 0) / Math.max(1, Number(tracker.dosagePerDay || 1))) : 0}</p>
                                                         <p className="text-xs text-slate-500 mt-1">Last intake: {tracker.lastTakenAt ? new Date(tracker.lastTakenAt).toLocaleString() : 'Not logged yet'}</p>
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => handleLogIntake(tracker._id)}
-                                                            className="mt-2 rounded-md bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700"
-                                                        >
-                                                            Log Intake Now
-                                                        </button>
+                                                        <div className="mt-2 flex flex-wrap gap-2">
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => handleLogIntake(tracker._id)}
+                                                                className="rounded-md bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700"
+                                                            >
+                                                                Log Intake Now
+                                                            </button>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => handleOneClickRefill(tracker.medicineName)}
+                                                                className="rounded-md bg-cyan-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-cyan-700"
+                                                            >
+                                                                Refill
+                                                            </button>
+                                                        </div>
                                                     </div>
                                                 ))}
                                             </div>

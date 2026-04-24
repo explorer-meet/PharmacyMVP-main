@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Pill, ShoppingCart, FileText, CheckCircle, Upload, X, AlertCircle, Clock, BadgeCheck, Stethoscope, CalendarDays, UserRound, Zap, Heart } from 'lucide-react';
+import { Pill, ShoppingCart, FileText, CheckCircle, Upload, X, AlertCircle, Clock, BadgeCheck, Stethoscope, CalendarDays, UserRound, Heart } from 'lucide-react';
 import axios from 'axios';
 import { baseURL } from '../main';
 import StatusBadge from './StatusBadge';

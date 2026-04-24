@@ -1145,7 +1145,7 @@ const fetchData = async (req, res) => {
             let loggedInStaff = null;
             if (decoded.staffId) {
                 loggedInStaff = await StoreStaff.findById(decoded.staffId)
-                    .select('firstName middleName lastName email contact address role status')
+                    .select('firstName middleName lastName email contact address role status profilePhotoUrl')
                     .lean();
             }
 
@@ -1373,6 +1373,8 @@ const UpdatePatientProfile = async (req, res) => {
             city,
             state,
             pincode,
+            medicalConditions,
+            allergies,
         } = req.body;
 
         const existingUser = await User.findById(userId).select('profileImageKey').lean();
@@ -1391,6 +1393,26 @@ const UpdatePatientProfile = async (req, res) => {
         if (typeof city === 'string') updatePayload.city = city.trim();
         if (typeof state === 'string') updatePayload.state = state.trim();
         if (typeof pincode === 'string') updatePayload.pincode = pincode.trim();
+        if (typeof medicalConditions === 'string') {
+            updatePayload.medicalConditions = medicalConditions
+                .split(',')
+                .map((value) => String(value || '').trim())
+                .filter(Boolean);
+        } else if (Array.isArray(medicalConditions)) {
+            updatePayload.medicalConditions = medicalConditions
+                .map((value) => String(value || '').trim())
+                .filter(Boolean);
+        }
+        if (typeof allergies === 'string') {
+            updatePayload.allergies = allergies
+                .split(',')
+                .map((value) => String(value || '').trim())
+                .filter(Boolean);
+        } else if (Array.isArray(allergies)) {
+            updatePayload.allergies = allergies
+                .map((value) => String(value || '').trim())
+                .filter(Boolean);
+        }
 
         const computedFirstName = updatePayload.firstName ?? '';
         const computedMiddleName = updatePayload.middleName ?? '';
@@ -1900,7 +1922,7 @@ const createStoreInventoryMedicine = async (req, res) => {
         const normalizedPrice = Math.max(0, Number(price) || 0);
 
         let resolvedProviderId = null;
-        let resolvedManufacturer = String(manufacturer || '').trim();
+        let resolvedManufacturer = String(manufacturer || '').trim() || 'Sun Pharma';
         if (providerId) {
             const provider = await Provider.findOne({ _id: providerId, isActive: true }).lean();
             if (!provider) {
@@ -1966,7 +1988,7 @@ const updateStoreInventoryMedicine = async (req, res) => {
 
         const updatePayload = {};
         if (name !== undefined) updatePayload.name = String(name || '').trim();
-        if (manufacturer !== undefined) updatePayload.manufacturer = String(manufacturer || '').trim();
+        if (manufacturer !== undefined) updatePayload.manufacturer = String(manufacturer || '').trim() || 'Sun Pharma';
         if (dosage !== undefined) updatePayload.dosage = String(dosage || '').trim();
         if (type !== undefined) updatePayload.type = String(type || '').trim();
         if (price !== undefined) updatePayload.price = Math.max(0, Number(price) || 0);
@@ -1982,6 +2004,9 @@ const updateStoreInventoryMedicine = async (req, res) => {
                 updatePayload.manufacturer = provider.name;
             } else {
                 updatePayload.providerId = null;
+                if (!String(updatePayload.manufacturer || '').trim()) {
+                    updatePayload.manufacturer = 'Sun Pharma';
+                }
             }
         }
 
@@ -4950,7 +4975,7 @@ const addExtractedMedicinesToCart = async (req, res) => {
 const createMedicineTracker = async (req, res) => {
     try {
         const userId = req.user?._id;
-        const { medicineName, dosage, frequency, startDate, endDate, expiryDate } = req.body;
+        const { medicineName, dosage, frequency, quantityOnHand, dosagePerDay, startDate, endDate, expiryDate } = req.body;
 
         if (!userId) {
             return res.status(StatusCodes.UNAUTHORIZED).json({ message: 'Unauthorized' });
@@ -4966,6 +4991,8 @@ const createMedicineTracker = async (req, res) => {
             medicineName: String(medicineName).trim(),
             dosage: String(dosage).trim(),
             frequency: String(frequency).trim(),
+            quantityOnHand: Math.max(0, Number(quantityOnHand) || 0),
+            dosagePerDay: Math.max(1, Number(dosagePerDay) || 1),
             startDate: new Date(startDate),
             endDate: endDate ? new Date(endDate) : null,
             expiryDate: expiryDate ? new Date(expiryDate) : null,
@@ -5007,9 +5034,27 @@ const getMedicineTrackers = async (req, res) => {
             }))
             .sort((a, b) => new Date(a.expiryDate) - new Date(b.expiryDate));
 
+        const refillPredictions = trackers
+            .map((item) => {
+                const quantity = Math.max(0, Number(item.quantityOnHand) || 0);
+                const dailyDose = Math.max(1, Number(item.dosagePerDay) || 1);
+                const daysLeft = quantity > 0 ? Math.floor(quantity / dailyDose) : 0;
+                return {
+                    trackerId: item._id,
+                    medicineName: item.medicineName,
+                    quantityOnHand: quantity,
+                    dosagePerDay: dailyDose,
+                    daysLeft,
+                    needsRefill: quantity > 0 && daysLeft <= 7,
+                };
+            })
+            .filter((item) => item.quantityOnHand > 0)
+            .sort((a, b) => a.daysLeft - b.daysLeft);
+
         return res.status(StatusCodes.OK).json({
             trackers,
             expiryReminders,
+            refillPredictions,
         });
     } catch (error) {
         console.error('getMedicineTrackers error:', error.message);
@@ -5056,6 +5101,7 @@ const checkDrugInteractions = async (req, res) => {
     try {
         const userId = req.user?._id;
         const medicineNames = Array.isArray(req.body?.medicineNames) ? req.body.medicineNames : [];
+        const profileConditionsInput = Array.isArray(req.body?.profileConditions) ? req.body.profileConditions : [];
 
         if (!userId) {
             return res.status(StatusCodes.UNAUTHORIZED).json({ message: 'Unauthorized' });
@@ -5093,10 +5139,73 @@ const checkDrugInteractions = async (req, res) => {
             }
         }
 
+        const userProfile = await User.findById(userId).select('medicalConditions allergies').lean();
+        const normalizedConditions = (profileConditionsInput.length ? profileConditionsInput : (userProfile?.medicalConditions || []))
+            .map((item) => String(item || '').trim().toLowerCase())
+            .filter(Boolean);
+
+        const contraindicationRules = [
+            {
+                conditionKeywords: ['asthma'],
+                medicineKeywords: ['ibuprofen', 'diclofenac', 'naproxen'],
+                severity: 'Moderate',
+                note: 'Some NSAIDs can worsen asthma symptoms in sensitive patients.',
+            },
+            {
+                conditionKeywords: ['kidney disease', 'renal', 'ckd'],
+                medicineKeywords: ['ibuprofen', 'diclofenac', 'naproxen'],
+                severity: 'High',
+                note: 'NSAIDs may worsen kidney function in patients with kidney disease.',
+            },
+            {
+                conditionKeywords: ['liver disease', 'hepatitis'],
+                medicineKeywords: ['paracetamol', 'acetaminophen'],
+                severity: 'Moderate',
+                note: 'Paracetamol dosing may need caution with liver disease.',
+            },
+            {
+                conditionKeywords: ['ulcer', 'gastric bleed', 'bleeding disorder'],
+                medicineKeywords: ['aspirin', 'ibuprofen', 'diclofenac'],
+                severity: 'High',
+                note: 'These medicines may increase gastric irritation or bleeding risk.',
+            },
+            {
+                conditionKeywords: ['pregnancy'],
+                medicineKeywords: ['ibuprofen', 'diclofenac'],
+                severity: 'High',
+                note: 'Avoid many NSAIDs in late pregnancy unless specifically advised by a clinician.',
+            },
+        ];
+
+        const contraindications = [];
+        normalizedConditions.forEach((condition) => {
+            contraindicationRules.forEach((rule) => {
+                const conditionMatches = rule.conditionKeywords.some((keyword) => condition.includes(keyword));
+                if (!conditionMatches) return;
+
+                const matchedMedicines = medicineNames.filter((name) => {
+                    const normalizedName = String(name || '').trim().toLowerCase();
+                    return rule.medicineKeywords.some((keyword) => normalizedName.includes(keyword));
+                });
+
+                if (matchedMedicines.length > 0) {
+                    contraindications.push({
+                        condition,
+                        medicines: matchedMedicines,
+                        severity: rule.severity,
+                        note: rule.note,
+                    });
+                }
+            });
+        });
+
         return res.status(StatusCodes.OK).json({
             medicineNames,
             warnings,
+            contraindications,
             hasInteractions: warnings.length > 0,
+            hasContraindications: contraindications.length > 0,
+            profileConditions: normalizedConditions,
         });
     } catch (error) {
         console.error('checkDrugInteractions error:', error.message);
@@ -6918,7 +7027,7 @@ const checkInsuranceExpiryReminders = async (req, res) => {
 };
 
 module.exports = {
-    signUp, signIn, forgotPassword, fetchData, updateStoreProfile, adminsignIn, AdminfetchData, uploadPrescriptionFile, UpdatePatientProfile, fetchpharmacymedicines, updateorderedmedicines, updatecartquantity, addmedicinetodb, decreaseupdatecartquantity, deletemedicine, finalitems, finaladdress, finalpayment, deletecartItems, createStoreApprovalRequest, getStoreApprovalRequests, reviewStoreApprovalRequest, getAllStores, updateStoreStatus, addStore, getUserNotificationPreferences, updateUserNotificationPreferences,
+    signUp, signIn, forgotPassword, fetchData, updateStoreProfile, adminsignIn, AdminfetchData, uploadPrescriptionFile, UpdatePatientProfile, getFamilyProfiles, createFamilyProfile, updateFamilyProfile, deleteFamilyProfile, fetchpharmacymedicines, updateorderedmedicines, updatecartquantity, addmedicinetodb, decreaseupdatecartquantity, deletemedicine, finalitems, finaladdress, finalpayment, deletecartItems, createStoreApprovalRequest, getStoreApprovalRequests, reviewStoreApprovalRequest, getAllStores, updateStoreStatus, addStore, getUserNotificationPreferences, updateUserNotificationPreferences,
     uploadPrescriptionRequest, reuploadPrescriptionRequest, getMyPrescriptionRequests, getStorePrescriptionRequests, reviewPrescriptionRequest, getPrescriptionCheckout, placePrescriptionOrder,
     getStoreOrders, updateOrderTrackingStatus, getMyOrders, getOrderById, getStoreStaffMembers, createStoreStaffMember, updateStoreStaffMember, updateStoreStaffStatus, deleteStoreStaffMember, getCart, seedVaccinationMasterIfEmpty, upsertUserVaccination, getUserVaccinations, getVaccinationMaster, getUserVaccinationsForDashboard, updateUserVaccinationByMasterId, createUserQuery, getUserQueries, getStoreQueries, answerStoreQuery, importPatientsFromCsv,
     getMedicinesByStore,
@@ -6941,6 +7050,7 @@ module.exports = {
     getStoreAuditLogs, exportStoreAuditLogsCsv,
     getDailyCloseReport, getPrescriptionTurnaroundReport, getInventoryRiskReport,
     getMyInsurancePolicies, addInsurancePolicy, updateInsurancePolicy, deleteInsurancePolicy, downloadInsurancePolicyPdf, checkInsuranceExpiryReminders,
+    uploadStorePhoto, getStoreSettings, updateStoreSettings, uploadStaffPhoto,
 };
 
 const STAFF_ROLE_PERMISSIONS = {
@@ -7170,5 +7280,264 @@ async function updateStoreProfile(req, res) {
     } catch (error) {
         console.error('updateStoreProfile error:', error);
         return res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({ message: 'Failed to update store profile' });
+    }
+}
+
+async function uploadStorePhoto(req, res) {
+    try {
+        const storeId = req.user?.storeId || req.user?._id;
+        const roleCode = Number(req.user?.roleCode || ROLE_CODES.STORE_ADMIN);
+        if (roleCode !== ROLE_CODES.STORE_ADMIN) {
+            return res.status(StatusCodes.FORBIDDEN).json({ message: 'Only Store Admin can upload store photo' });
+        }
+        if (!req.file) {
+            return res.status(StatusCodes.BAD_REQUEST).json({ message: 'No image file provided' });
+        }
+        const { uploadBufferToS3 } = require('../utils/s3Service');
+        const uploadResult = await uploadBufferToS3({
+            buffer: req.file.buffer,
+            contentType: req.file.mimetype,
+            originalName: req.file.originalname,
+            folder: 'store-photos',
+        });
+        const photoUrl = uploadResult?.url || '';
+        const updatedStore = await Store.findByIdAndUpdate(
+            storeId,
+            { $set: { storePhotoUrl: photoUrl } },
+            { new: true },
+        ).lean();
+        if (!updatedStore) {
+            return res.status(StatusCodes.NOT_FOUND).json({ message: 'Store not found' });
+        }
+        return res.status(StatusCodes.OK).json({ success: true, storePhotoUrl: photoUrl });
+    } catch (error) {
+        console.error('uploadStorePhoto error:', error);
+        return res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({ message: 'Failed to upload store photo' });
+    }
+}
+
+async function getStoreSettings(req, res) {
+    try {
+        const storeId = req.user?.storeId || req.user?._id;
+        const store = await Store.findById(storeId).select('settings storePhotoUrl').lean();
+        if (!store) {
+            return res.status(StatusCodes.NOT_FOUND).json({ message: 'Store not found' });
+        }
+        return res.status(StatusCodes.OK).json({ success: true, settings: store.settings || {}, storePhotoUrl: store.storePhotoUrl || '' });
+    } catch (error) {
+        console.error('getStoreSettings error:', error);
+        return res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({ message: 'Failed to fetch store settings' });
+    }
+}
+
+async function updateStoreSettings(req, res) {
+    try {
+        const storeId = req.user?.storeId || req.user?._id;
+        const roleCode = Number(req.user?.roleCode || ROLE_CODES.STORE_ADMIN);
+        if (roleCode !== ROLE_CODES.STORE_ADMIN) {
+            return res.status(StatusCodes.FORBIDDEN).json({ message: 'Only Store Admin can update store settings' });
+        }
+        const { storeHours, deliveryRadiusKm, acceptedPayments } = req.body || {};
+        const settingsUpdate = {};
+        if (storeHours && typeof storeHours === 'object') settingsUpdate['settings.storeHours'] = storeHours;
+        if (deliveryRadiusKm !== undefined) settingsUpdate['settings.deliveryRadiusKm'] = Number(deliveryRadiusKm) || 10;
+        if (Array.isArray(acceptedPayments)) settingsUpdate['settings.acceptedPayments'] = acceptedPayments;
+        if (!Object.keys(settingsUpdate).length) {
+            return res.status(StatusCodes.BAD_REQUEST).json({ message: 'No valid settings fields provided' });
+        }
+        const updatedStore = await Store.findByIdAndUpdate(
+            storeId,
+            { $set: settingsUpdate },
+            { new: true },
+        ).lean();
+        if (!updatedStore) {
+            return res.status(StatusCodes.NOT_FOUND).json({ message: 'Store not found' });
+        }
+        return res.status(StatusCodes.OK).json({ success: true, settings: updatedStore.settings || {} });
+    } catch (error) {
+        console.error('updateStoreSettings error:', error);
+        return res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({ message: 'Failed to update store settings' });
+    }
+}
+
+async function uploadStaffPhoto(req, res) {
+    try {
+        const storeId = req.user?.storeId || req.user?._id;
+        const { staffId } = req.params;
+        if (!staffId) {
+            return res.status(StatusCodes.BAD_REQUEST).json({ message: 'Staff ID required' });
+        }
+        if (!req.file) {
+            return res.status(StatusCodes.BAD_REQUEST).json({ message: 'No image file provided' });
+        }
+        // Allow staff to upload their own photo, or admin to upload for any staff
+        const roleCode = Number(req.user?.roleCode || ROLE_CODES.STORE_ADMIN);
+        const staffMember = await StoreStaff.findOne({ _id: staffId, storeId }).lean();
+        if (!staffMember) {
+            return res.status(StatusCodes.NOT_FOUND).json({ message: 'Staff member not found' });
+        }
+        const isOwnProfile = String(req.user?.staffId || '') === String(staffId);
+        if (!isOwnProfile && roleCode !== ROLE_CODES.STORE_ADMIN) {
+            return res.status(StatusCodes.FORBIDDEN).json({ message: 'Not authorized to update this staff photo' });
+        }
+        const { uploadBufferToS3 } = require('../utils/s3Service');
+        const uploadResult = await uploadBufferToS3({
+            buffer: req.file.buffer,
+            contentType: req.file.mimetype,
+            originalName: req.file.originalname,
+            folder: 'staff-photos',
+        });
+        const photoUrl = uploadResult?.url || '';
+        await StoreStaff.findByIdAndUpdate(staffId, { $set: { profilePhotoUrl: photoUrl } });
+        return res.status(StatusCodes.OK).json({ success: true, profilePhotoUrl: photoUrl });
+    } catch (error) {
+        console.error('uploadStaffPhoto error:', error);
+        return res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({ message: 'Failed to upload staff photo' });
+    }
+}
+
+async function getFamilyProfiles(req, res) {
+    try {
+        const userId = req.user?._id;
+        if (!userId) {
+            return res.status(StatusCodes.UNAUTHORIZED).json({ message: 'Unauthorized' });
+        }
+
+        const user = await User.findById(userId).select('familyProfiles').lean();
+        if (!user) {
+            return res.status(StatusCodes.NOT_FOUND).json({ message: 'User not found' });
+        }
+
+        return res.status(StatusCodes.OK).json({
+            familyProfiles: user.familyProfiles || [],
+        });
+    } catch (error) {
+        console.error('getFamilyProfiles error:', error.message);
+        return res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({ message: 'Failed to fetch family profiles' });
+    }
+}
+
+async function createFamilyProfile(req, res) {
+    try {
+        const userId = req.user?._id;
+        if (!userId) {
+            return res.status(StatusCodes.UNAUTHORIZED).json({ message: 'Unauthorized' });
+        }
+
+        const { fullName, relation, dob, sex, medicalConditions, allergies, notes } = req.body;
+
+        if (!String(fullName || '').trim() || !String(relation || '').trim()) {
+            return res.status(StatusCodes.BAD_REQUEST).json({ message: 'fullName and relation are required' });
+        }
+
+        const user = await User.findById(userId);
+        if (!user) {
+            return res.status(StatusCodes.NOT_FOUND).json({ message: 'User not found' });
+        }
+
+        user.familyProfiles.push({
+            fullName: String(fullName).trim(),
+            relation: String(relation).trim(),
+            dob: String(dob || '').trim(),
+            sex: String(sex || '').trim(),
+            medicalConditions: Array.isArray(medicalConditions)
+                ? medicalConditions.map((item) => String(item || '').trim()).filter(Boolean)
+                : String(medicalConditions || '').split(',').map((item) => item.trim()).filter(Boolean),
+            allergies: Array.isArray(allergies)
+                ? allergies.map((item) => String(item || '').trim()).filter(Boolean)
+                : String(allergies || '').split(',').map((item) => item.trim()).filter(Boolean),
+            notes: String(notes || '').trim(),
+        });
+
+        await user.save();
+
+        return res.status(StatusCodes.CREATED).json({
+            message: 'Family profile added successfully',
+            familyProfiles: user.familyProfiles,
+        });
+    } catch (error) {
+        console.error('createFamilyProfile error:', error.message);
+        return res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({ message: 'Failed to add family profile' });
+    }
+}
+
+async function updateFamilyProfile(req, res) {
+    try {
+        const userId = req.user?._id;
+        const { profileId } = req.params;
+
+        if (!userId) {
+            return res.status(StatusCodes.UNAUTHORIZED).json({ message: 'Unauthorized' });
+        }
+
+        const user = await User.findById(userId);
+        if (!user) {
+            return res.status(StatusCodes.NOT_FOUND).json({ message: 'User not found' });
+        }
+
+        const target = user.familyProfiles.id(profileId);
+        if (!target) {
+            return res.status(StatusCodes.NOT_FOUND).json({ message: 'Family profile not found' });
+        }
+
+        const { fullName, relation, dob, sex, medicalConditions, allergies, notes } = req.body;
+
+        if (typeof fullName === 'string' && fullName.trim()) target.fullName = fullName.trim();
+        if (typeof relation === 'string' && relation.trim()) target.relation = relation.trim();
+        if (typeof dob === 'string') target.dob = dob.trim();
+        if (typeof sex === 'string') target.sex = sex.trim();
+        if (typeof notes === 'string') target.notes = notes.trim();
+        if (Array.isArray(medicalConditions)) {
+            target.medicalConditions = medicalConditions.map((item) => String(item || '').trim()).filter(Boolean);
+        } else if (typeof medicalConditions === 'string') {
+            target.medicalConditions = medicalConditions.split(',').map((item) => item.trim()).filter(Boolean);
+        }
+        if (Array.isArray(allergies)) {
+            target.allergies = allergies.map((item) => String(item || '').trim()).filter(Boolean);
+        } else if (typeof allergies === 'string') {
+            target.allergies = allergies.split(',').map((item) => item.trim()).filter(Boolean);
+        }
+
+        await user.save();
+
+        return res.status(StatusCodes.OK).json({
+            message: 'Family profile updated successfully',
+            familyProfiles: user.familyProfiles,
+        });
+    } catch (error) {
+        console.error('updateFamilyProfile error:', error.message);
+        return res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({ message: 'Failed to update family profile' });
+    }
+}
+
+async function deleteFamilyProfile(req, res) {
+    try {
+        const userId = req.user?._id;
+        const { profileId } = req.params;
+
+        if (!userId) {
+            return res.status(StatusCodes.UNAUTHORIZED).json({ message: 'Unauthorized' });
+        }
+
+        const user = await User.findById(userId);
+        if (!user) {
+            return res.status(StatusCodes.NOT_FOUND).json({ message: 'User not found' });
+        }
+
+        const target = user.familyProfiles.id(profileId);
+        if (!target) {
+            return res.status(StatusCodes.NOT_FOUND).json({ message: 'Family profile not found' });
+        }
+
+        user.familyProfiles.pull(profileId);
+        await user.save();
+
+        return res.status(StatusCodes.OK).json({
+            message: 'Family profile removed successfully',
+            familyProfiles: user.familyProfiles,
+        });
+    } catch (error) {
+        console.error('deleteFamilyProfile error:', error.message);
+        return res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({ message: 'Failed to delete family profile' });
     }
 }

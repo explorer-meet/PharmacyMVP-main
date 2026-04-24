@@ -4,7 +4,7 @@ import emergency from "../assets/emergency.png";
 import info from "../assets/info.png";
 import tracking from "../assets/tracking.png";
 import Footer from "../components/Footer";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import TestimonialCard from "../components/Testimonials/TestimonialCard";
 import { testimonials as staticTestimonials } from "../components/Testimonials/data";
 import { baseURL } from '../main';
@@ -49,7 +49,6 @@ const FaqItem = ({ question, answer }) => {
 
 const Home = () => {
   const navigate = useNavigate();
-  const location = useLocation();
   const token = localStorage.getItem("medVisionToken");
   const [liveReviews, setLiveReviews] = useState([]);
   const [promotions, setPromotions] = useState([]);
@@ -79,6 +78,8 @@ const Home = () => {
   const handleOnlinePharmacy = () => navigate("/onlinepharmacy");
   const handleEmergencyPharmacy = () => navigate("/emergencyguidelines");
   const handlePrescriptionHelp = () => navigate("/dashboard", { state: { openSection: "prescriptions" } });
+  const handleMaternityCare = () => navigate("/maternity-care");
+  const handleBabyMotherCare = () => navigate("/baby-mother-care");
   const handleQuickRefill = () => {
     if (token) {
       navigate("/dashboard", { state: { openSection: "prescriptions" } });
@@ -86,28 +87,6 @@ const Home = () => {
     }
     navigate("/login");
   };
-
-  useEffect(() => {
-    const sectionId = location.state?.scrollToSection;
-    if (!sectionId) return;
-
-    const scrollToRequestedSection = () => {
-      const headerOffsetValue = parseInt(
-        getComputedStyle(document.documentElement).getPropertyValue('--app-navbar-offset') || '88',
-        10,
-      );
-      const element = document.getElementById(sectionId);
-
-      if (!element) return;
-
-      const offsetPosition = element.getBoundingClientRect().top + window.pageYOffset - headerOffsetValue - 8;
-      window.scrollTo({ top: offsetPosition, behavior: 'smooth' });
-      navigate('.', { replace: true, state: null });
-    };
-
-    const timeoutId = window.setTimeout(scrollToRequestedSection, 80);
-    return () => window.clearTimeout(timeoutId);
-  }, [location.state, navigate]);
 
   useEffect(() => {
     const observer = new IntersectionObserver(
@@ -540,7 +519,7 @@ const Home = () => {
             </p>
           </div>
 
-          <div className="grid grid-cols-1 gap-7 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="grid grid-cols-1 gap-7 sm:grid-cols-2 lg:grid-cols-3">
             {[
               {
                 img: info,
@@ -589,6 +568,30 @@ const Home = () => {
                 badge: '🩺',
                 cta: 'View Disease Guide',
                 ctaColor: 'text-rose-700',
+              },
+              {
+                img: null,
+                title: 'Maternity Care',
+                desc: 'Open a dedicated month-wise pregnancy care guide with trimester reminders and safety notes.',
+                onClick: handleMaternityCare,
+                iconEl: <HeartPulse className="h-8 w-8 text-fuchsia-600" />,
+                accent: 'from-fuchsia-50 via-rose-50 to-white',
+                ring: 'ring-fuchsia-200',
+                badge: '🤰',
+                cta: 'Open Maternity Guide',
+                ctaColor: 'text-fuchsia-700',
+              },
+              {
+                img: null,
+                title: 'Baby & Mother Care',
+                desc: 'Explore postpartum recovery, newborn basics, and daily care essentials on a separate page.',
+                onClick: handleBabyMotherCare,
+                iconEl: <HeartPulse className="h-8 w-8 text-pink-600" />,
+                accent: 'from-pink-50 via-rose-50 to-white',
+                ring: 'ring-pink-200',
+                badge: '👶',
+                cta: 'Open Baby & Mother Care',
+                ctaColor: 'text-pink-700',
               },
             ].map((service, index) => (
               <button

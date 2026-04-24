@@ -104,6 +104,7 @@ export function OrderConfirmationPage() {
   };
 
   const downloadInvoice = async () => {
+    let invoiceContent = null;
     try {
       if (!latestOrder?.orderId) {
         alert('Order ID not found');
@@ -111,7 +112,7 @@ export function OrderConfirmationPage() {
       }
 
       // Create invoice HTML content
-      const invoiceContent = document.createElement('div');
+      invoiceContent = document.createElement('div');
       invoiceContent.style.cssText = 'position: absolute; left: -9999px; width: 850px; background: white; padding: 40px; font-family: Arial, sans-serif;';
       
       const invoiceHTML = `
@@ -265,19 +266,33 @@ export function OrderConfirmationPage() {
       });
 
       const imgData = canvas.toDataURL('image/png');
-      const pdfWidth = pdf.internal.pageSize.getWidth();
-      const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      const imageHeight = (canvas.height * pageWidth) / canvas.width;
 
-      pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+      let remainingHeight = imageHeight;
+      let yPosition = 0;
+
+      pdf.addImage(imgData, 'PNG', 0, yPosition, pageWidth, imageHeight);
+      remainingHeight -= pageHeight;
+
+      while (remainingHeight > 0) {
+        yPosition = remainingHeight - imageHeight;
+        pdf.addPage();
+        pdf.addImage(imgData, 'PNG', 0, yPosition, pageWidth, imageHeight);
+        remainingHeight -= pageHeight;
+      }
 
       // Download the PDF
       pdf.save(`Invoice_${latestOrder.orderId}_${new Date().getTime()}.pdf`);
 
-      // Clean up
-      document.body.removeChild(invoiceContent);
     } catch (error) {
       console.error('Error downloading invoice:', error);
       alert('Failed to download invoice. Please try again.');
+    } finally {
+      if (invoiceContent?.parentNode) {
+        document.body.removeChild(invoiceContent);
+      }
     }
   };
 

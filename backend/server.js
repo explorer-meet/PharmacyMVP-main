@@ -7,14 +7,40 @@ const path = require("path");
 const os = require("os");
 const swaggerUi = require("swagger-ui-express");
 const swaggerSpec = require("./swagger");
+const helmet = require("helmet");
+const compression = require("compression");
+const rateLimit = require("express-rate-limit");
 
 const cors = require("cors");
-const multer = require("multer");
 
-const allowedOrigins = [
-  "http://localhost:3000",
-  "https://main-frontend-iota.vercel.app" 
-];
+const allowedOrigins = String(
+  process.env.CORS_ALLOWED_ORIGINS || "http://localhost:3000,https://main-frontend-iota.vercel.app"
+)
+  .split(",")
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+
+app.set("trust proxy", 1);
+app.disable("x-powered-by");
+
+app.use(
+  helmet({
+    crossOriginResourcePolicy: false,
+  })
+);
+app.use(
+  compression({
+    threshold: 1024,
+  })
+);
+
+const apiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: Number(process.env.RATE_LIMIT_MAX || 500),
+  standardHeaders: "draft-7",
+  legacyHeaders: false,
+  message: { message: "Too many requests from this IP. Please try again later." },
+});
 
 app.use(cors({
   origin: function (origin, callback) {
@@ -27,38 +53,17 @@ app.use(cors({
   },
   credentials: true
 }));
-
-// Configure multer for file uploads
-const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    cb(null, 'uploads/'); // Make sure this directory exists
-  },
-  filename: function (req, file, cb) {
-    cb(null, Date.now() + '-' + file.originalname);
-  }
-});
-
-const upload = multer({ 
-  storage: storage,
-  fileFilter: function (req, file, cb) {
-    if (file.mimetype.startsWith('image/') || file.mimetype === 'application/pdf') {
-      cb(null, true);
-    } else {
-      cb(new Error('Only images and PDF files are allowed!'), false);
-    }
-  },
-  limits: {
-    fileSize: 5 * 1024 * 1024 // 5MB limit
-  }
-});
-
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: "1mb" }));
+app.use(express.urlencoded({ extended: true, limit: "1mb" }));
 const uploadsDir = process.env.UPLOADS_DIR || path.join(os.tmpdir(), 'medvision-uploads');
 app.use('/uploads', express.static(uploadsDir));
 
 // app.use(cors(corsOptions));
 app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+app.get("/health", (req, res) => {
+  res.status(200).json({ status: "ok", timestamp: new Date().toISOString() });
+});
+app.use("/api", apiLimiter);
 app.use("/api", authRouter);
 
 
@@ -87,4 +92,14 @@ const start = async () => {
 app.use('/', (req, res) => {
   res.send('Not Found!');
 });
+
+app.use((err, req, res, next) => {
+  if (err && /Not allowed by CORS/i.test(err.message || "")) {
+    return res.status(403).json({ message: "Request origin is not allowed." });
+  }
+
+  console.error("Unhandled server error:", err);
+  return res.status(500).json({ message: "Internal server error" });
+});
+
 start();
